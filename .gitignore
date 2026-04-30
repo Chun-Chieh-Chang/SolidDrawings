@@ -1,0 +1,12 @@
+*.jpg
+*.png
+.DS_Store
+Thumbs.db
+node_modules/
+dist/
+.env
+.gemini/antigravity/scratch/
+.gemini/antigravity/recordings/
+.vscode/
+.idea/
+*.log
