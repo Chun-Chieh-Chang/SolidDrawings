@@ -6,31 +6,34 @@ SkillsBuilder 是一個專為「自動化智慧開發」而設計的元平台。
 
 ---
 
-## 🧠 核心哲學：LLM Wiki 模式
+## 🎯 本專案能做什麼？(核心能力)
 
-我們不只是在寫程式，我們在構建一個**「會學習的專案大腦」**。
-- **持久化知識 (Persistent)**：利用 `wiki/` 目錄捕捉每一項決策、實體與概念，實現跨 Session 的記憶。
-- **複利成長 (Compounding)**：每一次任務執行後的見解都會歸檔，讓 AI 對專案的理解隨時間增強。
+### 1. 為 AI 裝備「工業級技能」 (Skill Library)
+專案內建了從 ClawHub 與開源社群嚴選的**頂尖 AI 技能庫**（位於 `skills/` 目錄），涵蓋兩大類：
+- **Core (生產力)**：例如 `tavily` (深度網頁研究)、`youtube` (影音分析)、`last30days` (社群情報總結)、`summarize` (長文總結)。
+- **Dev (開發專用)**：例如 `gitnexus` (代碼圖譜與關聯分析)、`github-manager` (自動化 PR/Issue 管理)、`web-coder` (前端開發)。
+當這些技能被掛載後，AI 就能直接調用這些外部工具來幫您完成複雜任務。
 
-## 🚀 核心工具
+### 2. 「會學習」的專案大腦 (Karpathy LLM Wiki 模式)
+- **記憶複利**：傳統 AI 的記憶會在對話結束後消失，但 SkillsBuilder 實作了「持久化知識庫 (`wiki/`)」。您與 AI 共同制定過的架構決策、UI 規範（如莫蘭迪色系、SOP流程），都會被寫入 `wiki/` 當中。下次開新對話或新專案時，AI 只要讀取這裡的資料，就能立刻繼承過去的「開發智慧」，不需重新教導。
 
-### 1. Skill Architect (技能建築師)
-專門用來生產「工業級技能」的元工具。它強制執行 **「探索-執行-驗證-歸檔」** 的四階段生命週期。
-
-### 2. GitNexus (代碼智慧引擎)
-為 Antigravity 提供代碼庫的**「上帝視角」**。透過建立知識圖譜，實現精準的「爆炸半徑」分析，讓複雜重構不再危險。
+### 3. 生產新技能 (Skill Architect)
+- 內建 `skill-architect` 技能，您可以直接命令 AI：「幫我寫一個能夠自動化備份資料庫的 Skill」。系統會運用標準化流程（探索-執行-驗證-歸檔）為您自動生成、測試並封裝成一個新技能。
 
 ---
 
-## 💎 核心設計模式
-Google 5+1 設計模式
-- **Tool Wrapper**、**Generator**、**Reviewer**、**Inversion**、**Pipeline**。
-- **[NEW] Knowledge Artifact**：自動將任務產出合成為 Wiki 知識。
+## 🚀 如何使用本專案？(操作指南)
 
-### 2. 工業級護欄 (Guardrails)
-- **Surgical Precision**：嚴格的外科手術式修改，杜絕 Regression。
-- **Anti-Hallucination**：Hermes 風格的反幻覺行為邊界定義。
-- **Verification Loop**：內建 `[Step] → verify: [check]` 的自體確效邏輯。
+### 步驟一：一鍵安裝與環境綁定 (只需做一次)
+當您在任何電腦上下載本專案後：
+1. **執行安裝腳本**：對 `INSTALL.ps1` 點擊右鍵，選擇**「以系統管理員身分執行」**。
+2. **它的作用**：這個腳本會建立 **Symbolic Link (符號連結)**，把本專案 `skills/` 資料夾裡的技能，直接「映射」到 Antigravity IDE 系統隱藏的技能池裡 (`~/.gemini/antigravity/skills`)。這樣您在專案裡更新技能，系統級的 AI 都會同步生效。
+
+### 步驟二：喚醒與調用 (在對話框中)
+安裝完成後，您可以在任何對話框中透過以下指令來使用：
+- **啟動全局護欄與標準化開發**：「啟動 SkillsBuilder 開發模式」
+- **調用特定工具**：「幫我用 tavily-research 技能深入研究...」
+- **建造新工具**：「我想創建一個新技能...」
 
 ---
 
@@ -42,22 +45,11 @@ SkillsBuilder/
 │   ├── entities/         # 實體定義：工具、IDE、系統組件
 │   ├── concepts/         # 概念定義：設計模式、SOP、哲學
 │   └── log.md            # 全局活動日誌
-├── skills/               # 技能目錄：可執行的 SKILL.md
-│   └── skill-architect/  # 核心生產工具
+├── skills/               # 技能目錄：包含 core (生產力) 與 dev (開發) 技能
 ├── raw/                  # 原始素材：不可變的文檔與參考資料
 ├── DEV_LOG.md            # 開發日誌：PDCA 執行紀錄與 RCA/CAPA 歸檔
 └── README.md             # 本手冊
 ```
-
-## 🛠️ 如何安裝與遷移 (Cross-Device)
-
-本專案支援一鍵跨設備同步。當您在新的電腦上 Clone 本專案後：
-
-1. **執行安裝**：右鍵以系統管理員身分執行 `INSTALL.ps1`。
-2. **喚醒中樞**：對 Antigravity 說「啟動 SkillsBuilder 開發模式」。
-
-> [!TIP]
-> 建議使用 **Symbolic Link** (腳本預設) 進行連結，這樣您在 `SkillsBuilder` 目錄下的任何更新都會即時同步到系統級技能庫。
 
 ---
 
