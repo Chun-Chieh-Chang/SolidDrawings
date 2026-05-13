@@ -8,6 +8,11 @@
 - **文件指引優化**：在 `README.md` 中新增「核心能力（本專案能做什麼）」、「操作指南（如何使用）」以及「新專案應用方式」段落，提升新用戶的閱讀與使用體驗。
 - **歷史淨化 (Squash/Rewrite)**：將專案初期的所有零碎 commit 進行 squash，重寫為單一整潔的 `v1.0.0` 初始化 commit，確保 Git 歷史乾淨易讀。
 - **版本標記 (Tagging)**：建立 `v1.0.0` Git Tag，標誌著 SkillsBuilder 核心架構、Wiki 模式與 ClawHub 技能庫整合的正式完成。
+- **架構優化與衛生清理**：
+    - 將 `skills/dev/github` 更名為 `skills/dev/github-manager` 以對齊文件。
+    - 將 `PROJECT_DEVELOPMENT_SOP.html` 移至 `raw/` 目錄，進一步淨化根目錄。
+    - 在 `README.md` 中補完 `superpowers` 與 `vetter` 技能介紹。
+    - 完成 27 張原始截圖 `.jpg` 檔案的清理，達成 100% 潔淨度。
 
 ---
 
