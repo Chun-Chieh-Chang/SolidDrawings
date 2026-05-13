@@ -5,7 +5,7 @@
 ### 任務內容
 
 - **專案門面升級**：更新 `README.md`，正式將專案定位升級為「全球最大的 AI-Agentic Skill 開源圖書館 (ClawHub All-Star Library)」。
-- **文件指引優化**：在 `README.md` 中新增「核心能力（本專案能做什麼）」與「操作指南（如何使用）」段落，提升新用戶的閱讀與使用體驗。
+- **文件指引優化**：在 `README.md` 中新增「核心能力（本專案能做什麼）」、「操作指南（如何使用）」以及「新專案應用方式」段落，提升新用戶的閱讀與使用體驗。
 - **歷史淨化 (Squash/Rewrite)**：將專案初期的所有零碎 commit 進行 squash，重寫為單一整潔的 `v1.0.0` 初始化 commit，確保 Git 歷史乾淨易讀。
 - **版本標記 (Tagging)**：建立 `v1.0.0` Git Tag，標誌著 SkillsBuilder 核心架構、Wiki 模式與 ClawHub 技能庫整合的正式完成。
 
