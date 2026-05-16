@@ -4,10 +4,36 @@
 > 所有 Bug 修復與系統變更，必須在此日誌留下 RCA (Root Cause Analysis) 與 CAPA (Corrective and Preventive Actions) 的結構化紀錄。禁止「猜測性」的盲目修復。
 > 
 > **標準診斷模板 (Standard Diagnostic Template)：**
-> - **[Reproduce]**: 錯誤重現路徑
-> - **[Minimize]**: 影響範圍與脆弱點
-> - **[RCA]**: 根本原因假設
-> - **[CAPA]**: 修復邏輯與預防策略
+> - **Phase 1: Investigation (根因調查)** - 錯誤重現路徑與證據蒐集
+> - **Phase 2: Pattern (模式分析)** - 正常範例對比與參考文件查閱
+> - **Phase 3: Hypothesis (假設分析 RCA)** - 根本原因假設與驗證結果
+> - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
+
+
+---
+
+## [2026-05-16] 全文件一致性同步 (Doc Sync & Alignment)
+
+### 任務內容
+
+- **命名空間清理**：將 `skills/core/superpowers` 更名為 `skill-onboarding`，確保 `Superpowers` 術語專屬於高紀律工程方法論。
+- **術語對齊 (Semantic Sync)**：統一 `DEV_LOG.md` 與 `bug-diagnose` 的診斷術語為 **Phase 1-4 (Investigation, Pattern, Hypothesis, Fix)**。
+- **策略對齊**：在 `skill_usage_guide.md` 與 `grill-requirements` 中統一執行「蘇格拉底一次一問」原則。
+- **路徑標準化**：建立 `docs/plans/` 目錄，並在 `planning` 技能中強制執行 `YYYY-MM-DD-feature-plan.md` 的命名規範。
+- **環境清理**：同步更新 `README.md` 與 `wiki/log.md` 中的過時技能名稱。
+
+---
+
+## [2026-05-16] Superpowers 紀律深度整合 (Superpowers Integration)
+
+### 任務內容
+
+- **標準再升級**：更新 `karpathy_coding_standards.md`，納入 Superpowers 的「設計硬門檻 (Hard Gate)」、「蘇格拉底式探索」與「三修法則 (3-Fix Rule)」。
+- **工作流鉤子強化**：升級 `master_workflow_hook.md`，使新專案自動進入 Brainstorming 模式並產出「零佔位符 (Zero-Placeholder)」開發計畫。
+- **技能邏輯重構**：
+    - **`bug-diagnose`**：引入系統化除錯 4 階段與架構審查機制。
+    - **`grill-requirements`**：轉型為 Socratic Brainstorming 模式，強制執行「一次一問」與「核准後實作」。
+- **方法論閉環**：正式將 `obra/superpowers` 的工程紀律內化為 `SkillsBuilder` 的核心標準，杜絕一切 Vibe Coding 可能性。
 
 ---
 

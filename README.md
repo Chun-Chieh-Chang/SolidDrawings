@@ -10,7 +10,7 @@ SkillsBuilder 是一個專為「自動化智慧開發」而設計的元平台。
 
 ### 1. 為 AI 裝備「工業級技能」 (Skill Library)
 專案內建了從 ClawHub 與開源社群嚴選的**頂尖 AI 技能庫**（位於 `skills/` 目錄），涵蓋兩大類：
-- **Core (生產力)**：例如 `tavily` (深度研究)、`last30days` (趨勢總結)、`superpowers` (技能喚醒)、`vetter` (安全審查)。
+- **Core (生產力)**：例如 `tavily` (深度研究)、`last30days` (趨勢總結)、`skill-onboarding` (技能喚醒)、`vetter` (安全審查)。
 - **Dev (開發專用)**：例如 `gitnexus` (代碼圖譜)、`github-manager` (自動化管理)、`web-coder` (前端開發)、`skill-architect` (技能建築)。
 當這些技能被掛載後，AI 就能直接調用這些外部工具來幫您完成複雜任務。
 

@@ -6,7 +6,7 @@ All significant project events, wiki ingests, and architectural decisions are re
 *   **Source**: [resource/](file:///f:/Self-developed_Apps/SkillsBuilder/resource/) (ClawHub screenshots).
 *   **Action**: Fully populated the library with the "Top 15" industry-standard skills.
 *   **Changes**: 
-    - Added `core/`: last30days, x-trends, vetter, superpowers.
+    - Added `core/`: last30days, x-trends, vetter, skill-onboarding.
     - Added `dev/`: github, web-coder, soul-evolution, skill-creator.
 *   **Result**: `SkillsBuilder` now manages a total of 15+ high-fidelity skills.
 

@@ -1,9 +1,9 @@
 ---
-name: superpowers
-description: Establishes how to find and use skills. Essential for bootstrapping agent sessions.
+name: skill-onboarding
+description: 引導使用者了解本專案的技能體系。
 ---
 
-# Using Superpowers
+# Skill Onboarding (技能引導)
 
 ## Trigger Phrases
 - "如何使用技能", "我的超能力", "superpowers"
