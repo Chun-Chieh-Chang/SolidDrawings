@@ -535,3 +535,26 @@
 - [x] 解決 `gp_Trsf_SetTransformation` 重載簽名崩潰問題。
 - [x] `/rebuild` 路由完整支援 `BOX/CYLINDER/SPHERE` 幾何。
 - [x] 成功執行 parametric JOIN/CUT 混合運算。
+
+---
+
+### CI/CD 確效修正與 Pages 自動化部署
+
+#### 問題描述
+- **現象**：推送至 GitHub 後，首個 GitHub Actions 工作流執行失敗，Next.js 編譯步驟崩潰，回報 `Process completed with exit code 2`，且上傳 Artifact 找不到 `out` 目錄。
+
+#### 診斷 (Diagnosis - RCA)
+- **RCA (根因分析)**：`actions/configure-pages@v4` 行動在設定 `static_site_generator: next` 時，會在 Runner 根目錄動態注入過時參數並生成 `next.config.js`，這會覆蓋我們手動配置的 TypeScript 設定 [next.config.ts](file:///c:/Users/3kids/Downloads/3D-Builder/next.config.ts)。這導致 Next.js 無法執行靜態導出，也就沒有生成 `./out` 目錄，進而使上傳 artifact 步驟因找不到目錄而崩潰。
+
+#### 矯正與預防措施 (CAPA)
+- **矯正措施**：
+    1. 編輯 [.github/workflows/deploy.yml](file:///c:/Users/3kids/Downloads/3D-Builder/.github/workflows/deploy.yml)，移除 `static_site_generator: next` 的配置，保留純淨的 Pages 初始化環境。
+    2. 本地執行 `npm run build` 進行編譯與靜態導出測試，確認在 Turbopack 環境下以 exit code 0 完美生成 `./out` 靜態目錄。
+    3. 提交並推送修復。
+- **預防措施**：未來凡涉及 CI/CD 自動化建置的修改，必須手動透過 GitHub REST API 或網頁監控工具，確信 Actions 回報 100% 成功（Completed - Success）後，方可宣告任務完成，嚴禁「只管 Push，不顧 Actions」的 vibe coding。
+
+#### 最終確效結果 (Verification)
+- [x] 本地模擬 Next.js 16 靜態編譯成功，無 TS/ESLint 錯誤。
+- [x] 移除 Actions 冗餘的 `static_site_generator` 重置參數。
+- [x] GitHub API 查詢與 GitHub Actions 工作流 #2 回報 **completed - success** 🟢。
+- [x] 網頁正式部署上線且資源無 404 加載異常：[3D-Builder Live Pages](https://chun-chieh-chang.github.io/3D-Builder/) 🟢。
