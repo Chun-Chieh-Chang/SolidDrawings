@@ -10,3 +10,24 @@ dist/
 .vscode/
 .idea/
 *.log
+
+# Miniforge / Conda local envs and installers
+.miniforge/
+miniforge.exe
+micromamba.exe
+info/
+
+# Next.js build and export
+.next/
+out/
+tsconfig.tsbuildinfo
+
+# Python build and cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.venv/
+venv/
+env/
