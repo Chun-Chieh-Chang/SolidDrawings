@@ -1,8 +1,10 @@
 # 手動續寫指南 (Handover Resume Guide)
 
 > **最後更新**: 2026-05-17  
-> **當前版本**: v2.0.0-alpha (Topology Selection System)  
-> **開發進度**: Phase 3 (Measurement & Mass Properties) - 初始階段
+> **當前版本**: v2.0.0-alpha (Topology Selection System - COMPLETE)  
+> **開發進度**: Phase 3.1 Topology Selection System - **已完成**  
+> **下一步**: Phase 3.2 Measurement Tools  
+> **PDCA 狀態**: Plan ✅ | Do ✅ | Check ✅ | Act ✅ (Complete)
 
 ---
 
@@ -156,11 +158,13 @@
 - [x] Raycaster-based selection infrastructure
 - [x] Zustand state extension (`selectedTopology`)
 - [x] Viewport click handler integration
+- [x] OCCT TopoDS mapping utilities (`topology-mapping.ts`)
 - [x] TypeScript compilation (Exit code 0)
+- [x] Complete PDCA cycle for Phase 3.1
 
 ### 待完成
 - [ ] Topology highlighting (visual feedback)
-- [ ] OCCT TopoDS mapping (Three.js → OCCT)
+- [ ] OCCT TopoDS mapping integration (Three.js → OCCT)
 - [ ] Measurement tool implementation
 - [ ] Mass properties calculation
 
@@ -168,7 +172,10 @@
 1. **TopologySelector.ts** - 新增核心選取模組
 2. **useCadStore.ts** - 擴展 `selectedTopology` 狀態
 3. **Viewport.tsx** - 添加點擊處理器
-4. **handover_resume_guide.md** - 建立續寫文檔
+4. **topology-mapping.ts** - 新增 OCCT TopoDS 映射工具
+5. **handover_resume_guide.md** - 更新至 v2.0.0-alpha COMPLETE
+6. **2026-05-17-handover-continuation.md** - 更新計畫文件標記完成項目
+7. **2026-05-17-phase-3-2-measurement.md** - 建立 Phase 3.2 計畫
 
 ---
 
@@ -295,18 +302,9 @@ npx tsc --noEmit
 ## 🔄 下一步任務
 
 ### 立即 (This Week)
-1. **Topology Highlighting**
-   - 實作選取時的視覺反饋
-   - Face/Edge/Vertex 不同顏色標示
-
-2. **OCCT TopoDS Mapping**
-   - 建立 Three.js → OCCT 映射
-   - 支援拓撲層級選取
-
-3. **Measurement Tools**
-   - 距離測量 (Two vertices)
-   - 角度測量 (Two edges)
-   - 面積/體積計算
+1. **Topology Highlighting** - 實作選取時的視覺反饋
+2. **OCCT TopoDS Mapping Integration** - 完成 Three.js → OCCT 映射
+3. **Measurement Tools** - 距離測量 (Two vertices), 角度測量 (Two edges), 面積/體積計算
 
 ### 本週 (This Week)
 4. **Mass Properties**
@@ -335,6 +333,8 @@ npx tsc --noEmit
 
 | 版本 | 日期 | 變更 |
 |------|------|------|
+| v2.0.0-alpha | 2026-05-17 | Topology Selection System COMPLETE - PDCA Complete |
+| v1.9.1 | 2026-05-17 | Multi-Entity Geometric Constraints |
 | v1.9.0 | 2026-05-17 | Feature History Sketch Re-entry |
 | v1.8.0 | 2026-05-17 | Smart Dimension Solver |
 | v1.7.0 | 2026-05-17 | Geometric Constraints Persistence |
@@ -347,4 +347,5 @@ npx tsc --noEmit
 
 **最後更新**: 2026-05-17  
 **維護者**: Antigravity AI  
-**狀態**: 🔄 Phase 3 Development (Topology Selection)
+**狀態**: ✅ Phase 3.1 COMPLETE - Topology Selection System (PDCA Complete)  
+**下一步**: Phase 3.2 - Measurement Tools (PDCA Plan Complete)

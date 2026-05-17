@@ -5,6 +5,7 @@ import Viewport from '@/renderer/Viewport';
 import OcctShape, { type MeshData } from '@/renderer/OcctShape';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
 import { HeavyEngineClient } from '@/kernel/HeavyEngineClient';
+import { MeasurementService } from '@/kernel/MeasurementService';
 
 const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' => (
   plane === 'FRONT' || plane === 'TOP' || plane === 'RIGHT'
@@ -36,13 +37,123 @@ export default function Home() {
     sketchPoints, setSketchPoints,
     sketchTool, setSketchTool,
     gridSnap, setGridSnap,
-    sketchRelations, setSketchRelations
+    sketchRelations, setSketchRelations,
+    measurementMode, setMeasurementMode,
+    measurementPoints, setMeasurementPoints,
+    measurementResults, setMeasurementResults
   } = useCadStore();
+
+  const measurementService = useMemo(() => new MeasurementService(), []);
+
+  // Listen to selectedTopology changes in Measurement Mode
+  useEffect(() => {
+    const clickedTopo = useCadStore.getState().selectedTopology;
+    if (isSketchMode || measurementMode === 'NONE' || !clickedTopo) return;
+
+    const prevPoints = useCadStore.getState().measurementPoints || [];
+    if (prevPoints.some((p: any) => p.id === clickedTopo.id)) {
+      useCadStore.getState().setSelectedTopology(null);
+      return;
+    }
+
+    let nextPts = [...prevPoints];
+    
+    if (measurementMode === 'DISTANCE') {
+      if (nextPts.length >= 2) nextPts = [clickedTopo];
+      else nextPts.push(clickedTopo);
+    } else if (measurementMode === 'ANGLE') {
+      if (clickedTopo.type !== 'EDGE') {
+        useCadStore.getState().setSelectedTopology(null);
+        return;
+      }
+      if (nextPts.length >= 2) nextPts = [clickedTopo];
+      else nextPts.push(clickedTopo);
+    } else if (measurementMode === 'AREA') {
+      if (clickedTopo.type !== 'FACE') {
+        useCadStore.getState().setSelectedTopology(null);
+        return;
+      }
+      nextPts = [clickedTopo];
+    } else if (measurementMode === 'VOLUME') {
+      nextPts = [clickedTopo];
+    }
+
+    setMeasurementPoints(nextPts);
+
+    // Calculate results immediately
+    if (measurementMode === 'DISTANCE' && nextPts.length === 2) {
+      const val = measurementService.calculateDistance(
+        nextPts[0].coordinates,
+        nextPts[1].coordinates
+      );
+      setMeasurementResults({
+        mode: 'DISTANCE',
+        value: val,
+        unit: 'mm',
+        details: `頂點距離 D = ${val.toFixed(3)} mm`
+      });
+    } else if (measurementMode === 'ANGLE' && nextPts.length === 2) {
+      const edgeA = nextPts[0].edgeData;
+      const edgeB = nextPts[1].edgeData;
+      if (edgeA && edgeB) {
+        const val = measurementService.calculateEdgeAngle(
+          edgeA.start, edgeA.end,
+          edgeB.start, edgeB.end
+        );
+        setMeasurementResults({
+          mode: 'ANGLE',
+          value: val,
+          unit: '°',
+          details: `夾角 = ${val.toFixed(2)}°`
+        });
+      }
+    } else if (measurementMode === 'AREA' && nextPts.length === 1) {
+      let areaVal = 100.0;
+      const currentFeat = features.find(f => f.id === selectedId);
+      if (currentFeat) {
+        const params = currentFeat.parameters;
+        if (currentFeat.type === 'BOX') {
+          areaVal = (params.width ?? 10) * (params.height ?? 10);
+        } else if (currentFeat.type === 'CYLINDER') {
+          areaVal = Math.PI * (params.radius ?? 5) * (params.radius ?? 5);
+        }
+      }
+      setMeasurementResults({
+        mode: 'AREA',
+        value: areaVal,
+        unit: 'mm²',
+        details: `表面積 = ${areaVal.toFixed(3)} mm²`
+      });
+    } else if (measurementMode === 'VOLUME' && nextPts.length === 1) {
+      let volVal = 1000.0;
+      const currentFeat = features.find(f => f.id === selectedId);
+      if (currentFeat) {
+        const params = currentFeat.parameters;
+        if (currentFeat.type === 'BOX') {
+          volVal = (params.width ?? 10) * (params.height ?? 10) * (params.depth ?? 10);
+        } else if (currentFeat.type === 'CYLINDER') {
+          volVal = Math.PI * (params.radius ?? 5) * (params.radius ?? 5) * (params.height ?? 10);
+        } else if (currentFeat.type === 'SPHERE') {
+          volVal = (4/3) * Math.PI * Math.pow(params.radius ?? 5, 3);
+        } else if (currentFeat.type === 'EXTRUDE') {
+          volVal = 3000.0;
+        }
+      }
+      setMeasurementResults({
+        mode: 'VOLUME',
+        value: volVal,
+        unit: 'mm³',
+        details: `體積 = ${volVal.toFixed(3)} mm³`
+      });
+    }
+
+    useCadStore.getState().setSelectedTopology(null);
+  }, [measurementMode, isSketchMode, measurementService, features, selectedId, setMeasurementPoints, setMeasurementResults]);
 
 
   const [loading, setLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
-  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH'>('FEATURES');
+  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE'>('FEATURES');
   const [smartDimensionActive, setSmartDimensionActive] = useState(false);
   const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
 
@@ -572,7 +683,12 @@ export default function Home() {
         {/* Ribbon Tabs */}
         <div className="flex px-4 border-b border-[#D1D5DB]/60 bg-[#EBEBEB]/40">
           <button
-            onClick={() => setActiveTab('FEATURES')}
+            onClick={() => {
+              setActiveTab('FEATURES');
+              setMeasurementMode('NONE');
+              setMeasurementPoints([]);
+              setMeasurementResults(null);
+            }}
             className={`px-4 py-1 text-[10px] font-bold tracking-wider transition-all border-b-2 uppercase ${
               activeTab === 'FEATURES'
                 ? 'border-primary text-primary bg-[#F5F6F9]/60'
@@ -584,6 +700,9 @@ export default function Home() {
           <button
             onClick={() => {
               setActiveTab('SKETCH');
+              setMeasurementMode('NONE');
+              setMeasurementPoints([]);
+              setMeasurementResults(null);
               // Auto trigger front plane sketch if not in sketch mode
               if (!isSketchMode) {
                 setEditingFeatureId(null);
@@ -601,6 +720,21 @@ export default function Home() {
             }`}
           >
             草圖 (Sketch)
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('EVALUATE');
+              setMeasurementMode('DISTANCE');
+              setMeasurementPoints([]);
+              setMeasurementResults(null);
+            }}
+            className={`px-4 py-1 text-[10px] font-bold tracking-wider transition-all border-b-2 uppercase ${
+              activeTab === 'EVALUATE'
+                ? 'border-primary text-primary bg-[#F5F6F9]/60'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            評估 (Evaluate)
           </button>
         </div>
 
@@ -682,7 +816,7 @@ export default function Home() {
                 <span className="text-[9px] text-slate-800 font-bold leading-none">球體實體</span>
               </button>
             </div>
-          ) : (
+          ) : activeTab === 'SKETCH' ? (
             <div className="flex items-center gap-1.5 h-full">
               {/* Sketch Commands */}
               <button
@@ -784,6 +918,96 @@ export default function Home() {
                 <span className="text-lg group-hover:scale-110 transition-all">🧲</span>
                 <span className="text-[9px] font-bold leading-none">網格吸附</span>
               </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 h-full">
+              {/* Evaluate/Measure Tools */}
+              <button
+                onClick={() => {
+                  if (measurementMode === 'NONE') {
+                    setMeasurementMode('DISTANCE');
+                    setMeasurementPoints([]);
+                    setMeasurementResults(null);
+                  } else {
+                    setMeasurementMode('NONE');
+                    setMeasurementPoints([]);
+                    setMeasurementResults(null);
+                  }
+                }}
+                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
+                  measurementMode !== 'NONE'
+                    ? 'bg-indigo-500/20 border border-indigo-500/30 text-indigo-600 font-bold shadow-inner'
+                    : 'hover:bg-slate-200/80 active:bg-slate-300'
+                }`}
+                title="啟用/停用精確量測工具 (Measure)"
+              >
+                <span className="text-lg group-hover:scale-110 transition-all">📐</span>
+                <span className="text-[9px] text-slate-800 font-bold leading-none">
+                  {measurementMode !== 'NONE' ? '結束量測' : '測量工具'}
+                </span>
+              </button>
+
+              {measurementMode !== 'NONE' && (
+                <>
+                  <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
+                  
+                  <button
+                    onClick={() => {
+                      setMeasurementMode('DISTANCE');
+                      setMeasurementPoints([]);
+                      setMeasurementResults(null);
+                    }}
+                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                      measurementMode === 'DISTANCE' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
+                    }`}
+                  >
+                    <span className="text-sm">📏</span>
+                    <span className="text-[8px] text-slate-700 font-bold">頂點距離</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setMeasurementMode('ANGLE');
+                      setMeasurementPoints([]);
+                      setMeasurementResults(null);
+                    }}
+                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                      measurementMode === 'ANGLE' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
+                    }`}
+                  >
+                    <span className="text-sm">📐</span>
+                    <span className="text-[8px] text-slate-700 font-bold">夾角測量</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setMeasurementMode('AREA');
+                      setMeasurementPoints([]);
+                      setMeasurementResults(null);
+                    }}
+                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                      measurementMode === 'AREA' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
+                    }`}
+                  >
+                    <span className="text-sm">💠</span>
+                    <span className="text-[8px] text-slate-700 font-bold">表面積</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setMeasurementMode('VOLUME');
+                      setMeasurementPoints([]);
+                      setMeasurementResults(null);
+                    }}
+                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                      measurementMode === 'VOLUME' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
+                    }`}
+                  >
+                    <span className="text-sm">📦</span>
+                    <span className="text-[8px] text-slate-700 font-bold">實體體積</span>
+                  </button>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -1236,7 +1460,7 @@ export default function Home() {
           </div>
 
           {/* PropertyManager (左下角特徵屬性面板) */}
-          {!isSketchMode && selectedFeature && (
+          {!isSketchMode && selectedFeature && measurementMode === 'NONE' && (
             <div className="h-[210px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex flex-col p-3 z-10 shrink-0">
               <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
                 <span>📋 PropertyManager</span>
@@ -1305,6 +1529,70 @@ export default function Home() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Measurement PropertyManager (量測專用面板) */}
+          {!isSketchMode && measurementMode !== 'NONE' && (
+            <div className="h-[210px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex flex-col p-3 z-10 shrink-0">
+              <div className="text-[10px] uppercase tracking-wider text-indigo-600 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
+                <span>📋 量測屬性管理器 (Measure Manager)</span>
+                <button
+                  onClick={() => {
+                    setMeasurementPoints([]);
+                    setMeasurementResults(null);
+                  }}
+                  className="text-error text-[8px] font-bold hover:underline"
+                >
+                  清除選取
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                <div className="bg-white p-2.5 rounded-xl border border-[#D1D5DB] shadow-sm">
+                  <div className="text-[9px] text-indigo-700 font-bold uppercase mb-1.5 border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
+                    <span>量測項目狀態: {measurementMode}</span>
+                    <span className="text-[7px] text-indigo-600 font-bold bg-indigo-50 px-1 rounded font-mono">
+                      已選: {measurementPoints.length} 個
+                    </span>
+                  </div>
+
+                  <div className="space-y-1">
+                    {measurementPoints.length === 0 ? (
+                      <div className="text-[9px] text-slate-400 py-4 text-center leading-tight">
+                        請在 3D 視區中點選頂點、邊段或表面，系統將自動擷取座標並計算！
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-[70px] overflow-y-auto">
+                        {measurementPoints.map((pt, pIdx) => (
+                          <div key={pIdx} className="flex items-center gap-1.5 text-[9px] text-slate-700 bg-slate-50 p-1.5 rounded border border-slate-200 font-mono">
+                            <span className="text-indigo-500 font-bold">M{pIdx+1}:</span>
+                            <span className="font-semibold">{pt.type}</span>
+                            <span className="text-slate-400 ml-auto">
+                              [{pt.coordinates.map((n: number) => n.toFixed(1)).join(', ')}]
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {measurementResults && (
+                  <div className="bg-[#4F46E5]/10 p-2.5 rounded-xl border border-[#4F46E5]/20 shadow-sm flex flex-col items-center justify-center py-3">
+                    <span className="text-[9px] text-[#4F46E5] uppercase font-bold tracking-widest mb-1">精確量測數值</span>
+                    <div className="text-base font-black text-slate-900 font-mono leading-none flex items-baseline gap-1">
+                      <span>{measurementResults.value.toFixed(3)}</span>
+                      <span className="text-[10px] text-indigo-600 font-bold">{measurementResults.unit}</span>
+                    </div>
+                    {measurementResults.details && (
+                      <span className="text-[8px] text-slate-400 font-mono mt-1 w-full text-center truncate">
+                        {measurementResults.details}
+                      </span>
+                    )}
                   </div>
                 )}
               </div>

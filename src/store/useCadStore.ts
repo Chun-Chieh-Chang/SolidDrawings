@@ -2,6 +2,14 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING';
+export type MeasurementMode = 'NONE' | 'DISTANCE' | 'ANGLE' | 'AREA' | 'VOLUME';
+
+export interface MeasurementResult {
+  mode: MeasurementMode;
+  value: number;
+  unit: string;
+  details?: string;
+}
 
 export interface CADFeature {
   id: string;
@@ -46,6 +54,14 @@ interface CadState {
   // Topology Selection State
   selectedTopology: any; // SelectedTopology from TopologySelector
   setSelectedTopology: (topology: any) => void;
+
+  // Measurement State
+  measurementMode: MeasurementMode;
+  setMeasurementMode: (mode: MeasurementMode) => void;
+  measurementPoints: any[];
+  setMeasurementPoints: (points: any[]) => void;
+  measurementResults: MeasurementResult | null;
+  setMeasurementResults: (results: MeasurementResult | null) => void;
 
   // Render State
   meshData: any[]; // Array of { id, data: { vertices, indices, normals } }
@@ -108,6 +124,13 @@ export const useCadStore = create<CadState>()(
       selectedTopology: null,
       setSelectedTopology: (topology) => set({ selectedTopology: topology }),
 
+      measurementMode: 'NONE',
+      setMeasurementMode: (measurementMode) => set({ measurementMode }),
+      measurementPoints: [],
+      setMeasurementPoints: (measurementPoints) => set({ measurementPoints }),
+      measurementResults: null,
+      setMeasurementResults: (measurementResults) => set({ measurementResults }),
+
       meshData: [],
       setMeshData: (meshData) => set({ meshData }),
     }),
@@ -120,7 +143,7 @@ export const useCadStore = create<CadState>()(
         features: state.features,
         selectedId: state.selectedId,
         selectedTopology: state.selectedTopology,
-      }), // Don't persist meshData as it can be large
+      }), // Don't persist meshData and transient measurement state as they can be large or dynamic
     }
   )
 );

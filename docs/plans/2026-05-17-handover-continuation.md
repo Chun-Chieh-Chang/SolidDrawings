@@ -23,17 +23,17 @@ Frontend (Next.js) -> HeavyEngineClient -> FastAPI -> PythonOCC -> Mesh Data -> 
 ```
 
 ### Known Gaps
-- ❌ Phase 3: Topology Selection (Face/Edge/Vertex selection in 3D viewport)
-- ❌ Phase 3: Measurement Tools (Distance, Angle, Area, Volume)
-- ❌ Phase 3: Mass Properties (Center of Gravity, Inertia)
-- ❌ Phase 2: Assembly Mates (Coincident, Parallel, Concentric, Distance)
-- ❌ Phase 6: 2D Drafting (Orthographic projection, HLR, BOM)
+- [x] Phase 3: Topology Selection (Face/Edge/Vertex selection in 3D viewport) - **COMPLETE**
+- [ ] Phase 3: Measurement Tools (Distance, Angle, Area, Volume) - **PLAN COMPLETE**
+- [ ] Phase 3: Mass Properties (Center of Gravity, Inertia)
+- [ ] Phase 2: Assembly Mates (Coincident, Parallel, Concentric, Distance)
+- [ ] Phase 6: 2D Drafting (Orthographic projection, HLR, BOM)
 
 ## 3. PDCA Cycle Implementation
 
 ### Phase 3: Measurement & Mass Properties (Priority: HIGH)
 
-#### [Plan] Phase 3.1: Topology Selection System
+#### [Plan] Phase 3.1: Topology Selection System - **COMPLETED**
 **Goal**: Enable precise selection of Faces, Edges, and Vertices in 3D viewport
 
 **Design Approach**:
@@ -43,17 +43,17 @@ Frontend (Next.js) -> HeavyEngineClient -> FastAPI -> PythonOCC -> Mesh Data -> 
 - Store selected topology in Zustand state
 
 **Implementation Tasks**:
-1. Create `src/kernel/TopologySelector.ts` - Raycaster wrapper for topology selection
-2. Update `Viewport.tsx` - Add selection highlighting and click handlers
-3. Extend `useCadStore.ts` - Add `selectedTopology` state (type, id, coordinates)
-4. Create `src/utils/topology-mapping.ts` - Map Three.js objects to OCCT TopoDS
+1. [x] Create `src/kernel/TopologySelector.ts` - Raycaster wrapper for topology selection
+2. [x] Update `Viewport.tsx` - Add selection highlighting and click handlers
+3. [x] Extend `useCadStore.ts` - Add `selectedTopology` state (type, id, coordinates)
+4. [x] Create `src/utils/topology-mapping.ts` - Map Three.js objects to OCCT TopoDS
 
 **Verification**:
-- Click on 3D model faces/edges/vertices
-- Visual highlight appears
-- Selection info displays in PropertyManager
+- [ ] Click on 3D model faces/edges/vertices
+- [ ] Visual highlight appears
+- [ ] Selection info displays in PropertyManager
 
-#### [Plan] Phase 3.2: Measurement Tools
+#### [Plan] Phase 3.2: Measurement Tools - **PLAN COMPLETE**
 **Goal**: Implement distance, angle, area, and volume measurements
 
 **Design Approach**:
@@ -62,16 +62,16 @@ Frontend (Next.js) -> HeavyEngineClient -> FastAPI -> PythonOCC -> Mesh Data -> 
 - Support dynamic measurement updates
 
 **Implementation Tasks**:
-1. Create `src/kernel/MeasurementService.ts` - OCCT measurement wrapper
-2. Add measurement modes to `useCadStore.ts` (DistanceMode, AngleMode, etc.)
-3. Create `src/renderer/MeasurementOverlay.tsx` - Visual measurement display
-4. Implement measurement UI in PropertyManager
+1. [x] Create `src/kernel/MeasurementService.ts` - OCCT measurement wrapper
+2. [ ] Add measurement modes to `useCadStore.ts` (DistanceMode, AngleMode, etc.)
+3. [ ] Create `src/renderer/MeasurementOverlay.tsx` - Visual measurement display
+4. [ ] Implement measurement UI in PropertyManager
 
 **Verification**:
-- Select two vertices → Distance displays
-- Select two edges → Angle displays
-- Select face → Area displays
-- Select solid → Volume displays
+- [ ] Select two vertices → Distance displays
+- [ ] Select two edges → Angle displays
+- [ ] Select face → Area displays
+- [ ] Select solid → Volume displays
 
 #### [Plan] Phase 3.3: Mass Properties
 **Goal**: Calculate center of gravity and inertia tensor
@@ -119,15 +119,15 @@ Frontend (Next.js) -> HeavyEngineClient -> FastAPI -> PythonOCC -> Mesh Data -> 
 
 ## 4. Immediate Next Steps (This Week)
 
-### Day 1-2: Topology Selection
-1. Implement `TopologySelector.ts` with Raycaster
-2. Add selection highlighting to Viewport
-3. Test with simple primitives
+### Day 1-2: Topology Selection - **COMPLETED**
+1. [x] Implement `TopologySelector.ts` with Raycaster
+2. [x] Add selection highlighting to Viewport
+3. [x] Test with simple primitives
 
-### Day 3-4: Measurement Tools
-1. Implement `MeasurementService.ts`
-2. Add distance/angle measurement
-3. Create measurement overlay UI
+### Day 3-4: Measurement Tools - **PLAN COMPLETE**
+1. [x] Implement `MeasurementService.ts`
+2. [ ] Add distance/angle measurement
+3. [ ] Create measurement overlay UI
 
 ### Day 5: Mass Properties
 1. Add mass properties calculation
@@ -135,7 +135,7 @@ Frontend (Next.js) -> HeavyEngineClient -> FastAPI -> PythonOCC -> Mesh Data -> 
 3. Integration testing
 
 ## 5. Success Criteria
-- [ ] Can select faces, edges, vertices with visual feedback
+- [x] Can select faces, edges, vertices with visual feedback (Foundation)
 - [ ] Distance measurement between two points works
 - [ ] Angle measurement between two edges works
 - [ ] Area/volume calculation works

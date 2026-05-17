@@ -8,12 +8,17 @@ export interface SelectedTopology {
   id: string;
   coordinates: [number, number, number];
   normal?: [number, number, number];
+  edgeData?: {
+    start: [number, number, number];
+    end: [number, number, number];
+  };
 }
 
 export class TopologySelector {
   private raycaster: THREE.Raycaster;
   private scene: THREE.Scene;
   private camera: THREE.Camera;
+  private threshold: number = 3.0; // Distance threshold in model units
 
   constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.raycaster = new THREE.Raycaster();
@@ -22,23 +27,41 @@ export class TopologySelector {
   }
 
   /**
-   * Select a topology element at the given mouse position
-   * @param clientX Mouse X coordinate (0-1 normalized or pixel)
-   * @param clientY Mouse Y coordinate (0-1 normalized or pixel)
-   * @param normalized Whether coordinates are normalized (0-1) or pixel
+   * Helper function to calculate distance from a point to a line segment
+   */
+  private distanceToSegment(
+    p: THREE.Vector3,
+    a: THREE.Vector3,
+    b: THREE.Vector3,
+    outProjection: THREE.Vector3
+  ): number {
+    const ab = new THREE.Vector3().subVectors(b, a);
+    const ap = new THREE.Vector3().subVectors(p, a);
+    const abLenSq = ab.lengthSq();
+    
+    if (abLenSq === 0) {
+      outProjection.copy(a);
+      return p.distanceTo(a);
+    }
+    
+    let t = ap.dot(ab) / abLenSq;
+    t = Math.max(0, Math.min(1, t)); // Clamp to segment bounds
+    outProjection.copy(a).addScaledVector(ab, t);
+    return p.distanceTo(outProjection);
+  }
+
+  /**
+   * Select a topology element at NDC coordinates (Normalized Device Coordinates)
+   * @param ndcX Normalized X coordinate (-1 to 1)
+   * @param ndcY Normalized Y coordinate (-1 to 1)
    * @returns Selected topology or null
    */
   public selectAtPosition(
-    clientX: number,
-    clientY: number,
-    normalized: boolean = false
+    ndcX: number,
+    ndcY: number
   ): SelectedTopology | null {
-    // Normalize coordinates if needed
-    const x = normalized ? clientX : (clientX / window.innerWidth) * 2 - 1;
-    const y = normalized ? clientY : -(clientY / window.innerHeight) * 2 + 1;
-
     // Update raycaster
-    this.raycaster.setFromCamera(new THREE.Vector2(x, y), this.camera);
+    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
 
     // Get all mesh objects in scene
     const meshes = this.scene.children.filter(
@@ -50,47 +73,118 @@ export class TopologySelector {
 
     if (intersects.length > 0) {
       const hit = intersects[0];
-      const mesh = hit.object;
+      const mesh = hit.object as THREE.Mesh;
+      const geometry = mesh.geometry;
 
-      // Extract topology information from hit
-      // For now, we'll mark it as a FACE hit
-      // In the future, we can extract edge/vertex info from the hit
+      if (!geometry || !hit.face) return null;
+
+      const positionAttr = geometry.attributes.position;
+      const indexAttr = geometry.index;
+
+      if (!positionAttr) return null;
+
+      // Extract vertex indices for the hit face
+      const idxA = hit.face.a;
+      const idxB = hit.face.b;
+      const idxC = hit.face.c;
+
+      // Retrieve world positions of vertices
+      const vA = new THREE.Vector3().fromBufferAttribute(positionAttr, idxA).applyMatrix4(mesh.matrixWorld);
+      const vB = new THREE.Vector3().fromBufferAttribute(positionAttr, idxB).applyMatrix4(mesh.matrixWorld);
+      const vC = new THREE.Vector3().fromBufferAttribute(positionAttr, idxC).applyMatrix4(mesh.matrixWorld);
+
+      const hitPoint = hit.point;
+
+      // 1. VERTEX PICKING: Check distance to each vertex
+      const distA = hitPoint.distanceTo(vA);
+      const distB = hitPoint.distanceTo(vB);
+      const distC = hitPoint.distanceTo(vC);
+
+      if (distA < this.threshold) {
+        const topology: SelectedTopology = {
+          type: 'VERTEX',
+          id: `${mesh.uuid}_v_${idxA}`,
+          coordinates: [vA.x, vA.y, vA.z],
+        };
+        useCadStore.getState().setSelectedTopology(topology);
+        return topology;
+      }
+      if (distB < this.threshold) {
+        const topology: SelectedTopology = {
+          type: 'VERTEX',
+          id: `${mesh.uuid}_v_${idxB}`,
+          coordinates: [vB.x, vB.y, vB.z],
+        };
+        useCadStore.getState().setSelectedTopology(topology);
+        return topology;
+      }
+      if (distC < this.threshold) {
+        const topology: SelectedTopology = {
+          type: 'VERTEX',
+          id: `${mesh.uuid}_v_${idxC}`,
+          coordinates: [vC.x, vC.y, vC.z],
+        };
+        useCadStore.getState().setSelectedTopology(topology);
+        return topology;
+      }
+
+      // 2. EDGE PICKING: Check distance to each edge of the face
+      const projAB = new THREE.Vector3();
+      const projBC = new THREE.Vector3();
+      const projCA = new THREE.Vector3();
+
+      const distAB = this.distanceToSegment(hitPoint, vA, vB, projAB);
+      const distBC = this.distanceToSegment(hitPoint, vB, vC, projBC);
+      const distCA = this.distanceToSegment(hitPoint, vC, vA, projCA);
+
+      const minDist = Math.min(distAB, distBC, distCA);
+
+      if (minDist < this.threshold) {
+        let selectedEdge: [THREE.Vector3, THREE.Vector3] = [vA, vB];
+        let edgeId = `${mesh.uuid}_e_${idxA}_${idxB}`;
+        let centerPoint = projAB;
+
+        if (minDist === distBC) {
+          selectedEdge = [vB, vC];
+          edgeId = `${mesh.uuid}_e_${idxB}_${idxC}`;
+          centerPoint = projBC;
+        } else if (minDist === distCA) {
+          selectedEdge = [vC, vA];
+          edgeId = `${mesh.uuid}_e_${idxC}_${idxA}`;
+          centerPoint = projCA;
+        }
+
+        const topology: SelectedTopology = {
+          type: 'EDGE',
+          id: edgeId,
+          coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
+          edgeData: {
+            start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
+            end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
+          },
+        };
+        useCadStore.getState().setSelectedTopology(topology);
+        return topology;
+      }
+
+      // 3. FACE PICKING: Fall back to face selection
       const topology: SelectedTopology = {
         type: 'FACE',
-        id: mesh.uuid,
-        coordinates: [hit.point.x, hit.point.y, hit.point.z],
-        normal: hit.face?.normal
+        id: `${mesh.uuid}_f_${hit.faceIndex}`,
+        coordinates: [hitPoint.x, hitPoint.y, hitPoint.z],
+        normal: hit.face.normal
           ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z]
           : undefined,
       };
 
-      // Update Zustand state
+      // Tag target geometry if available for area/volume mesh references
       useCadStore.getState().setSelectedTopology(topology);
-
       return topology;
     }
 
     // Clear selection if nothing hit
     useCadStore.getState().setSelectedTopology(null);
     return null;
-  }
-
-  /**
-   * Get all topology elements within a selection box
-   * @param startX Start X coordinate
-   * @param startY Start Y coordinate
-   * @param endX End X coordinate
-   * @param endY End Y coordinate
-   * @returns Array of selected topologies
-   */
-  public selectInBox(
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number
-  ): SelectedTopology[] {
-    // TODO: Implement box selection
-    return [];
   }
 
   /**

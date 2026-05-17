@@ -1,7 +1,7 @@
 from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism
 from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
 from OCC.Core.TopExp import TopExp_Explorer
-from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID
+from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX
 from OCC.Core.BRep import BRep_Tool
 from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Pnt, gp_Dir, gp_Ax2, gp_Ax3
 from OCC.Core.TopLoc import TopLoc_Location
@@ -9,6 +9,8 @@ from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_Make
 from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut
 import math
 from OCC.Core.GC import GC_MakeArcOfCircle
+from OCC.Core.TopoDS import topods
+from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
 
 def _shape_to_mesh(shape, deflection=0.01):
     """Converts an OCCT shape to a mesh format for Three.js."""
@@ -78,6 +80,29 @@ def process_features(features):
             depth = float(params.get('depth', 10.0))
             points_2d = params.get('points', []) # Expected list of [u, v]
             
+            # Robust pre-processing: filter out consecutive duplicate points (Zero-Length Edge Prevention)
+            filtered_points = []
+            for pt in points_2d:
+                if not pt:
+                    continue
+                if not filtered_points:
+                    filtered_points.append(pt)
+                else:
+                    prev = filtered_points[-1]
+                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
+                    if dist > 1e-4:
+                        filtered_points.append(pt)
+            
+            # Remove trailing point if it duplicates the start point
+            if len(filtered_points) > 1:
+                first = filtered_points[0]
+                last = filtered_points[-1]
+                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
+                if dist < 1e-4:
+                    filtered_points.pop()
+            
+            points_2d = filtered_points
+
             if not points_2d or len(points_2d) < 3:
                 # Fallback to rectangle if points are missing (Legacy support)
                 w = float(params.get('width', 10.0))
@@ -102,64 +127,68 @@ def process_features(features):
                 ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
                 vec = gp_Vec(0, 0, depth)
 
-            # Build Wire supporting Lines and Arcs
-            make_wire = BRepBuilderAPI_MakeWire()
-            
-            def get_gp_pnt(p):
-                u_val = float(p[0])
-                v_val = float(p[1])
-                if plane_type == 'FRONT':
-                    return gp_Pnt(u_val, v_val, 0)
-                elif plane_type == 'TOP':
-                    return gp_Pnt(u_val, 0, v_val)
-                elif plane_type == 'RIGHT':
-                    return gp_Pnt(0, u_val, v_val)
-                else:
-                    return gp_Pnt(u_val, v_val, 0)
-
-            i = 0
-            n_points = len(points_2d)
-            while i < n_points:
-                p_start = points_2d[i]
-                p_next = points_2d[(i + 1) % n_points]
+            try:
+                # Build Wire supporting Lines and Arcs
+                make_wire = BRepBuilderAPI_MakeWire()
                 
-                # Check if next point is an arc control point
-                if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                    p_control = p_next
-                    p_end = points_2d[(i + 2) % n_points]
-                    
-                    gp_start = get_gp_pnt(p_start)
-                    gp_control = get_gp_pnt(p_control)
-                    gp_end = get_gp_pnt(p_end)
-                    
-                    arc = GC_MakeArcOfCircle(gp_start, gp_control, gp_end)
-                    if arc.IsDone():
-                        edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                        make_wire.Add(edge)
+                def get_gp_pnt(p):
+                    u_val = float(p[0])
+                    v_val = float(p[1])
+                    if plane_type == 'FRONT':
+                        return gp_Pnt(u_val, v_val, 0)
+                    elif plane_type == 'TOP':
+                        return gp_Pnt(u_val, 0, v_val)
+                    elif plane_type == 'RIGHT':
+                        return gp_Pnt(0, u_val, v_val)
                     else:
+                        return gp_Pnt(u_val, v_val, 0)
+
+                i = 0
+                n_points = len(points_2d)
+                while i < n_points:
+                    p_start = points_2d[i]
+                    p_next = points_2d[(i + 1) % n_points]
+                    
+                    # Check if next point is an arc control point
+                    if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
+                        p_control = p_next
+                        p_end = points_2d[(i + 2) % n_points]
+                        
+                        gp_start = get_gp_pnt(p_start)
+                        gp_control = get_gp_pnt(p_control)
+                        gp_end = get_gp_pnt(p_end)
+                        
+                        arc = GC_MakeArcOfCircle(gp_start, gp_control, gp_end)
+                        if arc.IsDone():
+                            edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+                            make_wire.Add(edge)
+                        else:
+                            edge = BRepBuilderAPI_MakeEdge(gp_start, gp_end).Edge()
+                            make_wire.Add(edge)
+                        i += 2
+                    else:
+                        gp_start = get_gp_pnt(p_start)
+                        gp_end = get_gp_pnt(p_next)
+                        
                         edge = BRepBuilderAPI_MakeEdge(gp_start, gp_end).Edge()
                         make_wire.Add(edge)
-                    i += 2
-                else:
-                    gp_start = get_gp_pnt(p_start)
-                    gp_end = get_gp_pnt(p_next)
-                    
-                    edge = BRepBuilderAPI_MakeEdge(gp_start, gp_end).Edge()
-                    make_wire.Add(edge)
-                    i += 1
+                        i += 1
 
-            wire = make_wire.Wire()
-            face = BRepBuilderAPI_MakeFace(wire).Face()
+                wire = make_wire.Wire()
+                face = BRepBuilderAPI_MakeFace(wire).Face()
 
-            # Apply Transformation (Place local sketch onto the datum plane)
-            trsf = gp_Trsf()
-            trsf.SetTransformation(gp_Ax3(ax2))
-            face.Move(TopLoc_Location(trsf))
-            
-            # Transform the extrusion vector to global space
-            vec.Transform(trsf)
-            
-            current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
+                # Apply Transformation (Place local sketch onto the datum plane)
+                trsf = gp_Trsf()
+                trsf.SetTransformation(gp_Ax3(ax2))
+                face.Move(TopLoc_Location(trsf))
+                
+                # Transform the extrusion vector to global space
+                vec.Transform(trsf)
+                
+                current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
+            except Exception as sketch_err:
+                print(f"[ERROR] Failed to construct sketch/prism wire: {sketch_err}")
+                current_feat_shape = None
 
         elif f_type == 'BOX':
             w = float(params.get('width', 10.0))

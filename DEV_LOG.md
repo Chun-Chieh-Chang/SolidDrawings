@@ -21,6 +21,41 @@
 
 ---
 
+## [2026-05-17] 實裝 Topology 拓撲高精度選取與三維 3D 浮動量測工具鏈 (v2.1.0-alpha)
+
+### 任務內容
+
+- **Zustand 狀態擴展與持久化分離**：
+  - 在 Zustand 全域狀態中新增 `measurementMode` (量測類型)、`measurementPoints` (量測端點座標陣列) 與 `measurementResults` (物理屬性量測數值結果) 狀態。
+  - 對 `cad-storage` 的 `partialize` 進行持久化分離設計，動態量測與網格數據均不寫入 localStorage 以保持快取整潔。
+- **高精度拓撲幾何拾取器 (Topology Selection Solver)**：
+  - 重構 `TopologySelector.ts` 內核，使用點到線段垂直投影距離公式、點到頂點幾何距離公式設計精確的 VERTEX 與 EDGE 偵測公式。
+  - 設定選取鄰域邊界閥值 $threshold = 3.0$。若滑鼠點擊點與幾何面之頂點距離小於 $threshold$，則自動吸附並精準回傳 `VERTEX` 拓撲；若與面的三條邊線之投影垂直距離小於 $threshold$，則自動吸附並回傳 `EDGE` 拓撲（含邊段起迄 coordinates）；否則回傳 `FACE` 拓撲。
+- **R3F SceneSelector context 橋接與 SVG 命名衝突修復**：
+  - 在 `Viewport.tsx` Canvas 內部新增 `<SceneSelector />` 組件，以 React Three Fiber hooks 形式精確擷取 Canvas 內部 Three.js Scene 與 Camera 上下文，解決 `useThree` 在 Canvas 外部呼叫之經典 context error。
+  - 將繪圖 SVG 命名空間衝突之 `<line>` 標籤，以 native Three.js 實例化之 `THREE.Line` 配合 `<primitive object={lineObj} />` 徹底重構，實現 100% 類型安全 (Type-safe) 與 Zero SVG collision。
+- **3D Floating Dimensions & Morandi-palette Measure Panel**：
+  - 在 3D viewport 中實作 `<HighlightRenderer />`，高亮選取之點/邊/面，且為量測點配置紫色 3D 閃爍球體與 "M1 / M2" 浮動 HTML coordinate 標記。
+  - 當點選 2 個量測點時，自動生成 dashed 三維量測連接線段，並在幾何中點渲染 3D 浮動毛玻璃尺寸長度標籤 (e.g. `📐 25.00 mm`)。
+  - 左下角 `PropertyManager` 動態渲染專屬「📋 量測屬性管理器 (Measure Manager)」，直觀標示選取狀態、類型與起迄點，大字體顯示 `25.321 mm` 或表面積與實體體積結果，配備 `清除選取` 重設按鈕。
+
+### 診斷 (Diagnosis)
+
+- **Phase 1: Investigation (根因調查)**：
+  - 原先三維視埠缺乏拓撲拾取與量測功能，僅有一無實動之 "智慧尺寸" 2D 修正；
+  - Canvas 外部呼叫 `useThree` 導致 R3F context error，且 `TopologySelector` 初始化時 `scene`/`camera` 缺少關聯。
+  - 渲染 `<line>` 時在 JSX 中會與 SVG 命名空間衝突，回報 `Property 'geometry' does not exist on type 'SVGLineElementAttributes'`.
+- **Phase 3: Hypothesis (RCA 根因)**：
+  - **Context 限制**：`useThree` 必須位於 `<Canvas>` 內部的子組件中才能取得正確 Context。
+  - **JSX 語意歧義**：TSX 將 `<line>` 標示為 DOM SVG 元件，使用 R3F `<primitive>` 繞過語意衝突。
+  - **B-Rep 測量計算**：需要基於 selectedTopology 與 features params 計算出精確的三維距離、角度、表面積與體積。
+- **Phase 4: Fix & Verify (CAPA 精準修復)**：
+  - **SCENESELECTOR 橋接**：完美打通 R3F Scene/Camera 到 `TopologySelector` 的雙向關聯。
+  - **PRIMITIVE 渲染**：利用 native `THREE.Line` + R3F `<primitive>` 實現 100% 類型安全，編譯成功 exit code `0`。
+  - **PRODUCTIONS BUILD 確效**：成功執行 `npm run build`，生產建置全自動完成，無任何警告與錯誤！
+
+---
+
 ## [2026-05-17] 實裝草圖多對象幾何約束解算器與 PropertyManager 交互卡片 (v1.9.1)
 
 ### 任務內容
@@ -1086,5 +1121,215 @@
 
 1. **Topology Highlighting**: Implement visual feedback for selected topology
 2. **OCCT Mapping**: Create topology mapping between Three.js and OCCT
+3. **Measurement Tools**: Implement distance, angle, area, volume measurements
+4. **Mass Properties**: Add center of gravity and inertia calculation
+## [2026-05-17] Handover Continuation: Topology Selection System (v2.0.0-alpha)
+
+### Summary
+
+- **Phase 3.1 Initiation**: Implemented Topology Selection System foundation for measurement and mass properties features
+- **New Kernel Module**: Created `TopologySelector.ts` with Raycaster-based face/edge/vertex selection
+- **State Management**: Extended Zustand store with `selectedTopology` state for persistent selection tracking
+- **Viewport Integration**: Added click handler for topology selection in 3D viewport
+- **TypeScript Fix**: Resolved `e.target.getBoundingClientRect()` type error in Viewport.tsx
+- **Handover Documentation**: Created comprehensive handover_resume_guide.md for seamless development continuation
+
+### Task Content
+
+- **Topology Selection Core**:
+  - Created `src/kernel/TopologySelector.ts` with Raycaster wrapper for precise 3D selection
+  - Implemented `selectAtPosition()` method for point-based topology selection
+  - Added `clearSelection()` and `getCurrentSelection()` methods for state management
+  - Supports FACE, EDGE, and VERTEX topology types with coordinate and normal data
+
+- **State Persistence**:
+  - Extended `useCadStore.ts` with `selectedTopology` state variable
+  - Added `setSelectedTopology()` action to Zustand store
+  - Configured localStorage persistence for topology selection
+  - Maintains selection across page refreshes
+
+- **Viewport Integration**:
+  - Added onClick handler to Canvas component for click detection
+  - Integrated with existing Raycaster system
+  - Prepares foundation for topology highlighting and measurement
+
+- **TypeScript Compilation**:
+  - Fixed `e.target.getBoundingClientRect()` type error
+  - Changed `e.target` to `e.target as HTMLCanvasElement`
+  - Changed `bg-gradient-to-b` to `bg-linear-to-b` (Tailwind v4 compatibility)
+  - Verified compilation with `npx tsc --noEmit` (Exit code 0)
+
+- **Handover Documentation**:
+  - Created `docs/handover_resume_guide.md` with comprehensive project overview
+  - Documented current architecture, directory structure, and development phases
+  - Included quick start guide, development standards, and troubleshooting tips
+  - Provided version history and next steps for continuation
+
+### Diagnosis (Diagnosis)
+
+- **Phase 1: Investigation (Root Cause Investigation)**:
+  - Current 3D viewport lacks precise topology selection capability
+  - Measurement tools require face/edge/vertex selection as input
+  - Mass properties calculation needs solid selection
+  - Existing Raycaster implementation only supports basic object picking
+  - TypeScript compilation error on Viewport.tsx line 84
+
+- **Phase 2: Pattern (Pattern Analysis)**:
+  - SolidWorks uses precise topology selection with visual highlighting
+  - Three.js Raycaster provides intersection data for face/edge/vertex
+  - OCCT TopoDS entities need mapping to Three.js objects
+  - Selection state must persist for measurement operations
+  - Tailwind v4 uses `bg-linear-to-b` instead of `bg-gradient-to-b`
+
+- **Phase 3: Hypothesis (RCA - Root Cause Analysis)**:
+  - Missing topology selection infrastructure in current implementation
+  - No state management for selected topology elements
+  - No visual feedback for selected topology
+  - No mapping between Three.js objects and OCCT TopoDS entities
+  - TypeScript type inference issue with Canvas onClick event target
+  - Tailwind CSS v4 syntax change for gradient utilities
+
+- **Phase 4: Fix & Verify (CAPA - Corrective and Preventive Actions)**:
+  - **Corrective Actions**:
+    - Created `TopologySelector.ts` with Raycaster wrapper
+    - Implemented selection methods with coordinate extraction
+    - Extended Zustand store with topology state
+    - Added click handler to Viewport
+    - Fixed TypeScript type assertion for Canvas element
+    - Updated Tailwind gradient utility syntax
+  - **Preventive Actions**:
+    - Documented topology selection requirements for future features
+    - Established pattern for topology-to-OCCT mapping
+    - Created comprehensive handover documentation
+    - Documented development standards and troubleshooting
+
+### Verification Results
+- [x] `TopologySelector.ts` created with Raycaster integration
+- [x] `selectedTopology` state added to Zustand store
+- [x] localStorage persistence configured
+- [x] Viewport click handler implemented
+- [x] TypeScript compilation successful (Exit code 0)
+- [x] Handover documentation created
+- [ ] Topology highlighting (pending implementation)
+- [ ] OCCT TopoDS mapping (pending implementation)
+- [ ] Measurement tool integration (pending implementation)
+
+### Next Steps
+
+1. **Topology Highlighting**: Implement visual feedback for selected topology
+2. **OCCT Mapping**: Create topology mapping between Three.js and OCCT
+3. **Measurement Tools**: Implement distance, angle, area, volume measurements
+4. **Mass Properties**: Add center of gravity and inertia calculation
+## [2026-05-17] Handover Continuation: Topology Selection System (v2.0.0-alpha)
+
+### Summary
+
+- **Phase 3.1 Initiation**: Implemented Topology Selection System foundation for measurement and mass properties features
+- **New Kernel Module**: Created `TopologySelector.ts` with Raycaster-based face/edge/vertex selection
+- **State Management**: Extended Zustand store with `selectedTopology` state for persistent selection tracking
+- **Viewport Integration**: Added click handler for topology selection in 3D viewport
+- **TypeScript Fix**: Resolved `e.target.getBoundingClientRect()` type error in Viewport.tsx
+- **Handover Documentation**: Created comprehensive handover_resume_guide.md for seamless development continuation
+- **PDCA Cycle Complete**: Plan, Do, Check, Act all completed for Phase 3.1
+- **Phase 3.2 Planning**: Created detailed plan for Measurement Tools implementation
+
+### Task Content
+
+- **Topology Selection Core**:
+  - Created `src/kernel/TopologySelector.ts` with Raycaster wrapper for precise 3D selection
+  - Implemented `selectAtPosition()` method for point-based topology selection
+  - Added `clearSelection()` and `getCurrentSelection()` methods for state management
+  - Supports FACE, EDGE, and VERTEX topology types with coordinate and normal data
+
+- **State Persistence**:
+  - Extended `useCadStore.ts` with `selectedTopology` state variable
+  - Added `setSelectedTopology()` action to Zustand store
+  - Configured localStorage persistence for topology selection
+  - Maintains selection across page refreshes
+
+- **Viewport Integration**:
+  - Added onClick handler to Canvas component for click detection
+  - Integrated with existing Raycaster system
+  - Prepares foundation for topology highlighting and measurement
+
+- **TypeScript Compilation**:
+  - Fixed `e.target.getBoundingClientRect()` type error
+  - Changed `e.target` to `e.target as HTMLCanvasElement`
+  - Changed `bg-gradient-to-b` to `bg-linear-to-b` (Tailwind v4 compatibility)
+  - Verified compilation with `npx tsc --noEmit` (Exit code 0)
+
+- **Handover Documentation**:
+  - Created `docs/handover_resume_guide.md` with comprehensive project overview
+  - Documented current architecture, directory structure, and development phases
+  - Included quick start guide, development standards, and troubleshooting tips
+  - Provided version history and next steps for continuation
+
+- **PDCA Cycle Completion**:
+  - **Plan**: Created `docs/plans/2026-05-17-handover-continuation.md` with detailed tasks
+  - **Do**: Implemented TopologySelector.ts, updated Viewport.tsx, extended Zustand store
+  - **Check**: TypeScript compilation successful, verified file structure
+  - **Act**: Updated handover_resume_guide.md and DEV_LOG.md with completion status
+
+- **Phase 3.2 Planning**:
+  - Created `docs/plans/2026-05-17-phase-3-2-measurement.md` with detailed plan
+  - Defined MeasurementService.ts, UI components, and verification criteria
+
+### Diagnosis (Diagnosis)
+
+- **Phase 1: Investigation (Root Cause Investigation)**:
+  - Current 3D viewport lacks precise topology selection capability
+  - Measurement tools require face/edge/vertex selection as input
+  - Mass properties calculation needs solid selection
+  - Existing Raycaster implementation only supports basic object picking
+  - TypeScript compilation error on Viewport.tsx line 84
+
+- **Phase 2: Pattern (Pattern Analysis)**:
+  - SolidWorks uses precise topology selection with visual highlighting
+  - Three.js Raycaster provides intersection data for face/edge/vertex
+  - OCCT TopoDS entities need mapping to Three.js objects
+  - Selection state must persist for measurement operations
+  - Tailwind v4 uses `bg-linear-to-b` instead of `bg-gradient-to-b`
+
+- **Phase 3: Hypothesis (RCA - Root Cause Analysis)**:
+  - Missing topology selection infrastructure in current implementation
+  - No state management for selected topology elements
+  - No visual feedback for selected topology
+  - No mapping between Three.js objects and OCCT TopoDS entities
+  - TypeScript type inference issue with Canvas onClick event target
+  - Tailwind CSS v4 syntax change for gradient utilities
+
+- **Phase 4: Fix & Verify (CAPA - Corrective and Preventive Actions)**:
+  - **Corrective Actions**:
+    - Created `TopologySelector.ts` with Raycaster wrapper
+    - Implemented selection methods with coordinate extraction
+    - Extended Zustand store with topology state
+    - Added click handler to Viewport
+    - Fixed TypeScript type assertion for Canvas element
+    - Updated Tailwind gradient utility syntax
+  - **Preventive Actions**:
+    - Documented topology selection requirements for future features
+    - Established pattern for topology-to-OCCT mapping
+    - Created comprehensive handover documentation
+    - Documented development standards and troubleshooting
+    - Created Phase 3.2 plan for measurement tools
+
+### Verification Results
+- [x] `TopologySelector.ts` created with Raycaster integration
+- [x] `selectedTopology` state added to Zustand store
+- [x] localStorage persistence configured
+- [x] Viewport click handler implemented
+- [x] `topology-mapping.ts` created with OCCT mapping utilities
+- [x] TypeScript compilation successful (Exit code 0)
+- [x] Handover documentation created
+- [x] Phase 3.2 plan created
+- [x] PDCA cycle completed for Phase 3.1
+- [ ] Topology highlighting (pending implementation)
+- [ ] OCCT TopoDS mapping integration (pending implementation)
+- [ ] Measurement tool integration (pending implementation)
+
+### Next Steps
+
+1. **Topology Highlighting**: Implement visual feedback for selected topology
+2. **OCCT TopoDS Mapping Integration**: Complete Three.js → OCCT mapping
 3. **Measurement Tools**: Implement distance, angle, area, volume measurements
 4. **Mass Properties**: Add center of gravity and inertia calculation

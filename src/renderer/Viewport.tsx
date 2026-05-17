@@ -1,8 +1,8 @@
 'use client';
 
-import React, { Suspense, useEffect, useRef } from 'react';
+import React, { Suspense, useEffect, useRef, useCallback } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, Stage, PerspectiveCamera } from '@react-three/drei';
+import { OrbitControls, Grid, Stage, PerspectiveCamera, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { useCadStore } from '../store/useCadStore';
@@ -53,6 +53,110 @@ const CameraHandler = () => {
 // Global topology selector instance
 let topologySelector: TopologySelector | null = null;
 
+// R3F context initialization helper rendered inside Canvas
+const SceneSelector = () => {
+  const { scene, camera } = useThree();
+
+  useEffect(() => {
+    topologySelector = new TopologySelector(scene, camera);
+    console.log('[Viewport] TopologySelector initialized with R3F scene and camera');
+    return () => {
+      topologySelector = null;
+    };
+  }, [scene, camera]);
+
+  return null;
+};
+
+// Visual feedback and 3D measurement tags renderer
+const HighlightRenderer = () => {
+  const { selectedTopology, measurementPoints } = useCadStore();
+
+  return (
+    <group>
+      {/* 1. Highlight currently selected topology element */}
+      {selectedTopology && (() => {
+        const { type, coordinates, edgeData } = selectedTopology;
+        const posVec = new THREE.Vector3(...coordinates);
+        
+        if (type === 'VERTEX') {
+          return (
+            <mesh position={posVec}>
+              <sphereGeometry args={[1.2, 16, 16]} />
+              <meshBasicMaterial color="#EF4444" depthTest={false} transparent opacity={0.9} />
+            </mesh>
+          );
+        } else if (type === 'EDGE' && edgeData) {
+          const start = new THREE.Vector3(...edgeData.start);
+          const end = new THREE.Vector3(...edgeData.end);
+          const points = [start, end];
+          const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+          const material = new THREE.LineBasicMaterial({
+            color: 0x3b82f6,
+            linewidth: 3,
+            depthTest: false,
+            transparent: true,
+            opacity: 0.9,
+          });
+          const lineObj = new THREE.Line(lineGeometry, material);
+          return <primitive object={lineObj} />;
+        } else if (type === 'FACE') {
+          return (
+            <mesh position={posVec}>
+              <sphereGeometry args={[1.0, 16, 16]} />
+              <meshBasicMaterial color="#10B981" depthTest={false} transparent opacity={0.8} />
+            </mesh>
+          );
+        }
+        return null;
+      })()}
+
+      {/* 2. Highlight picked measurement markers */}
+      {measurementPoints.map((pt, idx) => {
+        const pos = new THREE.Vector3(...pt.coordinates);
+        return (
+          <group key={idx}>
+            <mesh position={pos}>
+              <sphereGeometry args={[1.0, 16, 16]} />
+              <meshBasicMaterial color="#8B5CF6" depthTest={false} />
+            </mesh>
+            <Html position={pos} distanceFactor={15}>
+              <div className="bg-indigo-600 text-white font-bold font-mono px-1 py-0.5 rounded text-[8px] whitespace-nowrap shadow-md pointer-events-none select-none">
+                M{idx + 1}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+
+      {/* 3. Connecting measurement line */}
+      {measurementPoints.length === 2 && (() => {
+        const start = new THREE.Vector3(...measurementPoints[0].coordinates);
+        const end = new THREE.Vector3(...measurementPoints[1].coordinates);
+        const points = [start, end];
+        const lineGeometry = new THREE.BufferGeometry().setFromPoints(points);
+        const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+        const material = new THREE.LineBasicMaterial({
+          color: 0x8b5cf6,
+          linewidth: 2,
+          depthTest: false,
+        });
+        const lineObj = new THREE.Line(lineGeometry, material);
+        return (
+          <group>
+            <primitive object={lineObj} />
+            <Html position={midPoint} distanceFactor={15}>
+              <div className="bg-slate-900/90 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[9px] font-bold font-mono whitespace-nowrap shadow-2xl pointer-events-none select-none">
+                📏 {start.distanceTo(end).toFixed(2)} mm
+              </div>
+            </Html>
+          </group>
+        );
+      })()}
+    </group>
+  );
+};
+
 interface ViewportProps {
   children?: React.ReactNode;
 }
@@ -61,15 +165,23 @@ export default function Viewport({ children }: ViewportProps) {
   const { isSketchMode } = useCadStore();
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Initialize topology selector when canvas is available
-  useEffect(() => {
+  // Handle topology selection click
+  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    if (isSketchMode) return; // Don't select topology during sketching
+    
+    // Get mouse position
     const canvas = canvasRef.current;
     if (!canvas) return;
-
-    // Get the Three.js scene and camera from the Canvas context
-    // This is a workaround - in a real implementation, we'd pass these properly
-    console.log('[Viewport] Canvas initialized for topology selection');
-  }, []);
+    
+    const rect = canvas.getBoundingClientRect();
+    const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+    
+    if (topologySelector) {
+      const selected = topologySelector.selectAtPosition(ndcX, ndcY);
+      console.log('[Topology] Click at NDC:', ndcX, ndcY, 'Selected:', selected);
+    }
+  }, [isSketchMode, canvasRef]);
 
   return (
     <div className="w-full h-full bg-linear-to-b from-[#FFFFFF] to-[#C8D2DF] relative">
@@ -77,26 +189,16 @@ export default function Viewport({ children }: ViewportProps) {
         shadows 
         dpr={[1, 2]} 
         ref={canvasRef}
-        onClick={(e) => {
-          if (isSketchMode) return; // Don't select topology during sketching
-          
-          // Get mouse position
-          const canvas = e.target as HTMLCanvasElement;
-          const rect = canvas.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          
-          // Create topology selector (in real implementation, pass scene/camera properly)
-          // For now, we'll just log the click
-          console.log('[Topology] Click at:', x, y);
-        }}
+        onClick={handleCanvasClick}
       >
         <CameraHandler />
+        <SceneSelector />
         <PerspectiveCamera makeDefault position={[100, 100, 100]} fov={45} />
         <Suspense fallback={null}>
           <Stage environment="city" intensity={0.5}>
             <DatumPlanes />
             <SketchPreview />
+            <HighlightRenderer />
             {children || (
               <mesh>
                 <boxGeometry args={[1, 1, 1]} />
