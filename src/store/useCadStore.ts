@@ -13,33 +13,39 @@ export interface CADFeature {
 interface CadState {
   mode: CadMode;
   setMode: (mode: CadMode) => void;
-  
+
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
   activePlane: 'FRONT' | 'TOP' | 'RIGHT' | null;
   setActivePlane: (plane: 'FRONT' | 'TOP' | 'RIGHT' | null) => void;
-  
+
   sketchPoints: any[]; // 2D points on the active plane
   setSketchPoints: (points: any[]) => void;
-  sketchTool: 'LINE' | 'ARC';
-  setSketchTool: (tool: 'LINE' | 'ARC') => void;
+  sketchTool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC';
+  setSketchTool: (tool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC') => void;
   gridSnap: boolean;
   setGridSnap: (snap: boolean) => void;
-  
+  sketchRelations: string[];
+  setSketchRelations: (relations: string[]) => void;
+
   projectName: string;
 
   setProjectName: (name: string) => void;
 
-  
   // Feature Tree Logic
   features: CADFeature[];
   addFeature: (feature: CADFeature) => void;
   removeFeature: (id: string) => void;
   updateFeatureParams: (id: string, params: any) => void;
-  
+  editingFeatureId: string | null;
+  setEditingFeatureId: (id: string | null) => void;
+
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
 
+  // Topology Selection State
+  selectedTopology: any; // SelectedTopology from TopologySelector
+  setSelectedTopology: (topology: any) => void;
 
   // Render State
   meshData: any[]; // Array of { id, data: { vertices, indices, normals } }
@@ -51,47 +57,56 @@ export const useCadStore = create<CadState>()(
     (set) => ({
       mode: 'PART',
       setMode: (mode) => set({ mode }),
-      
+
       isSketchMode: false,
       setSketchMode: (active) => set({ isSketchMode: active }),
       activePlane: null,
       setActivePlane: (plane) => set({ activePlane: plane }),
-      
+
       sketchPoints: [],
       setSketchPoints: (points) => set({ sketchPoints: points }),
       sketchTool: 'LINE',
       setSketchTool: (tool) => set({ sketchTool: tool }),
       gridSnap: true,
       setGridSnap: (snap) => set({ gridSnap: snap }),
-      
+      sketchRelations: [],
+      setSketchRelations: (relations) => set({ sketchRelations: relations }),
+
       projectName: 'Professional CAD Project',
 
 
       setProjectName: (name) => set({ projectName: name }),
-      
+
       // Start with a clean slate: no default features, exactly like a new SolidWorks Part document
       features: [],
 
 
-      
-      addFeature: (feature) => set((state) => ({ 
-        features: [...state.features, feature] 
+
+      addFeature: (feature) => set((state) => ({
+        features: [...state.features, feature]
       })),
-      
+
       removeFeature: (id) => set((state) => ({
         features: state.features.filter(f => f.id !== id),
-        selectedId: state.selectedId === id ? null : state.selectedId
+        selectedId: state.selectedId === id ? null : state.selectedId,
+        editingFeatureId: state.editingFeatureId === id ? null : state.editingFeatureId
       })),
-      
+
       updateFeatureParams: (id, params) => set((state) => {
-        const newFeatures = state.features.map(f => 
+        const newFeatures = state.features.map(f =>
           f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f
         );
         return { features: [...newFeatures] };
       }),
-      
+
+      editingFeatureId: null,
+      setEditingFeatureId: (id) => set({ editingFeatureId: id }),
+
       selectedId: null,
       setSelectedId: (id) => set({ selectedId: id }),
+
+      selectedTopology: null,
+      setSelectedTopology: (topology) => set({ selectedTopology: topology }),
 
       meshData: [],
       setMeshData: (meshData) => set({ meshData }),
@@ -104,8 +119,8 @@ export const useCadStore = create<CadState>()(
         projectName: state.projectName,
         features: state.features,
         selectedId: state.selectedId,
+        selectedTopology: state.selectedTopology,
       }), // Don't persist meshData as it can be large
     }
   )
 );
-

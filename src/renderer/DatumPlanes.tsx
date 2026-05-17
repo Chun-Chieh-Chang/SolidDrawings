@@ -9,7 +9,7 @@ export const DatumPlanes = () => {
     isSketchMode, setSketchMode,
     sketchPoints, setSketchPoints,
     sketchTool, gridSnap,
-    addFeature, features
+    setSketchRelations, setEditingFeatureId
   } = useCadStore();
   const [hovered, setHovered] = useState<string | null>(null);
 
@@ -20,6 +20,9 @@ export const DatumPlanes = () => {
 
   const handlePlaneClick = (plane: 'FRONT' | 'TOP' | 'RIGHT', event: any) => {
     if (!isSketchMode) {
+      setEditingFeatureId(null);
+      setSketchPoints([]);
+      setSketchRelations([]);
       setActivePlane(plane);
       setSketchMode(true);
       return;
@@ -42,7 +45,52 @@ export const DatumPlanes = () => {
       v = Math.round(v);
     }
 
-    // Tag the point if it's an Arc Control Point (the 2nd point in a 3-point arc sequence)
+    // --- CIRCLE DRAWING TOOL ---
+    if (sketchTool === 'CIRCLE') {
+      if (sketchPoints.length === 0) {
+        setSketchPoints([[u, v, 'CIRCLE_CENTER']]);
+      } else {
+        const [u_c, v_c] = sketchPoints[0];
+        const R = Math.hypot(u - u_c, v - v_c);
+        if (R > 0.1) {
+          const circlePoints: any[] = [];
+          const DIVISIONS = 36;
+          for (let k = 0; k <= DIVISIONS; k++) {
+            const theta = (k / DIVISIONS) * Math.PI * 2;
+            circlePoints.push([u_c + R * Math.cos(theta), v_c + R * Math.sin(theta)]);
+          }
+          setSketchPoints(circlePoints);
+        }
+      }
+      return;
+    }
+
+    // --- RECTANGLE DRAWING TOOL ---
+    if (sketchTool === 'RECTANGLE') {
+      if (sketchPoints.length === 0) {
+        setSketchPoints([[u, v, 'RECT_CORNER']]);
+      } else {
+        const [u1, v1] = sketchPoints[0];
+        const rectPoints = [
+          [u1, v1],
+          [u, v1],
+          [u, v],
+          [u1, v],
+          [u1, v]
+        ];
+        setSketchPoints(rectPoints);
+      }
+      return;
+    }
+
+    // --- CENTER_LINE DRAWING TOOL ---
+    if (sketchTool === 'CENTER_LINE') {
+      const newPt = [u, v, 'CENTER_LINE'];
+      setSketchPoints([...sketchPoints, newPt]);
+      return;
+    }
+
+    // --- STANDARD LINE & ARC DRAWING ---
     let newPt: any = [u, v];
     if (sketchTool === 'ARC' && sketchPoints.length % 3 === 1) {
       newPt = [u, v, 'ARC_CONTROL'];
@@ -55,23 +103,8 @@ export const DatumPlanes = () => {
       (Math.hypot(newPoints[0][0] - u, newPoints[0][1] - v) < 2);
 
     if (isClosing) {
-      // Create a Polyline Extrude
-      addFeature({
-        id: `feat_${Date.now()}`,
-        type: 'EXTRUDE',
-        name: `Custom Extrude ${features.length + 1}`,
-        parameters: { 
-          points: newPoints.slice(0, -1), // Remove the closing click
-          depth: 10, 
-          x: 0, y: 0, z: 0,
-          operation: 'ADD', 
-          plane 
-        }
-      });
-
-      setSketchPoints([]);
-      setSketchMode(false);
-      setActivePlane(null);
+      const firstPoint = newPoints[0];
+      setSketchPoints([...newPoints.slice(0, -1), [firstPoint[0], firstPoint[1], firstPoint[2]]]);
     } else {
       setSketchPoints(newPoints);
     }
@@ -131,4 +164,3 @@ export const DatumPlanes = () => {
     </group>
   );
 };
-
