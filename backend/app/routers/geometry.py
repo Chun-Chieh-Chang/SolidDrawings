@@ -66,4 +66,40 @@ async def rebuild_assembly(request: AssemblyRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+class ExportStepRequest(BaseModel):
+    features: List[FeatureDefinition]
+    filename: Optional[str] = "part.step"
+
+@router.post("/export/step")
+async def export_step(request: ExportStepRequest):
+    try:
+        import os
+        from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
+        
+        shape = geometry_service.build_shape_only(request.features)
+        if not shape or shape.IsNull():
+            raise HTTPException(status_code=400, detail="Failed to build a valid 3D shape from features.")
+        
+        # Save step file inside artifacts directory
+        target_dir = r"C:\Users\3kids\.gemini\antigravity\brain\c393fd10-6f9e-42cf-9722-9cb722fd18e2"
+        os.makedirs(target_dir, exist_ok=True)
+        filepath = os.path.join(target_dir, request.filename)
+        
+        writer = STEPControl_Writer()
+        writer.Transfer(shape, STEPControl_AsIs)
+        status = writer.Write(filepath)
+        
+        if status != 1:
+            raise HTTPException(status_code=500, detail=f"STEP writer failed to save shape (status={status})")
+            
+        return {
+            "status": "SUCCESS", 
+            "filepath": filepath, 
+            "message": f"Successfully exported to {request.filename}"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 

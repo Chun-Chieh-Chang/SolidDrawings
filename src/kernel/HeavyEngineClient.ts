@@ -18,7 +18,7 @@ export interface CADFeature {
 
 export class HeavyEngineClient {
   private static instance: HeavyEngineClient;
-  private baseUrl: string = 'http://localhost:8000/api/v1/geometry';
+  private baseUrl: string = 'http://localhost:8400/api/v1/geometry';
 
   private constructor() {}
 
@@ -82,7 +82,7 @@ export class HeavyEngineClient {
    */
   public async checkHealth(): Promise<boolean> {
     try {
-      const response = await fetch('http://localhost:8000/');
+      const response = await fetch('http://localhost:8400/');
       return response.ok;
     } catch {
       return false;

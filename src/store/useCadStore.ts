@@ -13,7 +13,7 @@ export interface MeasurementResult {
 
 export interface CADFeature {
   id: string;
-  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE';
+  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'REVOLVE';
   name: string;
   parameters: any;
 }
