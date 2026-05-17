@@ -637,5 +637,7 @@
 - [x] 重構後的 SolidWorks 桌面環境全面跑通，UI 外觀達國際頂尖水準 🟢。
 - [x] `伸長-實體` 與 `伸長-除料 (CUT)` 能根據特徵樹配置，完美觸發 FastAPI 後端 OCC B-Rep Kernel 重新計算 🟢。
 - [x] 成功將雙擊基準面、視角快捷變換、CommandManager 標籤與 FeatureTree 高度耦合。
+- [x] 清除初始預載的實體特徵，將 `features` 預設值設為空陣列 `[]`，`selectedId` 設為 `null`，保證初始介面完全乾淨 🟢。
+- [x] 新增瀏覽器端 `localStorage` 快取自動清理機制，若檢測到歷史 Mockup 特徵直接重設，保證實時載入乾淨無暇的 SolidWorks Part1 空間 🟢。
 - [x] Next.js Turbopack 生產環境編譯百分之百成功，無任何 TypeScript 類型或語意錯誤，退出碼 0 🟢。
 - [x] 完整代碼順利推送至 remote GitHub 倉庫 🟢。
