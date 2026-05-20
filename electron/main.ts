@@ -73,13 +73,13 @@ function createWindow() {
 
 // 檔案系統操作 IPC handlers
 ipcMain.handle('file:open', async (event: IpcMainInvokeEvent) => {
-  const result = await dialog.showOpenDialog(mainWindow!, {
+  const result = (await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
       { name: 'CAD Files', extensions: ['step', 'stl', 'iges', 'igs'] },
       { name: 'All Files', extensions: ['*'] },
     ],
-  });
+  })) as any;
 
   if (!result.canceled && result.filePaths.length > 0) {
     return { path: result.filePaths[0] };
@@ -88,13 +88,13 @@ ipcMain.handle('file:open', async (event: IpcMainInvokeEvent) => {
 });
 
 ipcMain.handle('file:save', async (event: IpcMainInvokeEvent, data: string) => {
-  const result = await dialog.showSaveDialog(mainWindow!, {
+  const result = (await dialog.showSaveDialog(mainWindow!, {
     filters: [
       { name: 'STEP Files', extensions: ['step'] },
       { name: 'STL Files', extensions: ['stl'] },
       { name: 'IGES Files', extensions: ['iges', 'igs'] },
     ],
-  });
+  })) as any;
 
   if (!result.canceled && result.filePath) {
     try {

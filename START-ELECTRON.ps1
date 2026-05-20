@@ -47,7 +47,7 @@ npm run build
 # 建置 Electron
 Write-Host "  - Building Electron application..." -ForegroundColor Gray
 cd electron
-tsc --project tsconfig.json
+npx tsc --project tsconfig.json
 
 Write-Host ""
 Write-Host "Step 3: Starting Electron..." -ForegroundColor Green

@@ -2,13 +2,14 @@
   "name": "cad-app",
   "version": "3.1.0-alpha",
   "private": true,
+  "main": "out/main.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "concurrently \"npm run dev\" \"npm run electron:start\"",
-    "electron:build": "npm run build && tsc --project electron/tsconfig.json",
+    "electron:build": "npm run build && npx tsc --project electron/tsconfig.json",
     "electron:start": "electron .",
     "electron:pack": "electron-builder --dir",
     "electron:dist": "electron-builder"
