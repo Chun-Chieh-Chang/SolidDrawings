@@ -21,6 +21,29 @@
 
 ---
 
+## [2026-05-20] 修正 Electron 桌面應用靜態資源載入 404 與後端 OCC 載入崩潰問題 (v3.1.1-alpha)
+
+### 任務內容
+
+- **Electron 靜態資源載入前綴動態裁剪 (UX 崩潰修復)**：
+  - **RCA**：Next.js 編譯配置了 `basePath: "/3D-Builder"`，使 `out/index.html` 中引入的資源連結（如 CSS、JS）都帶有前綴 `/3D-Builder/_next/...`。當 Electron 主進程的 `startStaticServer` 收到請求時，去尋找對應的 `out/3D-Builder/_next/...` 文件，此路徑並不存在，返回 404，導致所有樣式表和交互腳本載入失敗。
+  - **CAPA**：
+    - 修改 `electron/main.ts` 中的 `startStaticServer`。
+    - 取得請求 URL 後，動態檢查其是否以 `/3D-Builder/` 開頭或等於 `/3D-Builder`。如果是，則自動將其裁切/轉換為無前綴的路徑，使其能順利映射到本地 `out/` 目錄下的資源文件。
+    - 此修改在不改動任何 Next.js 設定（保留線上 GitHub Pages 自動部署相容性）的情況下，完美解決了 Electron 本地啟動時的靜態路徑載入問題。
+  - **確效與編譯**：
+    - 通過 `npx tsc --project electron/tsconfig.json` 編譯，無任何型別或語法錯誤。
+    - 啟動測試後，CSS 樣式完美載入，Morandi 灰藍專業主題 UI 100% 復活！
+
+- **後端 OCC 模組防禦性載入修復 (後端強固度提升)**：
+  - **RCA**：後端 `geometry_service.py` 在第 1 與 2 行直接導入了 `OCC.Core.HLRBRep` 與 `OCC.Core.gp`，並未包含在 `try-except` 隔離區內。當在沒有安裝 pythonOCC C++ 庫的本地 Python 執行環境中啟動 FastAPI 時，會直接拋出 `ModuleNotFoundError` 造成後端服務崩潰死鎖，純 Python fallback 降級機制形同虛設。
+  - **CAPA**：
+    - 將所有 `OCC` 子模組導入（包括 `HLRBRep` 和 `gp`）全部安全地整合到 `try-except ImportError` 區塊中。
+    - 這確保了在沒有安裝 pythonOCC 的環境下，後端能百分之百優雅降級到 `HAS_OCC = False` 模式，成功解決了本地後端無法啟動的問題。
+    - 啟動全局環境測試後，FastAPI 服務於 Port 8400 上 100% 成功啟動並開始提供幾何引擎服務，前端右上角順利顯示為 `CONNECTED` 綠色亮燈！
+
+---
+
 ## [2026-05-20] 實裝面上草圖 (Sketch on Face) 與特徵陣列 (Circular/Linear Patterns) (v3.1.0-alpha)
 
 ### 任務內容

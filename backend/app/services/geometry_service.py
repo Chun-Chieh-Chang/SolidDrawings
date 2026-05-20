@@ -1,14 +1,13 @@
-from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3
 import math
 
 try:
+    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1
     from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol
     from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
     from OCC.Core.TopExp import TopExp_Explorer
     from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX
     from OCC.Core.BRep import BRep_Tool
-    from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Pnt, gp_Dir, gp_Ax2, gp_Ax3, gp_Ax1
     from OCC.Core.TopLoc import TopLoc_Location
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
     from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut

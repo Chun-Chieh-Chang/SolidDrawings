@@ -45,6 +45,13 @@ function startStaticServer(): Promise<number> {
         return;
       }
       
+      // 動態移除 basePath 前綴 "/3D-Builder" 確保 Electron 下靜態資源能正常載入
+      if (safeUrl.startsWith('/3D-Builder/')) {
+        safeUrl = safeUrl.substring('/3D-Builder'.length);
+      } else if (safeUrl === '/3D-Builder') {
+        safeUrl = '/';
+      }
+      
       // 移除 query 參數以定位實體檔案
       let filePath = path.join(publicDir, safeUrl.split('?')[0]);
       if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
