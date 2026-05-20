@@ -9,15 +9,38 @@ export const SketchPreview = () => {
     activePlane, 
     isSketchMode,
     selectedEntityIds,
-    setSelectedEntityIds
+    setSelectedEntityIds,
+    activeFaceOrigin,
+    activeFaceNormal
   } = useCadStore();
 
   const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
+
+  const faceBasis = useMemo(() => {
+    if (activePlane !== 'FACE' || !activeFaceOrigin || !activeFaceNormal) {
+      return null;
+    }
+    const origin = new THREE.Vector3(...activeFaceOrigin);
+    const normal = new THREE.Vector3(...activeFaceNormal).normalize();
+    let xDir = new THREE.Vector3();
+    if (Math.abs(normal.x) < 1e-5 && Math.abs(normal.y) < 1e-5) {
+      xDir.set(1, 0, 0);
+    } else {
+      xDir.set(-normal.y, normal.x, 0).normalize();
+    }
+    const yDir = new THREE.Vector3().crossVectors(normal, xDir).normalize();
+    return { origin, normal, xDir, yDir };
+  }, [activePlane, activeFaceOrigin, activeFaceNormal]);
 
   const get3DPoint = (u: number, v: number) => {
     if (activePlane === 'FRONT') return new THREE.Vector3(u, v, 0);
     if (activePlane === 'TOP') return new THREE.Vector3(u, 0, v);
     if (activePlane === 'RIGHT') return new THREE.Vector3(0, u, v);
+    if (activePlane === 'FACE' && faceBasis) {
+      return faceBasis.origin.clone()
+        .addScaledVector(faceBasis.xDir, u)
+        .addScaledVector(faceBasis.yDir, v);
+    }
     return new THREE.Vector3(u, v, 0);
   };
 
@@ -63,7 +86,11 @@ export const SketchPreview = () => {
       const pCurr = sketchPoints[i];
       const pNext = sketchPoints[i + 1];
       if (pNext) {
-        if (pCurr[2] === 'CENTER_LINE') {
+        if (pNext[2] && pNext[2].includes('START')) {
+          // This is the boundary of a new drawing chain.
+          // Do NOT draw a segment from pCurr to pNext. Skip it!
+          i += 1;
+        } else if (pCurr[2] && pCurr[2].includes('CENTER_LINE')) {
           list.push({
             id: `cline_${i}`,
             type: 'CENTER_LINE',

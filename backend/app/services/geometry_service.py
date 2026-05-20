@@ -1,3 +1,5 @@
+from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3
 import math
 
 try:
@@ -104,6 +106,293 @@ def find_matching_edge(shape, target_start, target_end):
         return best_edge
     return None
 
+
+def build_feature_shape_in_isolation(f_type, params):
+    if not HAS_OCC:
+        return None
+
+    current_feat_shape = None
+
+    if f_type == 'SKETCH_POLYLINE' or f_type == 'EXTRUDE':
+        plane_type = params.get('plane', 'FRONT')
+        depth = float(params.get('depth', 10.0))
+        points_2d = params.get('points', [])
+
+        filtered_points = []
+        for pt in points_2d:
+            if not pt:
+                continue
+            if not filtered_points:
+                filtered_points.append(pt)
+            else:
+                prev = filtered_points[-1]
+                dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
+                if dist > 1e-4:
+                    filtered_points.append(pt)
+
+        if len(filtered_points) > 1:
+            first = filtered_points[0]
+            last = filtered_points[-1]
+            dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
+            if dist < 1e-4:
+                filtered_points.pop()
+
+        points_2d = filtered_points
+
+        if not points_2d or len(points_2d) < 3:
+            w = float(params.get('width', 10.0))
+            h = float(params.get('height', 10.0))
+            points_2d = [[0, 0], [w, 0], [w, h], [0, h]]
+
+        x_origin = float(params.get('x', 0.0))
+        y_origin = float(params.get('y', 0.0))
+        z_origin = float(params.get('z', 0.0))
+
+        if plane_type == 'FRONT':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
+            vec = gp_Vec(0, 0, depth)
+        elif plane_type == 'TOP':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
+            vec = gp_Vec(0, depth, 0)
+        elif plane_type == 'RIGHT':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
+            vec = gp_Vec(depth, 0, 0)
+        elif plane_type == 'FACE':
+            face_origin = params.get('faceOrigin', [0.0, 0.0, 0.0])
+            face_normal = params.get('faceNormal', [0.0, 0.0, 1.0])
+            ox = float(face_origin[0])
+            oy = float(face_origin[1])
+            oz = float(face_origin[2])
+            nx = float(face_normal[0])
+            ny = float(face_normal[1])
+            nz = float(face_normal[2])
+
+            n_len = math.sqrt(nx*nx + ny*ny + nz*nz)
+            if n_len > 1e-6:
+                nx, ny, nz = nx/n_len, ny/n_len, nz/n_len
+            else:
+                nx, ny, nz = 0.0, 0.0, 1.0
+
+            if abs(nx) < 1e-5 and abs(ny) < 1e-5:
+                xx, xy, xz = 1.0, 0.0, 0.0
+            else:
+                xx, xy, xz = -ny, nx, 0.0
+                x_len = math.sqrt(xx*xx + xy*xy)
+                xx, xy = xx/x_len, xy/x_len
+
+            ax2 = gp_Ax2(gp_Pnt(ox, oy, oz), gp_Dir(nx, ny, nz), gp_Dir(xx, xy, xz))
+            vec = gp_Vec(nx * depth, ny * depth, nz * depth)
+        else:
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
+            vec = gp_Vec(0, 0, depth)
+
+        try:
+            make_wire = BRepBuilderAPI_MakeWire()
+
+            def get_gp_pnt(p):
+                u_val = float(p[0])
+                v_val = float(p[1])
+                if plane_type == 'FRONT':
+                    return gp_Pnt(u_val, v_val, 0)
+                elif plane_type == 'TOP':
+                    return gp_Pnt(u_val, 0, v_val)
+                elif plane_type == 'RIGHT':
+                    return gp_Pnt(0, u_val, v_val)
+                elif plane_type == 'FACE':
+                    return gp_Pnt(u_val, v_val, 0)
+                else:
+                    return gp_Pnt(u_val, v_val, 0)
+
+            i = 0
+            n_points = len(points_2d)
+            while i < n_points:
+                p_start = points_2d[i]
+                p_next = points_2d[(i + 1) % n_points]
+
+                if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
+                    p_control = p_next
+                    p_end = points_2d[(i + 2) % n_points]
+
+                    arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
+                    if arc.IsDone():
+                        edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+                        make_wire.Add(edge)
+                    else:
+                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
+                        make_wire.Add(edge)
+                    i += 2
+                else:
+                    edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
+                    make_wire.Add(edge)
+                    i += 1
+
+            wire = make_wire.Wire()
+            face = BRepBuilderAPI_MakeFace(wire).Face()
+
+            trsf = gp_Trsf()
+            trsf.SetTransformation(gp_Ax3(ax2))
+            face.Move(TopLoc_Location(trsf))
+            vec.Transform(trsf)
+
+            current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
+        except Exception as sketch_err:
+            print(f"[ERROR] Failed to construct sketch/prism wire inside build_feature_shape_in_isolation: {sketch_err}")
+            current_feat_shape = None
+
+    elif f_type == 'REVOLVE':
+        plane_type = params.get('plane', 'FRONT')
+        angle = float(params.get('angle', 360.0)) * math.pi / 180.0
+        points_2d = params.get('points', [])
+
+        filtered_points = []
+        for pt in points_2d:
+            if not pt:
+                continue
+            if not filtered_points:
+                filtered_points.append(pt)
+            else:
+                prev = filtered_points[-1]
+                dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
+                if dist > 1e-4:
+                    filtered_points.append(pt)
+
+        if len(filtered_points) > 1:
+            first = filtered_points[0]
+            last = filtered_points[-1]
+            dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
+            if dist < 1e-4:
+                filtered_points.pop()
+
+        points_2d = filtered_points
+
+        if not points_2d or len(points_2d) < 3:
+            points_2d = [
+                [0, 0], [15, 0], [17.5, 10], [13.0, 35], [17.5, 60], [8.5, 85], [8.5, 120], [0, 120]
+            ]
+
+        x_origin = float(params.get('x', 0.0))
+        y_origin = float(params.get('y', 0.0))
+        z_origin = float(params.get('z', 0.0))
+
+        if plane_type == 'FRONT':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
+            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
+        elif plane_type == 'TOP':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
+            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0))
+        elif plane_type == 'RIGHT':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
+            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
+        elif plane_type == 'FACE':
+            face_origin = params.get('faceOrigin', [0.0, 0.0, 0.0])
+            face_normal = params.get('faceNormal', [0.0, 0.0, 1.0])
+            ox = float(face_origin[0])
+            oy = float(face_origin[1])
+            oz = float(face_origin[2])
+            nx = float(face_normal[0])
+            ny = float(face_normal[1])
+            nz = float(face_normal[2])
+
+            n_len = math.sqrt(nx*nx + ny*ny + nz*nz)
+            if n_len > 1e-6:
+                nx, ny, nz = nx/n_len, ny/n_len, nz/n_len
+            else:
+                nx, ny, nz = 0.0, 0.0, 1.0
+
+            if abs(nx) < 1e-5 and abs(ny) < 1e-5:
+                xx, xy, xz = 1.0, 0.0, 0.0
+            else:
+                xx, xy, xz = -ny, nx, 0.0
+                x_len = math.sqrt(xx*xx + xy*xy)
+                xx, xy = xx/x_len, xy/x_len
+
+            ax2 = gp_Ax2(gp_Pnt(ox, oy, oz), gp_Dir(nx, ny, nz), gp_Dir(xx, xy, xz))
+            yx, yy, yz = ny*xz - nz*xy, nz*xx - nx*xz, nx*xy - ny*xx
+            ax1 = gp_Ax1(gp_Pnt(ox, oy, oz), gp_Dir(yx, yy, yz))
+        else:
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
+            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
+
+        try:
+            make_wire = BRepBuilderAPI_MakeWire()
+
+            def get_gp_pnt(p):
+                u_val = float(p[0])
+                v_val = float(p[1])
+                if plane_type == 'FRONT':
+                    return gp_Pnt(u_val, v_val, 0)
+                elif plane_type == 'TOP':
+                    return gp_Pnt(u_val, 0, v_val)
+                elif plane_type == 'RIGHT':
+                    return gp_Pnt(0, u_val, v_val)
+                elif plane_type == 'FACE':
+                    return gp_Pnt(u_val, v_val, 0)
+                else:
+                    return gp_Pnt(u_val, v_val, 0)
+
+            i = 0
+            n_points = len(points_2d)
+            while i < n_points:
+                p_start = points_2d[i]
+                p_next = points_2d[(i + 1) % n_points]
+
+                if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
+                    p_control = p_next
+                    p_end = points_2d[(i + 2) % n_points]
+
+                    arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
+                    if arc.IsDone():
+                        edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+                        make_wire.Add(edge)
+                    else:
+                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
+                        make_wire.Add(edge)
+                    i += 2
+                else:
+                    edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
+                    make_wire.Add(edge)
+                    i += 1
+
+            wire = make_wire.Wire()
+            face = BRepBuilderAPI_MakeFace(wire).Face()
+
+            trsf = gp_Trsf()
+            trsf.SetTransformation(gp_Ax3(ax2))
+            face.Move(TopLoc_Location(trsf))
+            ax1.Transform(trsf)
+
+            current_feat_shape = BRepPrimAPI_MakeRevol(face, ax1, angle).Shape()
+        except Exception as e:
+            print(f"[ERROR] Revolve failed inside build_feature_shape_in_isolation: {e}")
+            current_feat_shape = None
+
+    elif f_type == 'BOX':
+        w = float(params.get('width', 10.0))
+        h = float(params.get('height', 10.0))
+        d = float(params.get('depth', 10.0))
+        x = float(params.get('x', 0.0))
+        y = float(params.get('y', 0.0))
+        z = float(params.get('z', 0.0))
+        current_feat_shape = BRepPrimAPI_MakeBox(gp_Pnt(x, y, z), w, h, d).Shape()
+
+    elif f_type == 'CYLINDER':
+        r = float(params.get('radius', 5.0))
+        h = float(params.get('height', 10.0))
+        x = float(params.get('x', 0.0))
+        y = float(params.get('y', 0.0))
+        z = float(params.get('z', 0.0))
+        ax = gp_Ax2(gp_Pnt(x, y, z), gp_Dir(0, 0, 1))
+        current_feat_shape = BRepPrimAPI_MakeCylinder(ax, r, h).Shape()
+
+    elif f_type == 'SPHERE':
+        r = float(params.get('radius', 5.0))
+        x = float(params.get('x', 0.0))
+        y = float(params.get('y', 0.0))
+        z = float(params.get('z', 0.0))
+        current_feat_shape = BRepPrimAPI_MakeSphere(gp_Pnt(x, y, z), r).Shape()
+
+    return current_feat_shape
+
 def process_features(features):
     """
     The Core CAD Kernel: Processes a sequence of parametric features to build a B-Rep model.
@@ -163,246 +452,63 @@ def process_features(features):
                             print(f"[ERROR] Chamfer failed: {chamfer_err}")
             continue
 
-        if f_type == 'SKETCH_POLYLINE' or f_type == 'EXTRUDE':
-            # Support both explicit Sketch and the unified Extrude
-            plane_type = params.get('plane', 'FRONT')
-            depth = float(params.get('depth', 10.0))
-            points_2d = params.get('points', []) # Expected list of [u, v]
-            
-            # Robust pre-processing: filter out consecutive duplicate points (Zero-Length Edge Prevention)
-            filtered_points = []
-            for pt in points_2d:
-                if not pt:
-                    continue
-                if not filtered_points:
-                    filtered_points.append(pt)
-                else:
-                    prev = filtered_points[-1]
-                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
-                    if dist > 1e-4:
-                        filtered_points.append(pt)
-            
-            # Remove trailing point if it duplicates the start point
-            if len(filtered_points) > 1:
-                first = filtered_points[0]
-                last = filtered_points[-1]
-                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
-                if dist < 1e-4:
-                    filtered_points.pop()
-            
-            points_2d = filtered_points
+        if f_type in ['SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE']:
+            current_feat_shape = build_feature_shape_in_isolation(f_type, params)
 
-            if not points_2d or len(points_2d) < 3:
-                # Fallback to rectangle if points are missing (Legacy support)
-                w = float(params.get('width', 10.0))
-                h = float(params.get('height', 10.0))
-                points_2d = [[0, 0], [w, 0], [w, h], [0, h]]
+        elif f_type == 'PATTERN':
+            target_id = params.get('target_feature_id')
+            pattern_type = params.get('pattern_type', 'LINEAR')
+            axis = params.get('axis', 'X')
+            count = int(params.get('count', 2))
+            spacing = float(params.get('spacing', 10.0))
 
-            x_origin = float(params.get('x', 0.0))
-            y_origin = float(params.get('y', 0.0))
-            z_origin = float(params.get('z', 0.0))
+            target_feat = None
+            for prev_feat in features:
+                prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
+                if prev_id == target_id:
+                    target_feat = prev_feat
+                    break
 
-            # Define Plane Axis
-            if plane_type == 'FRONT': # XY
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
-                vec = gp_Vec(0, 0, depth)
-            elif plane_type == 'TOP': # XZ
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
-                vec = gp_Vec(0, depth, 0)
-            elif plane_type == 'RIGHT': # YZ
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
-                vec = gp_Vec(depth, 0, 0)
-            else:
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-                vec = gp_Vec(0, 0, depth)
+            if target_feat:
+                tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
+                tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
+                target_shape = build_feature_shape_in_isolation(tf_type, tf_params)
 
-            try:
-                # Build Wire supporting Lines and Arcs
-                make_wire = BRepBuilderAPI_MakeWire()
-                
-                def get_gp_pnt(p):
-                    u_val = float(p[0])
-                    v_val = float(p[1])
-                    if plane_type == 'FRONT':
-                        return gp_Pnt(u_val, v_val, 0)
-                    elif plane_type == 'TOP':
-                        return gp_Pnt(u_val, 0, v_val)
-                    elif plane_type == 'RIGHT':
-                        return gp_Pnt(0, u_val, v_val)
-                    else:
-                        return gp_Pnt(u_val, v_val, 0)
+                if target_shape:
+                    copies = []
+                    for i in range(1, count):
+                        trsf = gp_Trsf()
+                        if pattern_type == 'LINEAR':
+                            val = spacing * i
+                            if axis == 'X':
+                                vec = gp_Vec(val, 0, 0)
+                            elif axis == 'Y':
+                                vec = gp_Vec(0, val, 0)
+                            else:
+                                vec = gp_Vec(0, 0, val)
+                            trsf.SetTranslation(vec)
+                        else:  # CIRCULAR
+                            angle_rad = math.radians(spacing * i)
+                            if axis == 'X':
+                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
+                            elif axis == 'Y':
+                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0))
+                            else:
+                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+                            trsf.SetRotation(ax1, angle_rad)
 
-                i = 0
-                n_points = len(points_2d)
-                while i < n_points:
-                    p_start = points_2d[i]
-                    p_next = points_2d[(i + 1) % n_points]
-                    
-                    # Check if next point is an arc control point
-                    if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                        p_control = p_next
-                        p_end = points_2d[(i + 2) % n_points]
-                        
-                        gp_start = get_gp_pnt(p_start)
-                        gp_control = get_gp_pnt(p_control)
-                        gp_end = get_gp_pnt(p_end)
-                        
-                        arc = GC_MakeArcOfCircle(gp_start, gp_control, gp_end)
-                        if arc.IsDone():
-                            edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                            make_wire.Add(edge)
+                        shape_copy = target_shape.Moved(TopLoc_Location(trsf))
+                        copies.append(shape_copy)
+
+                    target_op = tf_params.get('operation', 'ADD')
+                    for copy_shape in copies:
+                        if final_shape is None:
+                            final_shape = copy_shape
                         else:
-                            edge = BRepBuilderAPI_MakeEdge(gp_start, gp_end).Edge()
-                            make_wire.Add(edge)
-                        i += 2
-                    else:
-                        gp_start = get_gp_pnt(p_start)
-                        gp_end = get_gp_pnt(p_next)
-                        
-                        edge = BRepBuilderAPI_MakeEdge(gp_start, gp_end).Edge()
-                        make_wire.Add(edge)
-                        i += 1
-
-                wire = make_wire.Wire()
-                face = BRepBuilderAPI_MakeFace(wire).Face()
-
-                # Apply Transformation (Place local sketch onto the datum plane)
-                trsf = gp_Trsf()
-                trsf.SetTransformation(gp_Ax3(ax2))
-                face.Move(TopLoc_Location(trsf))
-                
-                # Transform the extrusion vector to global space
-                vec.Transform(trsf)
-                
-                current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
-            except Exception as sketch_err:
-                print(f"[ERROR] Failed to construct sketch/prism wire: {sketch_err}")
-                current_feat_shape = None
-
-        elif f_type == 'REVOLVE':
-            plane_type = params.get('plane', 'FRONT')
-            angle = float(params.get('angle', 360.0)) * math.pi / 180.0
-            points_2d = params.get('points', [])
-            
-            filtered_points = []
-            for pt in points_2d:
-                if not pt:
-                    continue
-                if not filtered_points:
-                    filtered_points.append(pt)
-                else:
-                    prev = filtered_points[-1]
-                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
-                    if dist > 1e-4:
-                        filtered_points.append(pt)
-            
-            if len(filtered_points) > 1:
-                first = filtered_points[0]
-                last = filtered_points[-1]
-                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
-                if dist < 1e-4:
-                    filtered_points.pop()
-            
-            points_2d = filtered_points
-
-            if not points_2d or len(points_2d) < 3:
-                # Default half bottle sketch profile
-                points_2d = [
-                    [0, 0], [15, 0], [17.5, 10], [13.0, 35], [17.5, 60], [8.5, 85], [8.5, 120], [0, 120]
-                ]
-
-            x_origin = float(params.get('x', 0.0))
-            y_origin = float(params.get('y', 0.0))
-            z_origin = float(params.get('z', 0.0))
-
-            if plane_type == 'FRONT':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
-            elif plane_type == 'TOP':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0))
-            elif plane_type == 'RIGHT':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-            else:
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
-
-            try:
-                make_wire = BRepBuilderAPI_MakeWire()
-                
-                def get_gp_pnt(p):
-                    u_val = float(p[0])
-                    v_val = float(p[1])
-                    if plane_type == 'FRONT':
-                        return gp_Pnt(u_val, v_val, 0)
-                    elif plane_type == 'TOP':
-                        return gp_Pnt(u_val, 0, v_val)
-                    elif plane_type == 'RIGHT':
-                        return gp_Pnt(0, u_val, v_val)
-                    else:
-                        return gp_Pnt(u_val, v_val, 0)
-
-                i = 0
-                n_points = len(points_2d)
-                while i < n_points:
-                    p_start = points_2d[i]
-                    p_next = points_2d[(i + 1) % n_points]
-                    
-                    if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                        p_control = p_next
-                        p_end = points_2d[(i + 2) % n_points]
-                        
-                        arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
-                        if arc.IsDone():
-                            edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                            make_wire.Add(edge)
-                        else:
-                            edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
-                            make_wire.Add(edge)
-                        i += 2
-                    else:
-                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
-                        make_wire.Add(edge)
-                        i += 1
-
-                wire = make_wire.Wire()
-                face = BRepBuilderAPI_MakeFace(wire).Face()
-
-                trsf = gp_Trsf()
-                trsf.SetTransformation(gp_Ax3(ax2))
-                face.Move(TopLoc_Location(trsf))
-                ax1.Transform(trsf)
-                
-                current_feat_shape = BRepPrimAPI_MakeRevol(face, ax1, angle).Shape()
-            except Exception as e:
-                print(f"[ERROR] Revolve failed inside process_features: {e}")
-                current_feat_shape = None
-
-        elif f_type == 'BOX':
-            w = float(params.get('width', 10.0))
-            h = float(params.get('height', 10.0))
-            d = float(params.get('depth', 10.0))
-            x = float(params.get('x', 0.0))
-            y = float(params.get('y', 0.0))
-            z = float(params.get('z', 0.0))
-            current_feat_shape = BRepPrimAPI_MakeBox(gp_Pnt(x, y, z), w, h, d).Shape()
-
-        elif f_type == 'CYLINDER':
-            r = float(params.get('radius', 5.0))
-            h = float(params.get('height', 10.0))
-            x = float(params.get('x', 0.0))
-            y = float(params.get('y', 0.0))
-            z = float(params.get('z', 0.0))
-            ax = gp_Ax2(gp_Pnt(x, y, z), gp_Dir(0, 0, 1))
-            current_feat_shape = BRepPrimAPI_MakeCylinder(ax, r, h).Shape()
-
-        elif f_type == 'SPHERE':
-            r = float(params.get('radius', 5.0))
-            x = float(params.get('x', 0.0))
-            y = float(params.get('y', 0.0))
-            z = float(params.get('z', 0.0))
-            current_feat_shape = BRepPrimAPI_MakeSphere(gp_Pnt(x, y, z), r).Shape()
+                            if target_op == 'ADD':
+                                final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                            elif target_op == 'CUT':
+                                final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
 
         # Perform the B-Rep boolean combination
         if current_feat_shape:
@@ -466,228 +572,65 @@ def build_shape_only(features):
                             print(f"[ERROR] Chamfer failed: {chamfer_err}")
             continue
 
-        if f_type == 'SKETCH_POLYLINE' or f_type == 'EXTRUDE':
-            plane_type = params.get('plane', 'FRONT')
-            depth = float(params.get('depth', 10.0))
-            points_2d = params.get('points', [])
-            
-            filtered_points = []
-            for pt in points_2d:
-                if not pt:
-                    continue
-                if not filtered_points:
-                    filtered_points.append(pt)
-                else:
-                    prev = filtered_points[-1]
-                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
-                    if dist > 1e-4:
-                        filtered_points.append(pt)
-            
-            if len(filtered_points) > 1:
-                first = filtered_points[0]
-                last = filtered_points[-1]
-                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
-                if dist < 1e-4:
-                    filtered_points.pop()
-            
-            points_2d = filtered_points
+        if f_type in ['SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE']:
+            current_feat_shape = build_feature_shape_in_isolation(f_type, params)
 
-            if not points_2d or len(points_2d) < 3:
-                w = float(params.get('width', 10.0))
-                h = float(params.get('height', 10.0))
-                points_2d = [[0, 0], [w, 0], [w, h], [0, h]]
+        elif f_type == 'PATTERN':
+            target_id = params.get('target_feature_id')
+            pattern_type = params.get('pattern_type', 'LINEAR')
+            axis = params.get('axis', 'X')
+            count = int(params.get('count', 2))
+            spacing = float(params.get('spacing', 10.0))
 
-            x_origin = float(params.get('x', 0.0))
-            y_origin = float(params.get('y', 0.0))
-            z_origin = float(params.get('z', 0.0))
+            target_feat = None
+            for prev_feat in features:
+                prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
+                if prev_id == target_id:
+                    target_feat = prev_feat
+                    break
 
-            if plane_type == 'FRONT':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
-                vec = gp_Vec(0, 0, depth)
-            elif plane_type == 'TOP':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
-                vec = gp_Vec(0, depth, 0)
-            elif plane_type == 'RIGHT':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
-                vec = gp_Vec(depth, 0, 0)
-            else:
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-                vec = gp_Vec(0, 0, depth)
+            if target_feat:
+                tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
+                tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
+                target_shape = build_feature_shape_in_isolation(tf_type, tf_params)
 
-            try:
-                make_wire = BRepBuilderAPI_MakeWire()
-                
-                def get_gp_pnt(p):
-                    u_val = float(p[0])
-                    v_val = float(p[1])
-                    if plane_type == 'FRONT':
-                        return gp_Pnt(u_val, v_val, 0)
-                    elif plane_type == 'TOP':
-                        return gp_Pnt(u_val, 0, v_val)
-                    elif plane_type == 'RIGHT':
-                        return gp_Pnt(0, u_val, v_val)
-                    else:
-                        return gp_Pnt(u_val, v_val, 0)
+                if target_shape:
+                    copies = []
+                    for i in range(1, count):
+                        trsf = gp_Trsf()
+                        if pattern_type == 'LINEAR':
+                            val = spacing * i
+                            if axis == 'X':
+                                vec = gp_Vec(val, 0, 0)
+                            elif axis == 'Y':
+                                vec = gp_Vec(0, val, 0)
+                            else:
+                                vec = gp_Vec(0, 0, val)
+                            trsf.SetTranslation(vec)
+                        else:  # CIRCULAR
+                            angle_rad = math.radians(spacing * i)
+                            if axis == 'X':
+                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
+                            elif axis == 'Y':
+                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0))
+                            else:
+                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+                            trsf.SetRotation(ax1, angle_rad)
 
-                i = 0
-                n_points = len(points_2d)
-                while i < n_points:
-                    p_start = points_2d[i]
-                    p_next = points_2d[(i + 1) % n_points]
-                    
-                    if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                        p_control = p_next
-                        p_end = points_2d[(i + 2) % n_points]
-                        
-                        arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
-                        if arc.IsDone():
-                            edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                            make_wire.Add(edge)
+                        shape_copy = target_shape.Moved(TopLoc_Location(trsf))
+                        copies.append(shape_copy)
+
+                    target_op = tf_params.get('operation', 'ADD')
+                    for copy_shape in copies:
+                        if final_shape is None:
+                            final_shape = copy_shape
                         else:
-                            edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
-                            make_wire.Add(edge)
-                        i += 2
-                    else:
-                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
-                        make_wire.Add(edge)
-                        i += 1
+                            if target_op == 'ADD':
+                                final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                            elif target_op == 'CUT':
+                                final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
 
-                wire = make_wire.Wire()
-                face = BRepBuilderAPI_MakeFace(wire).Face()
-
-                trsf = gp_Trsf()
-                trsf.SetTransformation(gp_Ax3(ax2))
-                face.Move(TopLoc_Location(trsf))
-                vec.Transform(trsf)
-                
-                current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
-            except Exception:
-                current_feat_shape = None
-
-        elif f_type == 'REVOLVE':
-            plane_type = params.get('plane', 'FRONT')
-            angle = float(params.get('angle', 360.0)) * math.pi / 180.0
-            points_2d = params.get('points', [])
-            
-            filtered_points = []
-            for pt in points_2d:
-                if not pt:
-                    continue
-                if not filtered_points:
-                    filtered_points.append(pt)
-                else:
-                    prev = filtered_points[-1]
-                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
-                    if dist > 1e-4:
-                        filtered_points.append(pt)
-            
-            if len(filtered_points) > 1:
-                first = filtered_points[0]
-                last = filtered_points[-1]
-                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
-                if dist < 1e-4:
-                    filtered_points.pop()
-            
-            points_2d = filtered_points
-
-            if not points_2d or len(points_2d) < 3:
-                points_2d = [
-                    [0, 0], [15, 0], [17.5, 10], [13.0, 35], [17.5, 60], [8.5, 85], [8.5, 120], [0, 120]
-                ]
-
-            x_origin = float(params.get('x', 0.0))
-            y_origin = float(params.get('y', 0.0))
-            z_origin = float(params.get('z', 0.0))
-
-            if plane_type == 'FRONT':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
-            elif plane_type == 'TOP':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0))
-            elif plane_type == 'RIGHT':
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-            else:
-                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-                ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
-
-            try:
-                make_wire = BRepBuilderAPI_MakeWire()
-                
-                def get_gp_pnt(p):
-                    u_val = float(p[0])
-                    v_val = float(p[1])
-                    if plane_type == 'FRONT':
-                        return gp_Pnt(u_val, v_val, 0)
-                    elif plane_type == 'TOP':
-                        return gp_Pnt(u_val, 0, v_val)
-                    elif plane_type == 'RIGHT':
-                        return gp_Pnt(0, u_val, v_val)
-                    else:
-                        return gp_Pnt(u_val, v_val, 0)
-
-                i = 0
-                n_points = len(points_2d)
-                while i < n_points:
-                    p_start = points_2d[i]
-                    p_next = points_2d[(i + 1) % n_points]
-                    
-                    if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                        p_control = p_next
-                        p_end = points_2d[(i + 2) % n_points]
-                        
-                        arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
-                        if arc.IsDone():
-                            edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                            make_wire.Add(edge)
-                        else:
-                            edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
-                            make_wire.Add(edge)
-                        i += 2
-                    else:
-                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
-                        make_wire.Add(edge)
-                        i += 1
-
-                wire = make_wire.Wire()
-                face = BRepBuilderAPI_MakeFace(wire).Face()
-
-                trsf = gp_Trsf()
-                trsf.SetTransformation(gp_Ax3(ax2))
-                face.Move(TopLoc_Location(trsf))
-                ax1.Transform(trsf)
-                
-                current_feat_shape = BRepPrimAPI_MakeRevol(face, ax1, angle).Shape()
-            except Exception as e:
-                print(f"[ERROR] Revolve failed inside build_shape_only: {e}")
-                current_feat_shape = None
-
-        elif f_type == 'BOX':
-            w = float(params.get('width', 10.0))
-            h = float(params.get('height', 10.0))
-            d = float(params.get('depth', 10.0))
-            x = float(params.get('x', 0.0))
-            y = float(params.get('y', 0.0))
-            z = float(params.get('z', 0.0))
-            current_feat_shape = BRepPrimAPI_MakeBox(gp_Pnt(x, y, z), w, h, d).Shape()
-
-        elif f_type == 'CYLINDER':
-            r = float(params.get('radius', 5.0))
-            h = float(params.get('height', 10.0))
-            x = float(params.get('x', 0.0))
-            y = float(params.get('y', 0.0))
-            z = float(params.get('z', 0.0))
-            ax = gp_Ax2(gp_Pnt(x, y, z), gp_Dir(0, 0, 1))
-            current_feat_shape = BRepPrimAPI_MakeCylinder(ax, r, h).Shape()
-
-        elif f_type == 'SPHERE':
-            r = float(params.get('radius', 5.0))
-            x = float(params.get('x', 0.0))
-            y = float(params.get('y', 0.0))
-            z = float(params.get('z', 0.0))
-            current_feat_shape = BRepPrimAPI_MakeSphere(gp_Pnt(x, y, z), r).Shape()
-
+        # Perform the B-Rep boolean combination
         if current_feat_shape:
             if final_shape is None:
                 final_shape = current_feat_shape
@@ -994,3 +937,30 @@ def generate_mock_mesh(features):
 
 
 
+
+def project_2d(features, plane_type='FRONT'):
+    shape = build_shape_only(features)
+    if not shape or shape.IsNull():
+        return []
+
+    # Simplified projection: extract edges and project them to 2D
+    projected_lines = []
+    explorer = TopExp_Explorer(shape, TopAbs_EDGE)
+    while explorer.More():
+        edge = topods.Edge(explorer.Current())
+        v_exp = TopExp_Explorer(edge, TopAbs_VERTEX)
+        pnts = []
+        while v_exp.More():
+            v = topods.Vertex(v_exp.Current())
+            pt = BRep_Tool.Pnt(v)
+            if plane_type == 'FRONT': u, v_val = pt.X(), pt.Y()
+            elif plane_type == 'TOP': u, v_val = pt.X(), pt.Z()
+            elif plane_type == 'RIGHT': u, v_val = pt.Y(), pt.Z()
+            else: u, v_val = pt.X(), pt.Y()
+            pnts.append([u, v_val])
+            v_exp.Next()
+        if len(pnts) >= 2:
+            projected_lines.append(pnts)
+        explorer.Next()
+    
+    return projected_lines

@@ -183,4 +183,119 @@ export class MeasurementService {
         return value.toString();
     }
   }
+
+  /**
+   * Calculate center of gravity (centroid) of a mesh
+   * @param geometry Three.js BufferGeometry
+   * @returns Center of gravity coordinates [x, y, z]
+   */
+  public calculateCenterOfGravity(geometry: THREE.BufferGeometry): [number, number, number] {
+    const positionAttribute = geometry.attributes.position;
+    let sumX = 0;
+    let sumY = 0;
+    let sumZ = 0;
+    let count = 0;
+
+    for (let i = 0; i < positionAttribute.count; i++) {
+      sumX += positionAttribute.getX(i);
+      sumY += positionAttribute.getY(i);
+      sumZ += positionAttribute.getZ(i);
+      count++;
+    }
+
+    if (count === 0) {
+      return [0, 0, 0];
+    }
+
+    return [sumX / count, sumY / count, sumZ / count];
+  }
+
+  /**
+   * Calculate inertia tensor of a mesh
+   * Uses the parallel axis theorem for tetrahedrons
+   * @param geometry Three.js BufferGeometry
+   * @param density Material density (default: 1.0)
+   * @returns Inertia tensor as 3x3 matrix [[Ixx, Ixy, Ixz], [Ixy, Iyy, Iyz], [Ixz, Iyz, Izz]]
+   */
+  public calculateInertiaTensor(
+    geometry: THREE.BufferGeometry,
+    density: number = 1.0
+  ): number[][] {
+    const positionAttribute = geometry.attributes.position;
+    let Ixx = 0;
+    let Iyy = 0;
+    let Izz = 0;
+    let Ixy = 0;
+    let Ixz = 0;
+    let Iyz = 0;
+
+    for (let i = 0; i < positionAttribute.count; i += 3) {
+      const v1 = new THREE.Vector3(
+        positionAttribute.getX(i),
+        positionAttribute.getY(i),
+        positionAttribute.getZ(i)
+      );
+      const v2 = new THREE.Vector3(
+        positionAttribute.getX(i + 1),
+        positionAttribute.getY(i + 1),
+        positionAttribute.getZ(i + 1)
+      );
+      const v3 = new THREE.Vector3(
+        positionAttribute.getX(i + 2),
+        positionAttribute.getY(i + 2),
+        positionAttribute.getZ(i + 2)
+      );
+
+      // Volume of tetrahedron from origin
+      const cross = new THREE.Vector3().crossVectors(v2, v3);
+      const volume = v1.dot(cross) / 6;
+
+      if (volume === 0) continue;
+
+      // Centroid of tetrahedron (average of vertices)
+      const cx = (v1.x + v2.x + v3.x) / 4;
+      const cy = (v1.y + v2.y + v3.y) / 4;
+      const cz = (v1.z + v2.z + v3.z) / 4;
+
+      // Mass of tetrahedron
+      const mass = density * Math.abs(volume);
+
+      // Inertia tensor of tetrahedron about its centroid
+      // Using formula for tetrahedron with vertices at origin and v1, v2, v3
+      const Ixx_tet = mass * (v1.y * v1.y + v1.z * v1.z + v2.y * v2.y + v2.z * v2.z + v3.y * v3.y + v3.z * v3.z - v1.y * v1.z - v2.y * v2.z - v3.y * v3.z) / 20;
+      const Iyy_tet = mass * (v1.x * v1.x + v1.z * v1.z + v2.x * v2.x + v2.z * v2.z + v3.x * v3.x + v3.z * v3.z - v1.x * v1.z - v2.x * v2.z - v3.x * v3.z) / 20;
+      const Izz_tet = mass * (v1.x * v1.x + v1.y * v1.y + v2.x * v2.x + v2.y * v2.y + v3.x * v3.x + v3.y * v3.y - v1.x * v1.y - v2.x * v2.y - v3.x * v3.y) / 20;
+
+      const Ixy_tet = -mass * (v1.x * v1.y + v1.x * v2.y + v2.x * v1.y + v2.x * v2.y + v1.x * v3.y + v3.x * v1.y + v2.x * v3.y + v3.x * v2.y + v3.x * v3.y) / 40;
+      const Ixz_tet = -mass * (v1.x * v1.z + v1.x * v2.z + v2.x * v1.z + v2.x * v2.z + v1.x * v3.z + v3.x * v1.z + v2.x * v3.z + v3.x * v2.z + v3.x * v3.z) / 40;
+      const Iyz_tet = -mass * (v1.y * v1.z + v1.y * v2.z + v2.y * v1.z + v2.y * v2.z + v1.y * v3.z + v3.y * v1.z + v2.y * v3.z + v3.y * v2.z + v3.y * v3.z) / 40;
+
+      // Parallel axis theorem: I = I_cm + m * (d^2 * I - d * d^T)
+      const dx = cx;
+      const dy = cy;
+      const dz = cz;
+
+      Ixx += Ixx_tet + mass * (dy * dy + dz * dz);
+      Iyy += Iyy_tet + mass * (dx * dx + dz * dz);
+      Izz += Izz_tet + mass * (dx * dx + dy * dy);
+      Ixy += Ixy_tet + mass * dx * dy;
+      Ixz += Ixz_tet + mass * dx * dz;
+      Iyz += Iyz_tet + mass * dy * dz;
+    }
+
+    return [
+      [Ixx, Ixy, Ixz],
+      [Ixy, Iyy, Iyz],
+      [Ixz, Iyz, Izz],
+    ];
+  }
+
+  /**
+   * Format inertia tensor for display
+   * @param tensor 3x3 inertia tensor matrix
+   * @returns Formatted string representation
+   */
+  public formatInertiaTensor(tensor: number[][]): string {
+    return `[[${tensor[0][0].toFixed(2)}, ${tensor[0][1].toFixed(2)}, ${tensor[0][2].toFixed(2)}],\n [${tensor[1][0].toFixed(2)}, ${tensor[1][1].toFixed(2)}, ${tensor[1][2].toFixed(2)}],\n [${tensor[2][0].toFixed(2)}, ${tensor[2][1].toFixed(2)}, ${tensor[2][2].toFixed(2)}]]`;
+  }
 }

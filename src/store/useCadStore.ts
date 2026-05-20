@@ -3,9 +3,36 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING';
 export type MeasurementMode = 'NONE' | 'DISTANCE' | 'ANGLE' | 'AREA' | 'VOLUME';
+export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT';
+
+export interface MateEntity {
+  componentId: string;
+  topologyId: string;
+}
+
+export interface CADMate {
+  id: string;
+  name: string;
+  type: MateType;
+  entity1: MateEntity;
+  entity2: MateEntity;
+  alignment: 'ALIGNED' | 'ANTI_ALIGNED';
+  offset?: number;
+}
+
+export interface CADComponent {
+  id: string;
+  partId: string;
+  instanceName: string;
+  transform: {
+    position: [number, number, number];
+    rotation: [number, number, number];
+  };
+  visible: boolean;
+}
 
 export interface CADContextMenu {
-  plane: 'FRONT' | 'TOP' | 'RIGHT';
+  plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE';
   position: [number, number, number];
 }
 
@@ -18,7 +45,7 @@ export interface MeasurementResult {
 
 export interface CADFeature {
   id: string;
-  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'REVOLVE' | 'FILLET' | 'CHAMFER';
+  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'REVOLVE' | 'FILLET' | 'CHAMFER' | 'PATTERN';
   name: string;
   parameters: any;
 }
@@ -29,19 +56,28 @@ interface CadState {
 
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
-  activePlane: 'FRONT' | 'TOP' | 'RIGHT' | null;
-  setActivePlane: (plane: 'FRONT' | 'TOP' | 'RIGHT' | null) => void;
+  activePlane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' | null;
+  setActivePlane: (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' | null) => void;
+
+  activeFaceOrigin: [number, number, number] | null;
+  setActiveFaceOrigin: (origin: [number, number, number] | null) => void;
+  activeFaceNormal: [number, number, number] | null;
+  setActiveFaceNormal: (normal: [number, number, number] | null) => void;
+  activeFaceId: string | null;
+  setActiveFaceId: (id: string | null) => void;
 
   sketchPoints: any[]; // 2D points on the active plane
   setSketchPoints: (points: any[]) => void;
-  sketchTool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC';
-  setSketchTool: (tool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC') => void;
+  sketchTool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC' | 'MIDPOINT_LINE';
+  setSketchTool: (tool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC' | 'MIDPOINT_LINE') => void;
   gridSnap: boolean;
   setGridSnap: (snap: boolean) => void;
   sketchRelations: string[];
   setSketchRelations: (relations: string[]) => void;
   selectedEntityIds: string[];
   setSelectedEntityIds: (ids: string[]) => void;
+  sketchNewChain: boolean;
+  setSketchNewChain: (val: boolean) => void;
 
   projectName: string;
 
@@ -69,6 +105,20 @@ interface CadState {
   setMeasurementPoints: (points: any[]) => void;
   measurementResults: MeasurementResult | null;
   setMeasurementResults: (results: MeasurementResult | null) => void;
+
+  // Assembly & Mate State
+  components: CADComponent[];
+  setComponents: (components: CADComponent[]) => void;
+  addComponent: (component: CADComponent) => void;
+  mates: CADMate[];
+  setMates: (mates: CADMate[]) => void;
+  addMate: (mate: CADMate) => void;
+
+  // Assembly Selection State
+  mateSelection: any[];
+  setMateSelection: (selection: any[]) => void;
+  addMateSelection: (entity: any) => void;
+  clearMateSelection: () => void;
 
   // Render State
   meshData: any[]; // Array of { id, data: { vertices, indices, normals } }
@@ -102,6 +152,13 @@ export const useCadStore = create<CadState>()(
       activePlane: null,
       setActivePlane: (plane) => set({ activePlane: plane }),
 
+      activeFaceOrigin: null,
+      setActiveFaceOrigin: (activeFaceOrigin) => set({ activeFaceOrigin }),
+      activeFaceNormal: null,
+      setActiveFaceNormal: (activeFaceNormal) => set({ activeFaceNormal }),
+      activeFaceId: null,
+      setActiveFaceId: (activeFaceId) => set({ activeFaceId }),
+
       sketchPoints: [],
       setSketchPoints: (points) => set({ sketchPoints: points }),
       sketchTool: 'LINE',
@@ -112,6 +169,8 @@ export const useCadStore = create<CadState>()(
       setSketchRelations: (relations) => set({ sketchRelations: relations }),
       selectedEntityIds: [],
       setSelectedEntityIds: (selectedEntityIds) => set({ selectedEntityIds }),
+      sketchNewChain: true,
+      setSketchNewChain: (sketchNewChain) => set({ sketchNewChain }),
 
       projectName: 'Professional CAD Project',
 
@@ -156,6 +215,18 @@ export const useCadStore = create<CadState>()(
       measurementResults: null,
       setMeasurementResults: (measurementResults) => set({ measurementResults }),
 
+      components: [],
+      setComponents: (components) => set({ components }),
+      addComponent: (component) => set((state) => ({ components: [...state.components, component] })),
+      mates: [],
+      setMates: (mates) => set({ mates }),
+      addMate: (mate) => set((state) => ({ mates: [...state.mates, mate] })),
+
+      mateSelection: [],
+      setMateSelection: (mateSelection) => set({ mateSelection }),
+      addMateSelection: (entity) => set((state) => ({ mateSelection: [...state.mateSelection, entity] })),
+      clearMateSelection: () => set({ mateSelection: [] }),
+
       meshData: [],
       setMeshData: (meshData) => set({ meshData }),
 
@@ -190,6 +261,12 @@ export const useCadStore = create<CadState>()(
         selectedId: state.selectedId,
         selectedTopology: state.selectedTopology,
         selectedEntityIds: state.selectedEntityIds,
+        components: state.components,
+        mates: state.mates,
+        activePlane: state.activePlane,
+        activeFaceOrigin: state.activeFaceOrigin,
+        activeFaceNormal: state.activeFaceNormal,
+        activeFaceId: state.activeFaceId,
       }), // Don't persist meshData and transient measurement state as they can be large or dynamic
     }
   )

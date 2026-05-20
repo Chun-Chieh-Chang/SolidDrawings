@@ -6,9 +6,14 @@ import OcctShape, { type MeshData } from '@/renderer/OcctShape';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
 import { HeavyEngineClient } from '@/kernel/HeavyEngineClient';
 import { MeasurementService } from '@/kernel/MeasurementService';
+import { MeasurementPanel } from '@/ui/MeasurementPanel';
+import { SketchHUD } from '@/renderer/SketchHUD';
+import { onFileOpen, onSaveRequest, onNewFile, appAPI, fileAPI } from '../../electron/renderer';
+import { MatePanel } from '@/ui/MatePanel';
+import { DrawingSheet } from '@/ui/DrawingSheet';
 
-const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' => (
-  plane === 'FRONT' || plane === 'TOP' || plane === 'RIGHT'
+const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' => (
+  plane === 'FRONT' || plane === 'TOP' || plane === 'RIGHT' || plane === 'FACE'
 );
 
 const cloneSketchPoints = (points: unknown[]) => (
@@ -25,6 +30,53 @@ export interface SketchEntity {
 }
 
 export default function Home() {
+  // Electron Native Integration
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.electronAPI) return;
+
+    const unsubs = [
+      onFileOpen(async (path) => {
+        const result = await fileAPI.read(path);
+        if (result.success && result.content) {
+          try {
+            const data = JSON.parse(result.content);
+            if (data.features) {
+              useCadStore.setState({ features: data.features });
+              appAPI.notify('File Opened', `Successfully loaded ${path}`);
+            }
+          } catch (e) {
+            appAPI.notify('Open Failed', 'Invalid project file format');
+          }
+        }
+      }),
+      onSaveRequest(async () => {
+        const state = useCadStore.getState();
+        const data = JSON.stringify({
+          features: state.features,
+          projectName: state.projectName
+        });
+        const result = await fileAPI.save(data);
+        if (result?.success) {
+          appAPI.notify('Saved', `Project saved to ${result.path}`);
+        }
+      }),
+      onNewFile(() => {
+        if (confirm('Create new project? All unsaved changes will be lost.')) {
+          useCadStore.setState({ 
+            features: [], 
+            projectName: 'New Project',
+            meshData: [],
+            selectedId: null,
+            components: [],
+            mates: []
+          });
+          appAPI.notify('New Project', 'Workspace cleared');
+        }
+      })
+    ];
+
+    return () => unsubs.forEach(unsub => unsub());
+  }, []);
   const {
     mode, setMode,
     projectName,
@@ -41,7 +93,16 @@ export default function Home() {
     measurementMode, setMeasurementMode,
     measurementPoints, setMeasurementPoints,
     measurementResults, setMeasurementResults,
-    setContextMenu
+    mateSelection, setMateSelection,
+    addComponent, components, setComponents,
+    setContextMenu,
+    sketchNewChain, setSketchNewChain,
+    selectedEntityIds, setSelectedEntityIds,
+    selectedTopology, setSelectedTopology,
+    activeFaceOrigin, setActiveFaceOrigin,
+    activeFaceNormal, setActiveFaceNormal,
+    activeFaceId, setActiveFaceId,
+    triggerCameraNormal
   } = useCadStore();
 
   const [hoveredTreeId, setHoveredTreeId] = useState<string | null>(null);
@@ -194,9 +255,8 @@ export default function Home() {
 
   const [loading, setLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
-  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE'>('FEATURES');
+  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING'>('FEATURES');
   const [smartDimensionActive, setSmartDimensionActive] = useState(false);
-  const [selectedEntityIds, setSelectedEntityIds] = useState<string[]>([]);
   const [demoStep, setDemoStep] = useState<string | null>(null);
   const [virtualCursor, setVirtualCursor] = useState<{
     x: string;
@@ -219,9 +279,41 @@ export default function Home() {
     }
   }, [features, setMeshData]);
 
+  // Global Keyboard Shortcuts for Sketch Mode (L to draw Line, A to draw Arc, Esc to finish chain)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (!isSketchMode) return;
+      
+      // Prevent stealing focus from input fields
+      if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+        return;
+      }
+
+      const key = e.key.toLowerCase();
+      if (key === 'l') {
+        setSketchTool('LINE');
+      } else if (key === 'a') {
+        setSketchTool('ARC');
+      } else if (e.key === 'Escape') {
+        // Esc ends current continuous polyline segment, but doesn't exit the tool
+        let newPts = [...sketchPoints];
+        if (newPts.length > 0) {
+          const last = newPts[newPts.length - 1];
+          if (last[2] && (last[2].includes('MIDPOINT_CENTER') || last[2].includes('CIRCLE_CENTER') || last[2].includes('RECT_CORNER'))) {
+            newPts.pop(); // Remove dangling center helper
+          }
+        }
+        setSketchPoints(newPts);
+        setSketchNewChain(true);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [isSketchMode, sketchPoints, setSketchPoints, setSketchTool, setSketchNewChain]);
+
   const selectedFeature = useMemo(() => features.find(f => f.id === selectedId), [features, selectedId]);
   const solidSketchPointCount = useMemo(
-    () => sketchPoints.filter(pt => pt[2] !== 'CENTER_LINE').length,
+    () => sketchPoints.filter(pt => !pt[2] || !pt[2].includes('CENTER_LINE')).length,
     [sketchPoints]
   );
 
@@ -279,7 +371,10 @@ export default function Home() {
       const pCurr = sketchPoints[i];
       const pNext = sketchPoints[i + 1];
       if (pNext) {
-        if (pCurr[2] === 'CENTER_LINE') {
+        if (pNext[2] && pNext[2].includes('START')) {
+          // This is a new chain boundary. Do NOT connect them!
+          i += 1;
+        } else if (pCurr[2] && pCurr[2].includes('CENTER_LINE')) {
           list.push({
             id: `cline_${i}`,
             type: 'CENTER_LINE',
@@ -323,7 +418,73 @@ export default function Home() {
     return list;
   }, [sketchPoints]);
 
+  // Listen to selectedTopology changes in Assembly/Mate Mode
+  useEffect(() => {
+    const clickedTopo = useCadStore.getState().selectedTopology;
+    if (isSketchMode || activeTab !== 'ASSEMBLY' || !clickedTopo) return;
+
+    const prevSelection = useCadStore.getState().mateSelection || [];
+    if (prevSelection.some((p: any) => p.id === clickedTopo.id)) {
+      useCadStore.getState().setSelectedTopology(null);
+      return;
+    }
+
+    let nextSelection = [...prevSelection];
+    if (nextSelection.length >= 2) nextSelection = [clickedTopo];
+    else nextSelection.push(clickedTopo);
+
+    setMateSelection(nextSelection);
+    useCadStore.getState().setSelectedTopology(null);
+  }, [activeTab, isSketchMode, setMateSelection]);
+
   // The new "Assembly-Aware" Rebuild Logic with History Rollback (退回控制棒)
+  const handleInsertComponent = () => {
+    const id = `comp_${Date.now()}`;
+    const newComp = {
+      id,
+      partId: 'current',
+      instanceName: `Component ${components.length + 1}`,
+      transform: {
+        position: [components.length * 50, 0, 0] as [number, number, number],
+        rotation: [0, 0, 0] as [number, number, number]
+      },
+      visible: true
+    };
+    addComponent(newComp);
+  };
+
+  const handleOpen = async () => {
+    const result = await fileAPI.open();
+    if (result) {
+      const readResult = await fileAPI.read(result.path);
+      if (readResult.success && readResult.content) {
+        try {
+          const data = JSON.parse(readResult.content);
+          if (data.features) {
+            useCadStore.setState({ features: data.features });
+            appAPI.notify('File Opened', `Successfully loaded ${result.path}`);
+          }
+        } catch (e) {
+          appAPI.notify('Open Failed', 'Invalid project file format');
+        }
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    const state = useCadStore.getState();
+    const data = JSON.stringify({
+      features: state.features,
+      projectName: state.projectName,
+      components: state.components,
+      mates: state.mates
+    });
+    const result = await fileAPI.save(data);
+    if (result?.success) {
+      appAPI.notify('Saved', `Project saved to ${result.path}`);
+    }
+  };
+
   const handleRebuild = useCallback(async () => {
     // Determine the active features based on the history rollback state
     let activeFeatures = features;
@@ -376,7 +537,7 @@ export default function Home() {
     if (!selectedId) return;
 
     // Industrial Parameter Handling: String-based parameters (Booleans, Planes, Types)
-    const stringParams = ['operation', 'plane', 'type'];
+    const stringParams = ['operation', 'plane', 'type', 'target_feature_id', 'pattern_type', 'axis'];
 
     if (stringParams.includes(key)) {
       updateFeatureParams(selectedId, { [key]: value });
@@ -627,21 +788,28 @@ export default function Home() {
   };
 
 
-  const addNewFeature = (type: 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE', operation: 'ADD' | 'CUT' = 'ADD') => {
+  const addNewFeature = (type: 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'PATTERN', operation: 'ADD' | 'CUT' = 'ADD') => {
     const id = `feat_${Date.now()}`;
     const names = {
       EXTRUDE: operation === 'ADD' ? '伸長-實體' : '伸長-除料',
       BOX: '方塊特徵',
       CYLINDER: '圓柱特徵',
-      SPHERE: '球體特徵'
+      SPHERE: '球體特徵',
+      PATTERN: '特徵陣列'
     };
     const defaultParams = {
       EXTRUDE: { width: 10, height: 10, depth: 10, x: 0, y: 0, z: 0, operation: operation, plane: 'FRONT' },
       BOX: { width: 10, height: 10, depth: 10, x: 0, y: 0, z: 0 },
       CYLINDER: { radius: 5, height: 10, x: 0, y: 0, z: 0 },
-      SPHERE: { radius: 5, x: 0, y: 0, z: 0 }
+      SPHERE: { radius: 5, x: 0, y: 0, z: 0 },
+      PATTERN: {
+        target_feature_id: features.find(f => f.type === 'EXTRUDE' || f.type === 'BOX' || f.type === 'CYLINDER' || f.type === 'SPHERE' || f.type === 'REVOLVE')?.id ?? '',
+        pattern_type: 'CIRCULAR',
+        axis: 'Y',
+        count: 4,
+        spacing: 90.0
+      }
     };
-
 
     addFeature({
       id,
@@ -660,7 +828,10 @@ export default function Home() {
     setEditingFeatureId(null);
     setSmartDimensionActive(false);
     setSelectedEntityIds([]);
-  }, [setSketchPoints, setSketchRelations, setSketchMode, setActivePlane, setEditingFeatureId, setSelectedEntityIds]);
+    setActiveFaceOrigin(null);
+    setActiveFaceNormal(null);
+    setActiveFaceId(null);
+  }, [setSketchPoints, setSketchRelations, setSketchMode, setActivePlane, setEditingFeatureId, setSelectedEntityIds, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
 
   const handleEditFeatureSketch = useCallback((feature: CADFeature) => {
     const rawPoints = feature.parameters?.points;
@@ -677,14 +848,23 @@ export default function Home() {
     setSketchPoints(cloneSketchPoints(rawPoints));
     setSketchRelations(relations);
     setActivePlane(plane);
+    if (plane === 'FACE') {
+      setActiveFaceOrigin(feature.parameters?.faceOrigin ?? null);
+      setActiveFaceNormal(feature.parameters?.faceNormal ?? null);
+      setActiveFaceId(feature.parameters?.faceId ?? null);
+    } else {
+      setActiveFaceOrigin(null);
+      setActiveFaceNormal(null);
+      setActiveFaceId(null);
+    }
     setSketchTool('LINE');
     setSketchMode(true);
     setActiveTab('SKETCH');
     setSmartDimensionActive(false);
-  }, [setSelectedId, setEditingFeatureId, setSketchPoints, setSketchRelations, setActivePlane, setSketchTool, setSketchMode]);
+  }, [setSelectedId, setEditingFeatureId, setSketchPoints, setSketchRelations, setActivePlane, setSketchTool, setSketchMode, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
 
   const handleExitAndExtrude = useCallback((operationOverride?: 'ADD' | 'CUT') => {
-    const solidPoints = cloneSketchPoints(sketchPoints.filter(pt => pt[2] !== 'CENTER_LINE'));
+    const solidPoints = cloneSketchPoints(sketchPoints.filter(pt => !pt[2] || !pt[2].includes('CENTER_LINE')));
     if (solidPoints.length < 3 || !activePlane) return;
 
     const existingFeature = editingFeatureId ? features.find(f => f.id === editingFeatureId) : null;
@@ -698,7 +878,12 @@ export default function Home() {
       z: existingParams.z ?? 0,
       operation: operationOverride ?? existingParams.operation ?? 'ADD',
       plane: activePlane,
-      relations: [...sketchRelations]
+      relations: [...sketchRelations],
+      ...(activePlane === 'FACE' ? {
+        faceOrigin: activeFaceOrigin,
+        faceNormal: activeFaceNormal,
+        faceId: activeFaceId
+      } : {})
     };
 
     let featureId = editingFeatureId;
@@ -718,7 +903,7 @@ export default function Home() {
     setSelectedId(featureId);
 
     setTimeout(handleRebuild, 50);
-  }, [sketchPoints, activePlane, editingFeatureId, features, sketchRelations, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild]);
+  }, [sketchPoints, activePlane, editingFeatureId, features, sketchRelations, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId]);
 
   const applyHorizontalConstraint = useCallback(() => {
     if (sketchPoints.length < 2) return;
@@ -944,16 +1129,65 @@ export default function Home() {
     setSelectedEntityIds([]);
   }, [sketchPoints, setSketchPoints, sketchRelations, setSketchRelations, setSelectedEntityIds]);
 
+  const applyMirrorSketch = useCallback(() => {
+    const selectedEntities = entities.filter(ent => selectedEntityIds.includes(ent.id));
+    const centerline = selectedEntities.find(ent => ent.type === 'CENTER_LINE');
+    if (!centerline) return;
+
+    const targets = selectedEntities.filter(ent => ent.id !== centerline.id);
+    if (targets.length === 0) return;
+
+    const cp1 = sketchPoints[centerline.pointIndices[0]];
+    const cp2 = sketchPoints[centerline.pointIndices[1]];
+    if (!cp1 || !cp2) return;
+
+    const a = cp2[1] - cp1[1];
+    const b = -(cp2[0] - cp1[0]);
+    const c = cp2[0] * cp1[1] - cp2[1] * cp1[0];
+    const denom = a * a + b * b;
+    if (denom < 1e-6) return;
+
+    const newPts = [...sketchPoints];
+
+    targets.forEach(target => {
+      target.pointIndices.forEach((ptIdx, loopIdx) => {
+        const pt = sketchPoints[ptIdx];
+        const u = pt[0];
+        const v = pt[1];
+        const d = (a * u + b * v + c) / denom;
+        const mirU = u - 2 * a * d;
+        const mirV = v - 2 * b * d;
+
+        // Extract original tag without any starting 'START' to avoid duplicate starts,
+        // and then append 'START' for the first point of the mirrored entity.
+        let origTag = pt[2] || '';
+        origTag = origTag.split(',').filter((t: string) => t !== 'START').join(',');
+        
+        let tag = origTag;
+        if (loopIdx === 0) {
+          tag = tag ? 'START,' + tag : 'START';
+        }
+
+        newPts.push([mirU, mirV, tag]);
+      });
+    });
+
+    setSketchPoints(newPts);
+    const newRel = `鏡像 (Mirror: ${targets.map(t => t.name).join(', ')} 🪞 對稱於 ${centerline.name})`;
+    setSketchRelations([...sketchRelations, newRel]);
+    setSelectedEntityIds([]);
+  }, [entities, selectedEntityIds, sketchPoints, setSketchPoints, sketchRelations, setSketchRelations, setSelectedEntityIds]);
+
   return (
     <main className="flex flex-col h-screen w-screen overflow-hidden bg-[#EBEBEB] text-slate-800 font-sans">
       {/* 1. SolidWorks Desktop Titlebar */}
       <header className="h-[32px] w-full bg-white border-b border-[#D1D5DB] flex items-center justify-between px-3 select-none z-30 shrink-0">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-1">
-            <span className="text-primary font-black text-xs">🔷</span>
-            <span className="text-[11px] font-bold tracking-tight text-slate-800">SolidWeb 3D-Builder</span>
+            <span className="text-primary font-black text-[14px]">🔷</span>
+            <span className="text-[14px] font-bold tracking-tight text-slate-800">SolidWeb 3D-Builder</span>
           </div>
-          <nav className="flex items-center gap-3 text-[10px] text-slate-600 font-medium">
+          <nav className="flex items-center gap-3 text-[14px] text-slate-600 font-medium">
             <span className="hover:text-foreground cursor-pointer transition-all">檔案 (F)</span>
             <span className="hover:text-foreground cursor-pointer transition-all">編輯 (E)</span>
             <span className="hover:text-foreground cursor-pointer transition-all">檢視 (V)</span>
@@ -963,11 +1197,11 @@ export default function Home() {
           </nav>
         </div>
 
-        <div className="text-[10px] text-slate-600 font-medium tracking-tight">
+        <div className="text-[14px] text-slate-600 font-medium tracking-tight">
           零件 1.SLDPRT * <span className="text-primary font-semibold">[{activePlane ? `${activePlane} 平面草圖` : '特徵編輯中'}]</span>
         </div>
 
-        <div className="flex items-center gap-4 text-[10px] text-slate-600">
+        <div className="flex items-center gap-4 text-[14px] text-slate-600">
           <div className="flex items-center gap-1.5">
             <div className={`w-1.5 h-1.5 rounded-full ${engineStatus === 'CONNECTED' ? 'bg-success' : 'bg-error'}`} />
             <span>OCCT 幾何引擎: <span className={engineStatus === 'CONNECTED' ? 'text-success font-bold' : 'text-error'}>{engineStatus}</span></span>
@@ -991,7 +1225,7 @@ export default function Home() {
               setMeasurementPoints([]);
               setMeasurementResults(null);
             }}
-            className={`px-4 py-1 text-[10px] font-bold tracking-wider transition-all border-b-2 uppercase ${
+            className={`px-4 py-1 text-[14px] font-bold tracking-wider transition-all border-b-2 uppercase ${
               activeTab === 'FEATURES'
                 ? 'border-primary text-primary bg-[#F5F6F9]/60'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1015,7 +1249,7 @@ export default function Home() {
                 setSketchTool('LINE');
               }
             }}
-            className={`px-4 py-1 text-[10px] font-bold tracking-wider transition-all border-b-2 uppercase ${
+            className={`px-4 py-1 text-[14px] font-bold tracking-wider transition-all border-b-2 uppercase ${
               activeTab === 'SKETCH'
                 ? 'border-primary text-primary bg-[#F5F6F9]/60'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1025,12 +1259,40 @@ export default function Home() {
           </button>
           <button
             onClick={() => {
+              setActiveTab('DRAWING');
+              setMode('DRAWING');
+              setMeasurementMode('NONE');
+            }}
+            className={`px-4 py-1 text-[14px] font-bold tracking-wider transition-all border-b-2 uppercase ${
+              activeTab === 'DRAWING'
+                ? 'border-primary text-primary bg-[#F5F6F9]/60'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            ?漲 (Drawing)
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('ASSEMBLY');
+              setMode('ASSEMBLY');
+              setMeasurementMode('NONE');
+            }}
+            className={`px-4 py-1 text-[14px] font-bold tracking-wider transition-all border-b-2 uppercase ${
+              activeTab === 'ASSEMBLY'
+                ? 'border-primary text-primary bg-[#F5F6F9]/60'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            ?? (Assembly)
+          </button>
+          <button
+            onClick={() => {
               setActiveTab('EVALUATE');
               setMeasurementMode('DISTANCE');
               setMeasurementPoints([]);
               setMeasurementResults(null);
             }}
-            className={`px-4 py-1 text-[10px] font-bold tracking-wider transition-all border-b-2 uppercase ${
+            className={`px-4 py-1 text-[14px] font-bold tracking-wider transition-all border-b-2 uppercase ${
               activeTab === 'EVALUATE'
                 ? 'border-primary text-primary bg-[#F5F6F9]/60'
                 : 'border-transparent text-slate-500 hover:text-slate-800'
@@ -1063,7 +1325,7 @@ export default function Home() {
                 title="拉伸封閉草圖為三維特徵"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🏗️</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">伸長-實體</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">伸長-實體</span>
               </button>
 
               <button
@@ -1083,7 +1345,7 @@ export default function Home() {
                 title="在已有實體上拉伸除料"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🕳️</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">伸長-除料</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">伸長-除料</span>
               </button>
 
               <button
@@ -1114,7 +1376,7 @@ export default function Home() {
                 title="執行 B-Rep 旋轉特徵（若在草圖模式下則旋轉當前草圖；否則載入可樂瓶）"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🍾</span>
-                <span className="text-[9px] leading-none">旋轉-實體</span>
+                <span className="text-[13px] leading-none">旋轉-實體</span>
               </button>
 
               <button
@@ -1123,7 +1385,7 @@ export default function Home() {
                 title="自動演示從零草圖繪製、定量定量變更、到 3D 旋轉實體化與物理屬性分析的完整中間建構過程，親眼見證 CAD 解析與重建的真實能力！"
               >
                 <span className="text-lg group-hover:scale-110 transition-all animate-bounce">🎥</span>
-                <span className="text-[9px] leading-none">示範建構</span>
+                <span className="text-[13px] leading-none">示範建構</span>
               </button>
 
               {/* Divider and active feature list cleaned of placeholder/padlocked orphans */}
@@ -1137,7 +1399,7 @@ export default function Home() {
                 title="快速生成三維方塊實體"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">📦</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">方塊實體</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">方塊實體</span>
               </button>
 
               <button
@@ -1146,7 +1408,7 @@ export default function Home() {
                 title="快速生成三維圓柱實體"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🧪</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">圓柱實體</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">圓柱實體</span>
               </button>
 
               <button
@@ -1155,7 +1417,16 @@ export default function Home() {
                 title="快速生成三維球體實體"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🔮</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">球體實體</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">球體實體</span>
+              </button>
+
+              <button
+                onClick={() => addNewFeature('PATTERN')}
+                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group text-indigo-600 font-bold border border-indigo-200/50 bg-indigo-50/30 shadow-sm animate-pulse"
+                title="建立線性/環形特徵陣列複製"
+              >
+                <span className="text-lg group-hover:scale-110 transition-all">🔄</span>
+                <span className="text-[13px] leading-none">特徵陣列</span>
               </button>
             </div>
           ) : activeTab === 'SKETCH' ? (
@@ -1172,7 +1443,7 @@ export default function Home() {
                 title="啟用/停用二維草圖編輯"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">✏️</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">{isSketchMode ? '結束草圖' : '繪製草圖'}</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">{isSketchMode ? '結束草圖' : '繪製草圖'}</span>
               </button>
 
               <button
@@ -1186,7 +1457,7 @@ export default function Home() {
                 title="啟用智慧定量尺寸：點擊測量並修改草圖邊段的精確長度"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">📏</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">智慧尺寸</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">智慧尺寸</span>
               </button>
 
               <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
@@ -1200,7 +1471,7 @@ export default function Home() {
                 title="繪製直邊輪廓 (Line)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">📐</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">直線段</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">直線段</span>
               </button>
 
               <button
@@ -1211,7 +1482,18 @@ export default function Home() {
                 title="繪製構造用中心線 (Centerline)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">⛓️</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">中心線</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">中心線</span>
+              </button>
+
+              <button
+                onClick={() => setSketchTool('MIDPOINT_LINE')}
+                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
+                  sketchTool === 'MIDPOINT_LINE' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
+                }`}
+                title="繪製對稱中點直線 (Midpoint Line)"
+              >
+                <span className="text-lg group-hover:scale-110 transition-all">↔️</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">中點直線</span>
               </button>
 
               <button
@@ -1222,7 +1504,7 @@ export default function Home() {
                 title="繪製中心起點圓 (Circle)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">⭕</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">中心圓</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">中心圓</span>
               </button>
 
               <button
@@ -1233,7 +1515,7 @@ export default function Home() {
                 title="繪製對角矩形 (Rectangle)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">⬜</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">邊角矩形</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">邊角矩形</span>
               </button>
 
               <button
@@ -1244,7 +1526,7 @@ export default function Home() {
                 title="繪製三點圓弧輪廓 (Arc)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🎯</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">三點圓弧</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">三點圓弧</span>
               </button>
 
               <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
@@ -1258,7 +1540,7 @@ export default function Home() {
                 title="是否將座標鎖定於整數網格點"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🧲</span>
-                <span className="text-[9px] font-bold leading-none">網格吸附</span>
+                <span className="text-[13px] font-bold leading-none">網格吸附</span>
               </button>
             </div>
           ) : (
@@ -1284,7 +1566,7 @@ export default function Home() {
                 title="啟用/停用精確量測工具 (Measure)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">📐</span>
-                <span className="text-[9px] text-slate-800 font-bold leading-none">
+                <span className="text-[13px] text-slate-800 font-bold leading-none">
                   {measurementMode !== 'NONE' ? '結束量測' : '測量工具'}
                 </span>
               </button>
@@ -1304,7 +1586,7 @@ export default function Home() {
                     }`}
                   >
                     <span className="text-sm">📏</span>
-                    <span className="text-[8px] text-slate-700 font-bold">頂點距離</span>
+                    <span className="text-[13px] text-slate-700 font-bold">頂點距離</span>
                   </button>
 
                   <button
@@ -1318,7 +1600,7 @@ export default function Home() {
                     }`}
                   >
                     <span className="text-sm">📐</span>
-                    <span className="text-[8px] text-slate-700 font-bold">夾角測量</span>
+                    <span className="text-[13px] text-slate-700 font-bold">夾角測量</span>
                   </button>
 
                   <button
@@ -1332,7 +1614,7 @@ export default function Home() {
                     }`}
                   >
                     <span className="text-sm">💠</span>
-                    <span className="text-[8px] text-slate-700 font-bold">表面積</span>
+                    <span className="text-[13px] text-slate-700 font-bold">表面積</span>
                   </button>
 
                   <button
@@ -1346,7 +1628,7 @@ export default function Home() {
                     }`}
                   >
                     <span className="text-sm">📦</span>
-                    <span className="text-[8px] text-slate-700 font-bold">實體體積</span>
+                    <span className="text-[13px] text-slate-700 font-bold">實體體積</span>
                   </button>
                 </>
               )}
@@ -1360,7 +1642,7 @@ export default function Home() {
         {/* Left Sidebars: FeatureManager & PropertyManager */}
         <aside className="w-[290px] h-full bg-white border-r border-[#D1D5DB] flex flex-col z-10 shrink-0">
           {/* SolidWorks Tab Header */}
-          <div className="h-[28px] w-full bg-[#F5F6F9] flex items-center justify-around border-b border-[#D1D5DB]/60 text-slate-500 text-xs">
+          <div className="h-[28px] w-full bg-[#F5F6F9] flex items-center justify-around border-b border-[#D1D5DB]/60 text-slate-500 text-[14px]">
             <span className="text-primary font-bold cursor-pointer" title="FeatureManager 設計樹">📑 設計樹</span>
             <span className="hover:text-slate-800 cursor-pointer" title="PropertyManager 屬性經理">📋 屬性列</span>
             <span className="hover:text-slate-800 cursor-pointer" title="ConfigurationManager 設定經理">⚙️ 組態</span>
@@ -1370,11 +1652,11 @@ export default function Home() {
             {isSketchMode ? (
               /* Active Sketch Editor Panel */
               <div className="flex-grow overflow-y-auto p-3 bg-primary/5 border-l-4 border-primary">
-                <div className="text-[10px] uppercase tracking-wider text-primary mb-3 font-bold flex justify-between items-center">
+                <div className="text-[14px] uppercase tracking-wider text-primary mb-3 font-bold flex justify-between items-center">
                   <span>Active Sketch Editor</span>
                   <button
                     onClick={resetSketchSession}
-                    className="text-error hover:underline text-[9px]"
+                    className="text-error hover:underline text-[13px]"
                   >
                     取消草圖
                   </button>
@@ -1382,9 +1664,9 @@ export default function Home() {
 
                 <div className="space-y-3">
                   <div className="p-2.5 bg-[#F5F6F9] rounded-xl border border-primary/20 shadow-sm">
-                    <div className="text-[10px] text-slate-600 mb-2 flex justify-between items-center">
+                    <div className="text-[14px] text-slate-600 mb-2 flex justify-between items-center">
                       <span>草圖基準面: <span className="text-primary font-bold">{activePlane}</span></span>
-                      <span className="text-[8px] text-primary font-semibold px-1 py-0.5 bg-primary/10 rounded uppercase">{sketchTool} 模式</span>
+                      <span className="text-[13px] text-primary font-semibold px-1 py-0.5 bg-primary/10 rounded uppercase">{sketchTool} 模式</span>
                     </div>
 
                     <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
@@ -1428,11 +1710,11 @@ export default function Home() {
                           const isControl = pt[2] === 'ARC_CONTROL';
                           listElems.push(
                             <div key={`pt_${i}`} className="flex gap-2 items-center">
-                              <span className={`text-[9px] font-bold w-12 shrink-0 ${isControl ? 'text-emerald-600 font-semibold' : 'text-slate-500'}`}>
+                              <span className={`text-[13px] font-bold w-12 shrink-0 ${isControl ? 'text-emerald-600 font-semibold' : 'text-slate-500'}`}>
                                 {isControl ? '弧頂 Ctrl' : `端點 P${i+1}`}
                               </span>
                               <div className="flex-1 flex gap-1 items-center">
-                                <span className="text-[8px] text-slate-500 font-bold">U:</span>
+                                <span className="text-[13px] text-slate-500 font-bold">U:</span>
                                 <input
                                   type="number"
                                   value={parseFloat(pt[0].toFixed(1))}
@@ -1441,11 +1723,11 @@ export default function Home() {
                                     newPts[i] = [parseFloat(e.target.value) || 0, newPts[i][1], newPts[i][2]];
                                     setSketchPoints(newPts);
                                   }}
-                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono focus:border-primary outline-none"
+                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] text-slate-800 font-mono focus:border-primary outline-none"
                                 />
                               </div>
                               <div className="flex-1 flex gap-1 items-center">
-                                <span className="text-[8px] text-slate-500 font-bold">V:</span>
+                                <span className="text-[13px] text-slate-500 font-bold">V:</span>
                                 <input
                                   type="number"
                                   value={parseFloat(pt[1].toFixed(1))}
@@ -1454,7 +1736,7 @@ export default function Home() {
                                     newPts[i] = [newPts[i][0], parseFloat(e.target.value) || 0, newPts[i][2]];
                                     setSketchPoints(newPts);
                                   }}
-                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono focus:border-primary outline-none"
+                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] text-slate-800 font-mono focus:border-primary outline-none"
                                 />
                               </div>
                             </div>
@@ -1465,11 +1747,11 @@ export default function Home() {
                         circleCenters.forEach((c, cIdx) => {
                           listElems.push(
                             <div key={`circle_${cIdx}`} className="flex gap-2 items-center bg-primary/5 p-1 rounded border border-primary/20">
-                              <span className="text-[9px] font-bold text-primary w-12 shrink-0">
+                              <span className="text-[13px] font-bold text-primary w-12 shrink-0">
                                 圓心 C{cIdx+1}
                               </span>
                               <div className="flex-1 flex gap-1 items-center">
-                                <span className="text-[8px] text-slate-500 font-bold">U:</span>
+                                <span className="text-[13px] text-slate-500 font-bold">U:</span>
                                 <input
                                   type="number"
                                   value={parseFloat(c.center[0].toFixed(1))}
@@ -1483,12 +1765,12 @@ export default function Home() {
                                     }
                                     setSketchPoints(newPts);
                                   }}
-                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono focus:border-primary outline-none"
+                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] text-slate-800 font-mono focus:border-primary outline-none"
                                   title="修改圓心 U 座標，整體平移圓形"
                                 />
                               </div>
                               <div className="flex-1 flex gap-1 items-center">
-                                <span className="text-[8px] text-slate-500 font-bold">V:</span>
+                                <span className="text-[13px] text-slate-500 font-bold">V:</span>
                                 <input
                                   type="number"
                                   value={parseFloat(c.center[1].toFixed(1))}
@@ -1502,7 +1784,7 @@ export default function Home() {
                                     }
                                     setSketchPoints(newPts);
                                   }}
-                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-xs text-slate-800 font-mono focus:border-primary outline-none"
+                                  className="w-full bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] text-slate-800 font-mono focus:border-primary outline-none"
                                   title="修改圓心 V 座標，整體平移圓形"
                                 />
                               </div>
@@ -1514,7 +1796,7 @@ export default function Home() {
                       })()}
                     </div>
                     {sketchPoints.length > 0 && (
-                      <div className="mt-3 p-2 bg-primary/10 rounded text-[9px] text-primary/90 text-center font-medium leading-tight">
+                      <div className="mt-3 p-2 bg-primary/10 rounded text-[13px] text-primary/90 text-center font-medium leading-tight">
                         在基準面上點擊定位，或在此精確設定 U, V 參數以定量輪廓！
                       </div>
                     )}
@@ -1522,12 +1804,12 @@ export default function Home() {
 
                   {/* Constraints & Relations Card */}
                   <div className="p-2.5 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-2">
-                    <div className="text-[10px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
+                    <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
                       <span>🔗 幾何限制與拘束關係</span>
-                      <span className="text-[8px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono">RELATIONS</span>
+                      <span className="text-[13px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono">RELATIONS</span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-1.5 text-[9px]">
+                    <div className="grid grid-cols-2 gap-1.5 text-[13px]">
                       <button
                         onClick={applyHorizontalConstraint}
                         disabled={sketchPoints.length < 2}
@@ -1603,9 +1885,9 @@ export default function Home() {
                         ? 'bg-amber-50/50 border-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.4)] ring-2 ring-amber-500/10'
                         : smartDimensionActive ? 'bg-primary/5 border-primary/30' : 'bg-white border-[#D1D5DB]'
                     }`}>
-                      <div className="text-[10px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
+                      <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
                         <span className="flex items-center gap-1">📏 智慧定量尺寸 (Smart Dimensions)</span>
-                        {smartDimensionActive && <span className="text-[7px] bg-primary text-white px-1.5 py-0.5 rounded animate-pulse font-mono">編輯中</span>}
+                        {smartDimensionActive && <span className="text-[12px] bg-primary text-white px-1.5 py-0.5 rounded animate-pulse font-mono">編輯中</span>}
                       </div>
 
                       <div className="space-y-2 max-h-[180px] overflow-y-auto pr-0.5">
@@ -1620,7 +1902,7 @@ export default function Home() {
                               const startIdx = ent.pointIndices?.[0] || 0;
 
                               return (
-                                <div key={ent.id} className="flex items-center justify-between gap-2 bg-primary/5 p-1.5 rounded border border-primary/20 text-[10px]">
+                                <div key={ent.id} className="flex items-center justify-between gap-2 bg-primary/5 p-1.5 rounded border border-primary/20 text-[14px]">
                                   <span className="text-primary font-bold font-mono">⭕ {ent.name} 直徑 (Ø Dia):</span>
                                   <div className="flex items-center gap-1">
                                     <input
@@ -1649,7 +1931,7 @@ export default function Home() {
                                       className="w-[85px] bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-right font-mono text-slate-800 focus:border-primary outline-none font-bold"
                                       title="修改直徑，動態更改圓圈尺寸"
                                     />
-                                    <span className="text-[8px] text-slate-400">mm</span>
+                                    <span className="text-[13px] text-slate-400">mm</span>
                                   </div>
                                 </div>
                               );
@@ -1667,10 +1949,10 @@ export default function Home() {
                               const height = Math.hypot(p2[0] - p1[0], p2[1] - p1[1]);
 
                               return (
-                                <div key={ent.id} className="space-y-1.5 p-2 bg-[#F8FAFC] rounded border border-slate-200 text-[10px]">
+                                <div key={ent.id} className="space-y-1.5 p-2 bg-[#F8FAFC] rounded border border-slate-200 text-[14px]">
                                   <div className="text-slate-600 font-bold border-b border-slate-200/50 pb-0.5 flex justify-between">
                                     <span>📦 {ent.name} 尺寸標註</span>
-                                    <span className="text-[8px] text-slate-400 uppercase font-mono">RECT</span>
+                                    <span className="text-[13px] text-slate-400 uppercase font-mono">RECT</span>
                                   </div>
                                   <div className="flex items-center justify-between gap-2">
                                     <span className="text-slate-500 font-medium">寬度 (Width):</span>
@@ -1691,7 +1973,7 @@ export default function Home() {
                                         }}
                                         className="w-[70px] bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-right font-mono text-slate-800 focus:border-primary outline-none"
                                       />
-                                      <span className="text-[8px] text-slate-400">mm</span>
+                                      <span className="text-[13px] text-slate-400">mm</span>
                                     </div>
                                   </div>
                                   <div className="flex items-center justify-between gap-2">
@@ -1713,7 +1995,7 @@ export default function Home() {
                                         }}
                                         className="w-[70px] bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-right font-mono text-slate-800 focus:border-primary outline-none"
                                       />
-                                      <span className="text-[8px] text-slate-400">mm</span>
+                                      <span className="text-[13px] text-slate-400">mm</span>
                                     </div>
                                   </div>
                                 </div>
@@ -1730,7 +2012,7 @@ export default function Home() {
                             const isSmartDimHighlight = !!(sidebarHighlight && sidebarHighlight.active && sidebarHighlight.target === 'SMART_DIM' && ent.name === '線段 L2');
 
                             return (
-                              <div key={ent.id} className={`flex items-center justify-between gap-2 rounded border p-1.5 text-[10px] transition-all duration-300 ${
+                              <div key={ent.id} className={`flex items-center justify-between gap-2 rounded border p-1.5 text-[14px] transition-all duration-300 ${
                                 isSmartDimHighlight
                                   ? 'bg-amber-50 border-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)] ring-2 ring-amber-500/10 font-bold'
                                   : 'bg-slate-50 border-slate-200/60'
@@ -1764,7 +2046,7 @@ export default function Home() {
                                       isSmartDimHighlight ? 'border-amber-500 text-amber-700 animate-pulse' : 'border-[#C4C7CE]'
                                     }`}
                                   />
-                                  <span className="text-[8px] text-slate-400">mm</span>
+                                  <span className="text-[13px] text-slate-400">mm</span>
                                 </div>
                               </div>
                             );
@@ -1774,17 +2056,96 @@ export default function Home() {
                     </div>
                   )}
 
+                  {/* Selected Entity Properties (For Construction) */}
+                  {selectedEntityIds.length > 0 && (() => {
+                    const selectedEnts = entities.filter(ent => selectedEntityIds.includes(ent.id));
+                    if (selectedEnts.length === 0) return null;
+
+                    const toggleForConstruction = (ent: any) => {
+                      const newPts = [...sketchPoints];
+                      const idx = ent.pointIndices[0];
+                      if (!newPts[idx]) return;
+                      
+                      const currentTag = newPts[idx][2] || '';
+                      if (currentTag.includes('CENTER_LINE')) {
+                        // Make standard
+                        newPts[idx][2] = currentTag.replace('CENTER_LINE', '').replace(/^,|,$/, '').trim();
+                        if (newPts[idx][2] === '') {
+                          newPts[idx] = [newPts[idx][0], newPts[idx][1]];
+                        }
+                      } else {
+                        // Make construction
+                        if (currentTag) {
+                          newPts[idx][2] = `${currentTag},CENTER_LINE`;
+                        } else {
+                          newPts[idx] = [newPts[idx][0], newPts[idx][1], 'CENTER_LINE'];
+                        }
+                      }
+                      setSketchPoints(newPts);
+                    };
+
+                    return (
+                      <div className="p-2.5 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-2">
+                        <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
+                          <span className="flex items-center gap-1">🛠️ 草圖對象屬性 (PropertyManager)</span>
+                          <span className="text-[13px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono">PROPERTIES</span>
+                        </div>
+
+                        <div className="space-y-2">
+                          {selectedEnts.map((ent) => {
+                            const isLine = ent.type === 'LINE' || ent.type === 'CENTER_LINE';
+                            if (!isLine) return null;
+
+                            const isConstruction = ent.type === 'CENTER_LINE';
+
+                            return (
+                              <div key={ent.id} className="flex items-center justify-between p-1.5 bg-[#F8FAFC] rounded border border-slate-200 text-[14px]">
+                                <span className="font-bold text-slate-700 flex items-center gap-1">
+                                  <span>{isConstruction ? '⛓️' : '➖'}</span>
+                                  <span>{ent.name}</span>
+                                </span>
+                                
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={isConstruction}
+                                    onChange={() => toggleForConstruction(ent)}
+                                    className="w-3.5 h-3.5 text-primary border-slate-300 rounded focus:ring-primary focus:ring-2 cursor-pointer"
+                                  />
+                                  <span className="text-[13px] text-slate-600 font-bold">作為建構線 (For Construction)</span>
+                                </label>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   {/* Multi-Entity Relations Card */}
                   {entities.length >= 2 && (
                     <div className="p-2.5 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-2">
-                      <div className="text-[10px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
+                      <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
                         <span className="flex items-center gap-1">🔗 多對象幾何關係 (Multi-Entity Relations)</span>
-                        <span className="text-[8px] bg-indigo-50 text-indigo-500 px-1 py-0.5 rounded font-mono">MULTI-ENTITIES</span>
+                        <span className="text-[13px] bg-indigo-50 text-indigo-500 px-1 py-0.5 rounded font-mono">MULTI-ENTITIES</span>
                       </div>
 
-                      <div className="text-[9px] text-slate-500 leading-tight">
-                        請選取 exactly **兩個** 草圖對象以建立平行、同心或相切約束：
-                      </div>
+                      {(() => {
+                        const selectedEntities = entities.filter(ent => selectedEntityIds.includes(ent.id));
+                        const centerline = selectedEntities.find(ent => ent.type === 'CENTER_LINE');
+                        if (centerline) {
+                          return (
+                            <div className="text-[13px] text-primary font-bold bg-primary/5 p-1.5 rounded border border-primary/20 leading-tight">
+                              💡 已選取中心線 {centerline.name} 作為對稱軸，請勾選其他草圖對象以執行「鏡像幾何」！
+                            </div>
+                          );
+                        }
+                        return (
+                          <div className="text-[13px] text-slate-500 leading-tight">
+                            請選取 <strong>兩個</strong> 草圖對象建立平行、同心、相切關係，或選取一條中心線進行 <strong>「鏡像」</strong>：
+                          </div>
+                        );
+                      })()}
 
                       {/* Entities Checklist */}
                       <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5">
@@ -1798,15 +2159,10 @@ export default function Home() {
                                 if (isSelected) {
                                   setSelectedEntityIds(selectedEntityIds.filter(id => id !== ent.id));
                                 } else {
-                                  if (selectedEntityIds.length >= 2) {
-                                    // limit selection to 2, deselecting first one
-                                    setSelectedEntityIds([selectedEntityIds[1], ent.id]);
-                                  } else {
-                                    setSelectedEntityIds([...selectedEntityIds, ent.id]);
-                                  }
+                                  setSelectedEntityIds([...selectedEntityIds, ent.id]);
                                 }
                               }}
-                              className={`w-full flex items-center justify-between p-1.5 rounded border text-[9px] font-bold text-left transition-all ${
+                              className={`w-full flex items-center justify-between p-1.5 rounded border text-[13px] font-bold text-left transition-all ${
                                 isSelected
                                   ? 'bg-primary/10 border-primary text-primary shadow-sm'
                                   : 'bg-[#F8FAFC] border-slate-200 text-slate-700 hover:bg-slate-100'
@@ -1816,7 +2172,7 @@ export default function Home() {
                                 <span>{ent.type === 'CIRCLE' ? '⭕' : ent.type === 'CENTER_LINE' ? '📏' : '➖'}</span>
                                 <span>{ent.name}</span>
                               </span>
-                              <span className="text-[7px] text-slate-400 font-mono font-normal">
+                              <span className="text-[12px] text-slate-400 font-mono font-normal">
                                 {ent.type === 'CIRCLE'
                                   ? `半徑: ${ent.radius?.toFixed(1)}mm`
                                   : `頂點: P${ent.pointIndices[0]+1}➔P${ent.pointIndices[ent.pointIndices.length-1]+1}`}
@@ -1827,22 +2183,27 @@ export default function Home() {
                       </div>
 
                       {/* Relation Buttons based on selection */}
-                      {selectedEntityIds.length === 2 && (() => {
-                        const entA = entities.find(e => e.id === selectedEntityIds[0]);
-                        const entB = entities.find(e => e.id === selectedEntityIds[1]);
-                        if (!entA || !entB) return null;
+                      {selectedEntityIds.length >= 2 && (() => {
+                        const selectedEntities = entities.filter(ent => selectedEntityIds.includes(ent.id));
+                        const centerline = selectedEntities.find(ent => ent.type === 'CENTER_LINE');
+                        const targets = selectedEntities.filter(ent => ent.id !== centerline?.id);
+                        const canMirror = centerline !== undefined && targets.length > 0;
 
-                        const isBothLines = (entA.type === 'LINE' || entA.type === 'CENTER_LINE') && (entB.type === 'LINE' || entB.type === 'CENTER_LINE');
-                        const isBothCircles = entA.type === 'CIRCLE' && entB.type === 'CIRCLE';
-                        const isLineAndCircle = ((entA.type === 'LINE' || entA.type === 'CENTER_LINE') && entB.type === 'CIRCLE') || (entA.type === 'CIRCLE' && (entB.type === 'LINE' || entB.type === 'CENTER_LINE'));
+                        const showTwoEntityButtons = selectedEntityIds.length === 2;
+                        const entA = showTwoEntityButtons ? entities.find(e => e.id === selectedEntityIds[0]) : null;
+                        const entB = showTwoEntityButtons ? entities.find(e => e.id === selectedEntityIds[1]) : null;
+
+                        const isBothLines = entA && entB && (entA.type === 'LINE' || entA.type === 'CENTER_LINE') && (entB.type === 'LINE' || entB.type === 'CENTER_LINE');
+                        const isBothCircles = entA && entB && entA.type === 'CIRCLE' && entB.type === 'CIRCLE';
+                        const isLineAndCircle = entA && entB && (((entA.type === 'LINE' || entA.type === 'CENTER_LINE') && entB.type === 'CIRCLE') || (entA.type === 'CIRCLE' && (entB.type === 'LINE' || entB.type === 'CENTER_LINE')));
 
                         return (
-                          <div className="pt-1.5 border-t border-slate-100 flex flex-col gap-1">
-                            {isBothLines && (
+                          <div className="pt-1.5 border-t border-slate-100 flex flex-col gap-1.5">
+                            {showTwoEntityButtons && isBothLines && (
                               <button
                                 onClick={() => applyParallelRelation(entA, entB)}
                                 type="button"
-                                className="w-full flex items-center justify-center gap-1.5 p-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded font-bold text-[10px] active:scale-95 transition-all shadow-sm"
+                                className="w-full flex items-center justify-center gap-1.5 p-1.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white rounded font-bold text-[14px] active:scale-95 transition-all shadow-sm"
                                 title="使兩條選定線段平行"
                               >
                                 <span>∥</span>
@@ -1850,11 +2211,11 @@ export default function Home() {
                               </button>
                             )}
 
-                            {isBothCircles && (
+                            {showTwoEntityButtons && isBothCircles && (
                               <button
                                 onClick={() => applyConcentricRelation(entA, entB)}
                                 type="button"
-                                className="w-full flex items-center justify-center gap-1.5 p-1.5 bg-[#059669] hover:bg-[#047857] text-white rounded font-bold text-[10px] active:scale-95 transition-all shadow-sm"
+                                className="w-full flex items-center justify-center gap-1.5 p-1.5 bg-[#059669] hover:bg-[#047857] text-white rounded font-bold text-[14px] active:scale-95 transition-all shadow-sm"
                                 title="使兩個圓同心"
                               >
                                 <span>🎯</span>
@@ -1862,14 +2223,14 @@ export default function Home() {
                               </button>
                             )}
 
-                            {isLineAndCircle && (() => {
+                            {showTwoEntityButtons && isLineAndCircle && (() => {
                               const lineEnt = entA.type === 'CIRCLE' ? entB : entA;
                               const circleEnt = entA.type === 'CIRCLE' ? entA : entB;
                               return (
                                 <button
                                   onClick={() => applyTangentRelation(lineEnt, circleEnt)}
                                   type="button"
-                                  className="w-full flex items-center justify-center gap-1.5 p-1.5 bg-[#D97706] hover:bg-[#B45309] text-white rounded font-bold text-[10px] active:scale-95 transition-all shadow-sm"
+                                  className="w-full flex items-center justify-center gap-1.5 p-1.5 bg-[#D97706] hover:bg-[#B45309] text-white rounded font-bold text-[14px] active:scale-95 transition-all shadow-sm"
                                   title="使線段與圓相切"
                                 >
                                   <span>🌀</span>
@@ -1877,6 +2238,18 @@ export default function Home() {
                                 </button>
                               );
                             })()}
+
+                            {canMirror && (
+                              <button
+                                onClick={applyMirrorSketch}
+                                type="button"
+                                className="w-full flex items-center justify-center gap-1.5 p-2 bg-[#EC4899] hover:bg-[#DB2777] text-white rounded font-bold text-[14px] active:scale-95 transition-all shadow-md animate-pulse"
+                                title={`鏡像草圖幾何對稱於 ${centerline.name}`}
+                              >
+                                <span>🪞</span>
+                                <span>鏡像幾何 (Mirror Entities)</span>
+                              </button>
+                            )}
                           </div>
                         );
                       })()}
@@ -1884,16 +2257,20 @@ export default function Home() {
                   )}
                 </div>
               </div>
+            ) : activeTab === 'ASSEMBLY' ? (
+              <MatePanel />
+            ) : measurementMode !== 'NONE' ? (
+              <MeasurementPanel />
             ) : (
               /* FeatureManager Design Tree */
               <div className="flex-1 overflow-y-auto p-3 flex flex-col">
-                <div className="text-[10px] uppercase tracking-wider text-slate-600 mb-3 font-bold flex justify-between items-center border-b border-[#D1D5DB] pb-1.5">
+                <div className="text-[14px] uppercase tracking-wider text-slate-600 mb-3 font-bold flex justify-between items-center border-b border-[#D1D5DB] pb-1.5">
                   <span>FeatureManager 設計樹</span>
-                  <button onClick={handleRebuild} className="text-primary hover:underline text-[9px] uppercase tracking-tighter">模型重構</button>
+                  <button onClick={handleRebuild} className="text-primary hover:underline text-[13px] uppercase tracking-tighter">模型重構</button>
                 </div>
 
                 {/* Standard SolidWorks Meta Nodes */}
-                <div className="space-y-1.5 text-xs select-none">
+                <div className="space-y-1.5 text-[14px] select-none">
                   <div className="flex items-center gap-2 p-1 text-slate-800 font-bold">
                     <span>🔷</span>
                     <span>零件1 (Part1)</span>
@@ -1946,7 +2323,7 @@ export default function Home() {
                               <span>🌐</span>
                               <span>前基準面 (Front Plane)</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 text-[7.5px] font-bold">
+                            <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
                               {frontRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
                               {frontRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded">子 (Child)</span>}
                               {activePlane === 'FRONT' && <span className="bg-primary/10 text-primary px-1 rounded uppercase">選取</span>}
@@ -1977,7 +2354,7 @@ export default function Home() {
                               <span>🌐</span>
                               <span>上基準面 (Top Plane)</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 text-[7.5px] font-bold">
+                            <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
                               {topRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
                               {topRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded">子 (Child)</span>}
                               {activePlane === 'TOP' && <span className="bg-primary/10 text-primary px-1 rounded uppercase">選取</span>}
@@ -2008,7 +2385,7 @@ export default function Home() {
                               <span>🌐</span>
                               <span>右基準面 (Right Plane)</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 text-[7.5px] font-bold">
+                            <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
                               {rightRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
                               {rightRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded">子 (Child)</span>}
                               {activePlane === 'RIGHT' && <span className="bg-primary/10 text-primary px-1 rounded uppercase">選取</span>}
@@ -2030,7 +2407,7 @@ export default function Home() {
                               <span>📍</span>
                               <span>原點 (Origin)</span>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 text-[7.5px] font-bold mr-1">
+                            <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold mr-1">
                               {originRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
                               {originRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded">子 (Child)</span>}
                             </div>
@@ -2042,7 +2419,7 @@ export default function Home() {
 
                   {/* Chronological History Tree */}
                   <div className="pl-2 pt-2 space-y-1">
-                    <div className="text-[9px] uppercase tracking-wider text-slate-500 font-bold mb-1">模型歷史特徵</div>
+                    <div className="text-[13px] uppercase tracking-wider text-slate-500 font-bold mb-1">模型歷史特徵</div>
                     {features.map((f, fIdx) => {
                       const relState = getTreeRelation(f.id, hoveredTreeId);
                       const isExtrudeOrRevolve = f.type === 'EXTRUDE' || f.type === 'REVOLVE';
@@ -2083,14 +2460,14 @@ export default function Home() {
                                 {f.type === 'REVOLVE' ? '🍾' : f.type === 'EXTRUDE' ? (f.parameters.operation === 'CUT' ? '🕳️' : '🏗️') : f.type === 'BOX' ? '📦' : f.type === 'CYLINDER' ? '🧪' : '🔮'}
                               </span>
                               <div className="flex flex-col">
-                                <span className="text-[11px] leading-tight">{f.name}</span>
-                                <span className="text-[8px] text-slate-500 font-mono leading-none uppercase">{f.type === 'EXTRUDE' ? f.parameters.operation : f.type}</span>
+                                <span className="text-[14px] leading-tight">{f.name}</span>
+                                <span className="text-[13px] text-slate-500 font-mono leading-none uppercase">{f.type === 'EXTRUDE' ? f.parameters.operation : f.type}</span>
                                 {editingFeatureId === f.id && (
-                                  <span className="mt-0.5 text-[7px] text-emerald-700 font-bold uppercase leading-none">Editing sketch</span>
+                                  <span className="mt-0.5 text-[12px] text-emerald-700 font-bold uppercase leading-none">Editing sketch</span>
                                 )}
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0 text-[7px] font-bold">
+                            <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
                               {relState === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
                               {relState === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1.5 py-0.2 rounded">子 (Child)</span>}
                               <button
@@ -2114,7 +2491,7 @@ export default function Home() {
                             <div
                               onClick={() => { setSelectedId(f.id); }}
                               onDoubleClick={() => handleEditFeatureSketch(f)}
-                              className="pl-7 py-1 flex items-center justify-between gap-1.5 text-slate-500 hover:text-primary cursor-pointer text-[10px] select-none hover:bg-slate-100/50 rounded transition-all"
+                              className="pl-7 py-1 flex items-center justify-between gap-1.5 text-slate-500 hover:text-primary cursor-pointer text-[14px] select-none hover:bg-slate-100/50 rounded transition-all"
                               title="雙擊編輯此特徵所屬的草圖幾何"
                             >
                               <div className="flex items-center gap-1.5">
@@ -2122,7 +2499,7 @@ export default function Home() {
                                 <span className="italic hover:underline">草圖{sketchNum} (Sketch{sketchNum})</span>
                               </div>
                               {editingFeatureId === f.id && (
-                                <span className="text-[7px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono mr-2 animate-pulse">編輯中</span>
+                                <span className="text-[12px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono mr-2 animate-pulse">編輯中</span>
                               )}
                             </div>
                           )}
@@ -2135,73 +2512,207 @@ export default function Home() {
             )}
           </div>
 
+          {/* 表面屬性管理器 (Face Selection) */}
+          {!isSketchMode && selectedTopology?.type === 'FACE' && measurementMode === 'NONE' && (
+            <div className="h-[250px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex flex-col p-3 z-10 shrink-0 shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+              <div className="text-[14px] uppercase tracking-wider text-slate-500 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
+                <span className="flex items-center gap-1">📋 表面屬性管理器</span>
+                <span className="text-[13px] bg-indigo-600/10 text-indigo-600 px-1.5 rounded uppercase font-mono">Face Selected</span>
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
+                <div className="bg-white p-2.5 rounded border border-[#D1D5DB] shadow-sm space-y-2 text-[14px]">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">中心點 (Center)</span>
+                    <span className="font-mono text-slate-800 text-[13px]">
+                      {selectedTopology.coordinates ? `[${selectedTopology.coordinates.map((c: number) => c.toFixed(1)).join(', ')}]` : 'N/A'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">法向量 (Normal)</span>
+                    <span className="font-mono text-slate-800 text-[13px]">
+                      {selectedTopology.normal ? `[${selectedTopology.normal.map((n: number) => n.toFixed(2)).join(', ')}]` : 'N/A'}
+                    </span>
+                  </div>
+                  {selectedTopology.id && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-500 font-medium">拓撲 ID</span>
+                      <span className="font-mono text-slate-800 text-xs bg-slate-100 px-1 rounded truncate max-w-[120px]" title={selectedTopology.id}>
+                        {selectedTopology.id}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => {
+                    if (!selectedTopology.coordinates || !selectedTopology.normal) return;
+                    setActiveFaceOrigin(selectedTopology.coordinates);
+                    setActiveFaceNormal(selectedTopology.normal);
+                    setActiveFaceId(selectedTopology.id || `face_${Date.now()}`);
+                    setActivePlane('FACE');
+                    setSketchPoints([]);
+                    setSketchRelations([]);
+                    setSketchMode(true);
+                    setSketchTool('LINE');
+                    setEditingFeatureId(null);
+                    triggerCameraNormal();
+                  }}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm text-[14px]"
+                >
+                  <span>✏️</span>
+                  <span>在面上起草 (Sketch on Face)</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* PropertyManager (左下角特徵屬性面板) */}
-          {!isSketchMode && selectedFeature && measurementMode === 'NONE' && (
+          {!isSketchMode && selectedFeature && measurementMode === 'NONE' && (!selectedTopology || selectedTopology.type !== 'FACE') && (
             <div className="h-[250px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex flex-col p-3 z-10 shrink-0">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
+              <div className="text-[14px] uppercase tracking-wider text-slate-500 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
                 <span>📋 PropertyManager</span>
-                <span className="text-[8px] bg-primary/10 text-primary px-1 rounded uppercase font-mono">{selectedFeature.type}</span>
+                <span className="text-[13px] bg-primary/10 text-primary px-1 rounded uppercase font-mono">{selectedFeature.type}</span>
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-                {/* direction header */}
-                <div className="bg-white p-2 rounded border border-[#D1D5DB] shadow-sm">
-                  <div className="text-[9px] text-primary font-bold uppercase mb-1.5">方向 1 (Direction 1)</div>
+                {selectedFeature.type === 'PATTERN' ? (
+                  <div className="bg-white p-2 rounded border border-[#D1D5DB] shadow-sm">
+                    <div className="text-[13px] text-primary font-bold uppercase mb-1.5 border-b border-[#D1D5DB]/30 pb-0.5">陣列參數 (Pattern Parameters)</div>
+                    <div className="space-y-2 text-[14px] pt-1">
+                      {/* Target Feature Selector */}
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[13px] text-slate-600 font-medium uppercase shrink-0">目標特徵</label>
+                        <select
+                          value={selectedFeature.parameters.target_feature_id || ''}
+                          onChange={(e) => onParamChange('target_feature_id', e.target.value)}
+                          className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 w-[120px]"
+                        >
+                          <option value="">選擇特徵...</option>
+                          {features
+                            .filter(f => f.id !== selectedFeature.id && f.type !== 'PATTERN')
+                            .map(f => (
+                              <option key={f.id} value={f.id}>{f.name}</option>
+                            ))
+                          }
+                        </select>
+                      </div>
 
-                  <div className="space-y-2 text-xs">
-                    {Object.keys(selectedFeature.parameters).map((key) => {
-                      // Avoid showing points or relations array directly as a raw field, edit coordinates instead
-                      if (key === 'points' || key === 'relations') return null;
-                      return (
-                        <div key={key} className="flex items-center justify-between gap-2">
-                          <label className="text-[9px] text-slate-600 font-medium uppercase shrink-0">{key}</label>
-                          {key === 'operation' ? (
-                            <select
-                              value={selectedFeature.parameters[key]}
-                              onChange={(e) => onParamChange(key, e.target.value)}
-                              className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[11px] focus:border-primary outline-none text-slate-800 w-[120px]"
-                            >
-                              <option value="ADD">伸長-實體 (JOIN)</option>
-                              <option value="CUT">伸長-除料 (CUT)</option>
-                            </select>
-                          ) : key === 'plane' ? (
-                            <select
-                              value={selectedFeature.parameters[key]}
-                              onChange={(e) => onParamChange(key, e.target.value)}
-                              className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[11px] focus:border-primary outline-none text-slate-800 w-[120px]"
-                            >
-                              <option value="FRONT">FRONT (XY)</option>
-                              <option value="TOP">TOP (XZ)</option>
-                              <option value="RIGHT">RIGHT (YZ)</option>
-                            </select>
-                          ) : (
-                            <input
-                              type="number"
-                              step="1"
-                              value={selectedFeature.parameters[key]}
-                              onChange={(e) => onParamChange(key, e.target.value)}
-                              className="bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[11px] focus:border-primary outline-none text-slate-800 font-mono w-[120px] text-right"
-                            />
-                          )}
-                        </div>
-                      );
-                    })}
+                      {/* Pattern Type */}
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[13px] text-slate-600 font-medium uppercase shrink-0">陣列類型</label>
+                        <select
+                          value={selectedFeature.parameters.pattern_type || 'CIRCULAR'}
+                          onChange={(e) => onParamChange('pattern_type', e.target.value)}
+                          className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 w-[120px]"
+                        >
+                          <option value="CIRCULAR">環形陣列</option>
+                          <option value="LINEAR">線性陣列</option>
+                        </select>
+                      </div>
+
+                      {/* Axis */}
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[13px] text-slate-600 font-medium uppercase shrink-0">參考軸心</label>
+                        <select
+                          value={selectedFeature.parameters.axis || 'Y'}
+                          onChange={(e) => onParamChange('axis', e.target.value)}
+                          className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 w-[120px]"
+                        >
+                          <option value="X">X 軸 (Axis X)</option>
+                          <option value="Y">Y 軸 (Axis Y)</option>
+                          <option value="Z">Z 軸 (Axis Z)</option>
+                        </select>
+                      </div>
+
+                      {/* Count */}
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[13px] text-slate-600 font-medium uppercase shrink-0">個數 (Count)</label>
+                        <input
+                          type="number"
+                          step="1"
+                          min="1"
+                          value={selectedFeature.parameters.count ?? 4}
+                          onChange={(e) => onParamChange('count', e.target.value)}
+                          className="bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 font-mono w-[120px] text-right"
+                        />
+                      </div>
+
+                      {/* Spacing */}
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-[13px] text-slate-600 font-medium uppercase shrink-0">
+                          {selectedFeature.parameters.pattern_type === 'CIRCULAR' ? '角度 (度)' : '距離 (mm)'}
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          value={selectedFeature.parameters.spacing ?? 90.0}
+                          onChange={(e) => onParamChange('spacing', e.target.value)}
+                          className="bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 font-mono w-[120px] text-right"
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  /* direction header */
+                  <div className="bg-white p-2 rounded border border-[#D1D5DB] shadow-sm">
+                    <div className="text-[13px] text-primary font-bold uppercase mb-1.5">方向 1 (Direction 1)</div>
+
+                    <div className="space-y-2 text-[14px]">
+                      {Object.keys(selectedFeature.parameters).map((key) => {
+                        // Avoid showing points or relations array directly as a raw field, edit coordinates instead
+                        if (key === 'points' || key === 'relations' || key === 'faceOrigin' || key === 'faceNormal' || key === 'faceId') return null;
+                        return (
+                          <div key={key} className="flex items-center justify-between gap-2">
+                            <label className="text-[13px] text-slate-600 font-medium uppercase shrink-0">{key}</label>
+                            {key === 'operation' ? (
+                              <select
+                                value={selectedFeature.parameters[key]}
+                                onChange={(e) => onParamChange(key, e.target.value)}
+                                className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 w-[120px]"
+                              >
+                                <option value="ADD">伸長-實體 (JOIN)</option>
+                                <option value="CUT">伸長-除料 (CUT)</option>
+                              </select>
+                            ) : key === 'plane' ? (
+                              <select
+                                value={selectedFeature.parameters[key]}
+                                onChange={(e) => onParamChange(key, e.target.value)}
+                                className="bg-white border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 w-[120px]"
+                              >
+                                <option value="FRONT">FRONT (XY)</option>
+                                <option value="TOP">TOP (XZ)</option>
+                                <option value="RIGHT">RIGHT (YZ)</option>
+                                <option value="FACE">表面草圖 (LCS)</option>
+                              </select>
+                            ) : (
+                              <input
+                                type="number"
+                                step="1"
+                                value={selectedFeature.parameters[key]}
+                                onChange={(e) => onParamChange(key, e.target.value)}
+                                className="bg-white border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] focus:border-primary outline-none text-slate-800 font-mono w-[120px] text-right"
+                              />
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
 
                 {/* Sketch Relations & Constraints Card */}
                 {selectedFeature.parameters.relations && selectedFeature.parameters.relations.length > 0 && (
                   <div className="bg-white p-2.5 rounded border border-[#D1D5DB] shadow-sm">
-                    <div className="text-[9px] text-slate-700 font-bold uppercase mb-1.5 border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
+                    <div className="text-[13px] text-slate-700 font-bold uppercase mb-1.5 border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
                       <span>🔗 草圖幾何關係 (Relations)</span>
-                      <span className="text-[7px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded animate-pulse">完全定義</span>
+                      <span className="text-[12px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded animate-pulse">完全定義</span>
                     </div>
                     <div className="space-y-1 max-h-[85px] overflow-y-auto pr-0.5">
                       {selectedFeature.parameters.relations.map((rel: string, rIdx: number) => (
-                        <div key={rIdx} className="flex items-center gap-1.5 text-[9px] text-slate-600 bg-[#F8FAFC] px-1.5 py-0.5 rounded border border-[#E2E8F0] font-mono">
+                        <div key={rIdx} className="flex items-center gap-1.5 text-[13px] text-slate-600 bg-[#F8FAFC] px-1.5 py-0.5 rounded border border-[#E2E8F0] font-mono">
                           <span className="text-emerald-500">🟢</span>
                           <span className="font-bold text-slate-800">{rel}</span>
-                          <span className="text-slate-400 text-[8px] ml-auto">已綁定</span>
+                          <span className="text-slate-400 text-[13px] ml-auto">已綁定</span>
                         </div>
                       ))}
                     </div>
@@ -2263,19 +2774,19 @@ export default function Home() {
 
                   return (
                     <div className="bg-white p-2.5 rounded border border-[#D1D5DB] shadow-sm space-y-2">
-                      <div className="text-[9px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
+                      <div className="text-[13px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
                         <span className="flex items-center gap-1">👪 父子拓撲鏈 (Parent/Child Relations)</span>
-                        <span className="text-[7px] text-primary font-bold bg-primary/10 px-1 rounded font-mono">拓撲依賴</span>
+                        <span className="text-[12px] text-primary font-bold bg-primary/10 px-1 rounded font-mono">拓撲依賴</span>
                       </div>
                       
                       <div className="grid grid-cols-2 gap-2 text-[9.5px]">
                         {/* Parents Column */}
                         <div className="space-y-1">
-                          <div className="text-[8px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-0.5">
+                          <div className="text-[13px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-0.5">
                             <span>⬆️</span> 父特徵 (Parents)
                           </div>
                           {parents.length === 0 ? (
-                            <div className="text-[8px] text-slate-400 italic p-1 bg-slate-50 rounded text-center border border-dashed border-[#E5E7EB]">無</div>
+                            <div className="text-[13px] text-slate-400 italic p-1 bg-slate-50 rounded text-center border border-dashed border-[#E5E7EB]">無</div>
                           ) : (
                             <div className="space-y-1 max-h-[70px] overflow-y-auto pr-0.5">
                               {parents.map((p) => (
@@ -2290,7 +2801,7 @@ export default function Home() {
                                   }}
                                   className="w-full text-left truncate px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-all font-medium leading-tight flex items-center gap-1"
                                 >
-                                  <span className="text-[8px]">●</span>
+                                  <span className="text-[13px]">●</span>
                                   <span className="truncate">{p.name}</span>
                                 </button>
                               ))}
@@ -2300,11 +2811,11 @@ export default function Home() {
 
                         {/* Children Column */}
                         <div className="space-y-1">
-                          <div className="text-[8px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-0.5">
+                          <div className="text-[13px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-0.5">
                             <span>⬇️</span> 子特徵 (Children)
                           </div>
                           {children.length === 0 ? (
-                            <div className="text-[8px] text-slate-400 italic p-1 bg-slate-50 rounded text-center border border-dashed border-[#E5E7EB]">無</div>
+                            <div className="text-[13px] text-slate-400 italic p-1 bg-slate-50 rounded text-center border border-dashed border-[#E5E7EB]">無</div>
                           ) : (
                             <div className="space-y-1 max-h-[70px] overflow-y-auto pr-0.5">
                               {children.map((c) => (
@@ -2313,7 +2824,7 @@ export default function Home() {
                                   onClick={() => setSelectedId(c.id)}
                                   className="w-full text-left truncate px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 transition-all font-medium leading-tight flex items-center gap-1"
                                 >
-                                  <span className="text-[8px]">●</span>
+                                  <span className="text-[13px]">●</span>
                                   <span className="truncate">{c.name}</span>
                                 </button>
                               ))}
@@ -2331,14 +2842,14 @@ export default function Home() {
           {/* Measurement PropertyManager (量測專用面板) */}
           {!isSketchMode && measurementMode !== 'NONE' && (
             <div className="h-[210px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex flex-col p-3 z-10 shrink-0">
-              <div className="text-[10px] uppercase tracking-wider text-indigo-600 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
+              <div className="text-[14px] uppercase tracking-wider text-indigo-600 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
                 <span>📋 量測屬性管理器 (Measure Manager)</span>
                 <button
                   onClick={() => {
                     setMeasurementPoints([]);
                     setMeasurementResults(null);
                   }}
-                  className="text-error text-[8px] font-bold hover:underline"
+                  className="text-error text-[13px] font-bold hover:underline"
                 >
                   清除選取
                 </button>
@@ -2346,22 +2857,22 @@ export default function Home() {
 
               <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
                 <div className="bg-white p-2.5 rounded-xl border border-[#D1D5DB] shadow-sm">
-                  <div className="text-[9px] text-indigo-700 font-bold uppercase mb-1.5 border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
+                  <div className="text-[13px] text-indigo-700 font-bold uppercase mb-1.5 border-b border-[#D1D5DB]/30 pb-0.5 flex justify-between items-center">
                     <span>量測項目狀態: {measurementMode}</span>
-                    <span className="text-[7px] text-indigo-600 font-bold bg-indigo-50 px-1 rounded font-mono">
+                    <span className="text-[12px] text-indigo-600 font-bold bg-indigo-50 px-1 rounded font-mono">
                       已選: {measurementPoints.length} 個
                     </span>
                   </div>
 
                   <div className="space-y-1">
                     {measurementPoints.length === 0 ? (
-                      <div className="text-[9px] text-slate-400 py-4 text-center leading-tight">
+                      <div className="text-[13px] text-slate-400 py-4 text-center leading-tight">
                         請在 3D 視區中點選頂點、邊段或表面，系統將自動擷取座標並計算！
                       </div>
                     ) : (
                       <div className="space-y-1.5 max-h-[70px] overflow-y-auto">
                         {measurementPoints.map((pt, pIdx) => (
-                          <div key={pIdx} className="flex items-center gap-1.5 text-[9px] text-slate-700 bg-slate-50 p-1.5 rounded border border-slate-200 font-mono">
+                          <div key={pIdx} className="flex items-center gap-1.5 text-[13px] text-slate-700 bg-slate-50 p-1.5 rounded border border-slate-200 font-mono">
                             <span className="text-indigo-500 font-bold">M{pIdx+1}:</span>
                             <span className="font-semibold">{pt.type}</span>
                             <span className="text-slate-400 ml-auto">
@@ -2376,13 +2887,13 @@ export default function Home() {
 
                 {measurementResults && (
                   <div className="bg-[#4F46E5]/10 p-2.5 rounded-xl border border-[#4F46E5]/20 shadow-sm flex flex-col items-center justify-center py-3">
-                    <span className="text-[9px] text-[#4F46E5] uppercase font-bold tracking-widest mb-1">精確量測數值</span>
+                    <span className="text-[13px] text-[#4F46E5] uppercase font-bold tracking-widest mb-1">精確量測數值</span>
                     <div className="text-base font-black text-slate-900 font-mono leading-none flex items-baseline gap-1">
                       <span>{measurementResults.value.toFixed(3)}</span>
-                      <span className="text-[10px] text-indigo-600 font-bold">{measurementResults.unit}</span>
+                      <span className="text-[14px] text-indigo-600 font-bold">{measurementResults.unit}</span>
                     </div>
                     {measurementResults.details && (
-                      <span className="text-[8px] text-slate-400 font-mono mt-1 w-full text-center truncate">
+                      <span className="text-[13px] text-slate-400 font-mono mt-1 w-full text-center truncate">
                         {measurementResults.details}
                       </span>
                     )}
@@ -2393,7 +2904,7 @@ export default function Home() {
           )}
 
           {/* Sidebar Status Footer */}
-          <div className="h-[28px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex items-center justify-between px-3 text-[9px] text-slate-600 shrink-0 font-mono">
+          <div className="h-[28px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex items-center justify-between px-3 text-[13px] text-slate-600 shrink-0 font-mono">
             <span className={loading ? 'text-warning animate-pulse' : 'text-slate-600'}>
               {loading ? '⚡ 幾何重構中 (BUSY)...' : '🟢 系統就緒 (READY)'}
             </span>
@@ -2408,14 +2919,28 @@ export default function Home() {
             <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-amber-50/95 border border-amber-300 text-amber-950 px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3.5 z-[999] animate-pulse w-[85%] max-w-[650px] pointer-events-none backdrop-blur-md">
               <span className="text-2xl">🎥</span>
               <div className="flex flex-col">
-                <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 leading-none">正在演示 CAD 逐步建構過程 (Live CAD Build Demo)</span>
+                <span className="text-[14px] font-extrabold uppercase tracking-wider text-amber-700 leading-none">正在演示 CAD 逐步建構過程 (Live CAD Build Demo)</span>
                 <span className="text-[13px] font-bold mt-2 leading-relaxed text-amber-900">{demoStep}</span>
               </div>
             </div>
           )}
 
-          <Viewport>
-            {meshData && meshData.length > 0 ? (
+          {activeTab === 'DRAWING' ? (
+            <DrawingSheet />
+          ) : (
+            <Viewport>
+              {activeTab === 'ASSEMBLY' && components.length > 0 ? (
+              components.map((comp) => (
+                meshData.map((mesh: { data: MeshData }, idx: number) => (
+                  <OcctShape 
+                    key={`${comp.id}_${idx}`} 
+                    data={mesh.data} 
+                    position={comp.transform.position}
+                    rotation={comp.transform.rotation}
+                  />
+                ))
+              ))
+            ) : meshData && meshData.length > 0 ? (
               meshData.map((mesh: { data: MeshData }, idx: number) => (
                 <OcctShape key={idx} data={mesh.data} />
               ))
@@ -2426,71 +2951,15 @@ export default function Home() {
               </mesh>
             )}
           </Viewport>
+          )}
 
           {/* Floating Sketch Viewport HUD */}
-          {isSketchMode && (
-            <div className="absolute top-6 left-1/2 -translate-x-1/2 glass-effect px-4 py-2.5 rounded-2xl flex items-center gap-6 shadow-2xl border border-white/30 z-50 animate-fade-in pointer-events-auto">
-              <div className="flex items-center gap-2">
-                <span className="text-[14px]">✏️</span>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-bold text-primary tracking-wider uppercase">草圖繪製中 (Sketching)</span>
-                  <span className="text-[8px] text-slate-500">
-                    正在繪製: {
-                      sketchTool === 'LINE' ? '直線段 (Line)' :
-                      sketchTool === 'CENTER_LINE' ? '中心線 (Centerline)' :
-                      sketchTool === 'CIRCLE' ? '中心圓 (Circle)' :
-                      sketchTool === 'RECTANGLE' ? '邊角矩形 (Rectangle)' :
-                      '三點圓弧 (Arc)'
-                    }
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2 border-l border-border/60 pl-4">
-                <button
-                  onClick={() => setGridSnap(!gridSnap)}
-                  type="button"
-                  className={`px-2 py-1 rounded text-[9px] font-bold transition-all border ${
-                    gridSnap
-                      ? 'bg-emerald-500/10 text-emerald-600 border-emerald-500/25'
-                      : 'bg-white/50 text-slate-600 border-slate-300'
-                  }`}
-                >
-                  🧲 網格吸附: {gridSnap ? '已啟用' : '已關閉'}
-                </button>
-              </div>
-
-              <div className="flex flex-col items-center justify-center border-l border-border/60 pl-4">
-                <span className="text-[11px] font-mono font-bold text-slate-800 leading-none">{sketchPoints.length}</span>
-                <span className="text-[7px] text-slate-500 uppercase tracking-widest text-center mt-1 w-8">節點</span>
-              </div>
-
-              <div className="flex items-center gap-2 border-l border-border/60 pl-4">
-                <button
-                  onClick={() => handleExitAndExtrude()}
-                  disabled={solidSketchPointCount < 3}
-                  type="button"
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 disabled:hover:bg-emerald-600 text-white rounded-xl text-[9px] font-bold shadow-lg shadow-emerald-500/20 transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
-                  title="閉合草圖並長出為 3D 實體"
-                >
-                  {editingFeatureId ? 'Update Feature' : '✓ 離開並拉伸 (Extrude)'}
-                </button>
-                <button
-                  onClick={resetSketchSession}
-                  type="button"
-                  className="px-2.5 py-1.5 bg-error/10 hover:bg-error/20 text-error rounded-xl text-[9px] font-bold transition-all hover:scale-105 active:scale-95"
-                  title="捨棄當前草圖"
-                >
-                  ✗ 捨棄 (Discard)
-                </button>
-              </div>
-            </div>
-          )}
+          <SketchHUD onReset={resetSketchSession} onExit={handleExitAndExtrude} />
 
           {/* Floating Camera View Orientation Toolbar (Right side) */}
           <div className="absolute top-4 right-4 flex flex-col gap-2 z-10 select-none">
-            <div className="glass-effect p-1.5 rounded-2xl flex flex-col gap-1.5 shadow-2xl border border-white/30 text-xs">
-              <div className="text-[7px] text-slate-500 font-bold uppercase tracking-wider text-center border-b border-slate-200 pb-1 mb-1">視角 (View)</div>
+            <div className="glass-effect p-1.5 rounded-2xl flex flex-col gap-1.5 shadow-2xl border border-white/30 text-[14px]">
+              <div className="text-[12px] text-slate-500 font-bold uppercase tracking-wider text-center border-b border-slate-200 pb-1 mb-1">視角 (View)</div>
 
               <button
                 onClick={() => { setActivePlane('FRONT'); setSelectedId(null); }}
@@ -2499,8 +2968,8 @@ export default function Home() {
                 }`}
                 title="前視景 (FRONT)"
               >
-                <span className="text-[8px] font-bold font-mono">前</span>
-                <span className="text-[7px] text-slate-600 leading-none">XY</span>
+                <span className="text-[13px] font-bold font-mono">前</span>
+                <span className="text-[12px] text-slate-600 leading-none">XY</span>
               </button>
 
               <button
@@ -2510,8 +2979,8 @@ export default function Home() {
                 }`}
                 title="俯視景 (TOP)"
               >
-                <span className="text-[8px] font-bold font-mono">上</span>
-                <span className="text-[7px] text-slate-600 leading-none">XZ</span>
+                <span className="text-[13px] font-bold font-mono">上</span>
+                <span className="text-[12px] text-slate-600 leading-none">XZ</span>
               </button>
 
               <button
@@ -2521,8 +2990,8 @@ export default function Home() {
                 }`}
                 title="右視景 (RIGHT)"
               >
-                <span className="text-[8px] font-bold font-mono">右</span>
-                <span className="text-[7px] text-slate-600 leading-none">YZ</span>
+                <span className="text-[13px] font-bold font-mono">右</span>
+                <span className="text-[12px] text-slate-600 leading-none">YZ</span>
               </button>
 
               <div className="w-6 h-px bg-slate-200 self-center my-0.5" />
@@ -2536,7 +3005,7 @@ export default function Home() {
                 title="等角透視 (Perspective)"
               >
                 <span className="text-[12px]">🌐</span>
-                <span className="text-[7px] text-slate-600 leading-none">立體</span>
+                <span className="text-[12px] text-slate-600 leading-none">立體</span>
               </button>
             </div>
           </div>
@@ -2544,7 +3013,7 @@ export default function Home() {
           {/* Loading Overlay */}
           {loading && (
             <div className="absolute inset-0 bg-background/25 backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-30">
-              <div className="glass-effect px-5 py-2.5 rounded-2xl text-[10px] font-bold text-primary animate-pulse border border-primary/30 shadow-2xl flex items-center gap-2">
+              <div className="glass-effect px-5 py-2.5 rounded-2xl text-[14px] font-bold text-primary animate-pulse border border-primary/30 shadow-2xl flex items-center gap-2">
                 <span>🔄</span>
                 <span>B-REP 幾何核心特徵重構中...</span>
               </div>

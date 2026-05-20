@@ -38,6 +38,7 @@ const CameraHandler = () => {
     const dir = cameraNormalFlip ? -1 : 1;
     let targetPos = new THREE.Vector3(DISTANCE, DISTANCE, DISTANCE);
     let upVector = new THREE.Vector3(0, 1, 0);
+    let targetOrbitCenter = new THREE.Vector3(0, 0, 0);
 
     if (activePlane === 'FRONT') {
       targetPos.set(0, 0, DISTANCE * dir);
@@ -48,6 +49,26 @@ const CameraHandler = () => {
     } else if (activePlane === 'RIGHT') {
       targetPos.set(DISTANCE * dir, 0, 0);
       upVector.set(0, 1, 0); // Y remains up
+    } else if (activePlane === 'FACE') {
+      const activeFaceOrigin = useCadStore.getState().activeFaceOrigin;
+      const activeFaceNormal = useCadStore.getState().activeFaceNormal;
+      if (activeFaceOrigin && activeFaceNormal) {
+        const originVec = new THREE.Vector3(...activeFaceOrigin);
+        const normalVec = new THREE.Vector3(...activeFaceNormal).normalize();
+        
+        targetOrbitCenter.copy(originVec);
+        targetPos.copy(originVec).addScaledVector(normalVec, DISTANCE * dir);
+
+        // Compute up vector as the local Y direction
+        let xDir = new THREE.Vector3();
+        if (Math.abs(normalVec.x) < 1e-5 && Math.abs(normalVec.y) < 1e-5) {
+          xDir.set(1, 0, 0);
+        } else {
+          xDir.set(-normalVec.y, normalVec.x, 0).normalize();
+        }
+        const yDir = new THREE.Vector3().crossVectors(normalVec, xDir).normalize();
+        upVector.copy(yDir);
+      }
     }
 
     // Cancel any active transitions to prevent conflicts
@@ -67,7 +88,7 @@ const CameraHandler = () => {
       ease: 'expo.out',
       onUpdate: () => {
         camera.up.copy(upVector);
-        camera.lookAt(0, 0, 0);
+        camera.lookAt(targetOrbitCenter);
       },
       onComplete: () => {
         setIsCameraAnimating(false); // Re-enable OrbitControls declaratively
@@ -80,9 +101,9 @@ const CameraHandler = () => {
     // Animate orbit target to origin
     if (controls) {
       gsap.to(controls.target, {
-        x: 0,
-        y: 0,
-        z: 0,
+        x: targetOrbitCenter.x,
+        y: targetOrbitCenter.y,
+        z: targetOrbitCenter.z,
         duration: 0.8,
         ease: 'expo.out'
       });
@@ -163,7 +184,7 @@ const HighlightRenderer = () => {
               <meshBasicMaterial color="#8B5CF6" depthTest={false} />
             </mesh>
             <Html position={pos} distanceFactor={15}>
-              <div className="bg-indigo-600 text-white font-bold font-mono px-1 py-0.5 rounded text-[8px] whitespace-nowrap shadow-md pointer-events-none select-none">
+              <div className="bg-indigo-600 text-white font-bold font-mono px-1 py-0.5 rounded text-[13px] whitespace-nowrap shadow-md pointer-events-none select-none">
                 M{idx + 1}
               </div>
             </Html>
@@ -188,7 +209,7 @@ const HighlightRenderer = () => {
           <group>
             <primitive object={lineObj} />
             <Html position={midPoint} distanceFactor={15}>
-              <div className="bg-slate-900/90 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[9px] font-bold font-mono whitespace-nowrap shadow-2xl pointer-events-none select-none">
+              <div className="bg-slate-900/90 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded text-[13px] font-bold font-mono whitespace-nowrap shadow-2xl pointer-events-none select-none">
                 📏 {start.distanceTo(end).toFixed(2)} mm
               </div>
             </Html>
@@ -612,7 +633,7 @@ export default function Viewport({ children }: ViewportProps) {
         />
       </Canvas>
 
-      <div className="absolute top-4 left-4 glass-effect p-2 rounded-lg text-xs font-mono text-slate-700 pointer-events-none">
+      <div className="absolute top-4 left-4 glass-effect p-2 rounded-lg text-[14px] font-mono text-slate-700 pointer-events-none">
         VIEWPORT: {isSketchMode ? 'SKETCHING MODE (LOCKED)' : 'PERSPECTIVE'}
       </div>
     </div>

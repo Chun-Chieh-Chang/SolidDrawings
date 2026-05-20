@@ -12,9 +12,16 @@ export interface MeshData {
 interface OcctShapeProps {
   data: MeshData;
   color?: string;
+  position?: [number, number, number];
+  rotation?: [number, number, number];
 }
 
-export default function OcctShape({ data, color = '#60A5FA' }: OcctShapeProps) {
+export default function OcctShape({ 
+  data, 
+  color = '#60A5FA',
+  position = [0, 0, 0],
+  rotation = [0, 0, 0]
+}: OcctShapeProps) {
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     
@@ -36,7 +43,7 @@ export default function OcctShape({ data, color = '#60A5FA' }: OcctShapeProps) {
   }, [data]);
 
   return (
-    <mesh geometry={geometry}>
+    <mesh geometry={geometry} position={position} rotation={rotation}>
       <meshStandardMaterial 
         color={color} 
         roughness={0.3} 

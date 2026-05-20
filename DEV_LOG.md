@@ -21,6 +21,104 @@
 
 ---
 
+## [2026-05-20] 實裝面上草圖 (Sketch on Face) 與特徵陣列 (Circular/Linear Patterns) (v3.1.0-alpha)
+
+### 任務內容
+
+- **面上草圖 (Sketch on Face) 基準面延伸與 LCS 投影系統**：
+  - **RCA**：原有 3D 建模只能在標準基準面 (FRONT/TOP/RIGHT) 上進行 2D 草圖繪製與拉伸，無法直接在已生成的 3D 實體平面上進行二次特徵的起草與定位，與 SolidWorks 差距極大。
+  - **CAPA**：
+    - 在 Zustand 中擴展 `activePlane: 'FACE'` 支援與 custom LCS 姿態狀態 (`activeFaceOrigin`, `activeFaceNormal`, `activeFaceId`)。
+    - 在 `DatumPlanes.tsx` 中基於選定面的法向量動態建立正交局部坐標系 (LCS)，並將滑鼠點擊/滑動之 3D 交點精準逆投影至 LCS 之 $u, v$ 本地坐標。
+    - 在 `SketchPreview.tsx` 中利用 3D LCS 變換矩陣將 2D 草圖點流暢且精準地映射至 3D 空間，支援穿透與吸附。
+    - 重構 `page.tsx` 中 `handleExitAndExtrude` 與 `handleEditFeatureSketch`，將 LCS 參數持久化序列化至特徵參數字典，並在雙擊編輯時 100% 完美重構。
+
+- **三維視埠「正對面上 (Normal To Face)」GSAP 視角轉正與 OrbitControls 軌道解耦**：
+  - **RCA**：選取任意 3D 面起草時，相機視角沒有對準該平面，難以直觀地進行 2D 幾何繪圖。
+  - **CAPA**：
+    - 升級 `Viewport.tsx` 中的 `CameraHandler`。當編輯基準面為 `'FACE'` 時，自動動態讀取 selected LCS 資訊。
+    - 將相機軌道控制器 (`controls.target`) 聚焦平移至面中心點 `activeFaceOrigin`。
+    - 計算面之切線 Y 向量，作為相機的 `upVector`，使相機 position 平滑沿法向外推 `DISTANCE`，達成絲毫無差 of 2D 轉正視野，並支持雙擊翻轉 (Flip Normal To)！
+
+- **線性與環形特徵陣列複製 (Circular/Linear Feature Patterns) 幾何引擎**：
+  - **RCA**：缺乏工業級 CAD 極為高頻的核心功能「特徵陣列複製」，導致需要手動建立多個相同的幾何特徵，耗費計算資源且不具備參數化關聯性。
+  - **CAPA**：
+    - 後端 `geometry_service.py` 封裝實裝隔離特徵重建與 `PATTERN` 特徵處理器。
+    - 針對 `LINEAR` 型陣列，利用 `gp_Trsf` 套用 `axis` 平移矩陣；針對 `CIRCULAR` 型陣列，套用對應 `axis` 之旋轉矩陣。
+    - 在 pythonOCC 拓撲重建管線中，對所有生成的分身複製品與主實體進行完美的 `BRepAlgoAPI_Fuse` (併集) 或 `BRepAlgoAPI_Cut` (除料) 布林運算，一鍵長出/切出高精度陣列實體。
+    - 前端 Ribbon 面板增設亮麗、脈搏動畫的 **「特徵陣列 (Pattern) 🔄」** 呼籲按鈕。
+    - 於左下角 `PropertyManager` 實裝專屬陣列屬性編輯面板，提供目標特徵 dropdown、陣列類型、參考軸心、個數及角度間距的動態即時修訂！
+
+- **表面屬性管理器 (Face Selection PropertyManager) 與互斥面板**：
+  - **CAPA**：當用戶在 3D Viewport 點選任意平面時，PropertyManager 動態變更為 **「📋 表面屬性管理器 (Face Selection)」**，顯示中心點、法向量與拓撲 ID，並提供極具質感的 Indigo **「在面上起草 (Sketch on Face) ✏️」** 按鈕，引導用戶進行正確的特徵建模，且與特徵樹/量測面板完全互斥無衝突。
+
+- **靜態型別確效與編譯檢測**：
+  - 前端 static typecheck `npx tsc --noEmit` 回報 Exit Code 0，無任何 TypeScript 類型錯誤！
+  - 後端 Python fallback 模組語法編譯檢查 100% 通過，系統高度強固，零拼圖遺漏！
+
+---
+
+## [2026-05-18] 實裝全局 UI 閱讀字體優化與鏡像幾何約束 (v3.0.0-alpha)
+
+### 任務內容
+
+- **全局 UI/UX 字體大小與可讀性提升**：
+  - **RCA**：用戶反饋介面中部分標籤和按鈕字體太小（7px-11px），難以清晰閱讀，不符合 Rule `[user_global]` 3 關於系統介面字體不小於 14px 的規範。
+  - **CAPA**：編寫並執行字體轉換自動化腳本，將 `page.tsx`、`DatumPlanes.tsx` 與 `Viewport.tsx` 中所有 `text-[7px]` 至 `text-[11px]` 及 `text-xs` 的 Tailwind class 統一升級至 `text-[14px]` (sm) 或以上。
+- **草圖深化：鏡像幾何 (Mirror Entities) 約束與對稱複製**：
+  - **RCA**：目前草圖關係僅支援雙對象約束，缺乏工業 CAD 極為核心的「多個對象圍繞中心線進行鏡像對稱複製」功能。
+  - **CAPA**：
+    - 解除 PropertyManager 選取上限，支援多對象複選。
+    - 引入高精度 2D 向量投影鏡像數學求解器，計算所有選定對象在指定 `CENTER_LINE` 中心線（作為對稱軸）上的鏡像點。
+    - 設計帶有 Composite Tags 的新幾何生成邏輯，確保鏡像產生的線段、圓、圓弧保持原有幾何特性且首尾有 `'START'` 斷鏈標籤，不干擾 Solid OCC 拉伸流程。
+    - 在 PropertyManager 多對象關係卡片中新增 **「鏡像幾何 (Mirror Entities) 🪞」** 呼籲按鈕（帶有脈搏動畫與高級粉紅品牌色配色）。
+
+### 預防措施 (Preventative Measures)
+
+- 運行全局 TypeScript 靜態編譯檢測（`npm run build`），確保所有新引入的泛型類型聲明與陣列操作皆具備嚴格的類型定義，維持 **Exit Code 0** 的零錯誤標準。
+
+---
+
+## [2026-05-18] 實裝 SolidWorks 專業草圖繪製力學與多重畫線模式 (v2.9.0-alpha)
+
+### 任務內容
+
+- **連續畫線 (Click-Click) 與單段畫線 (Click-Drag) 雙重力學融合**：
+  - **RCA**：用戶反饋草圖畫線操作過於單一，缺乏 SolidWorks 標誌性的「滑鼠按下拖曳產生單段線、點擊點擊產生連續折線」的雙重操作力學。
+  - **CAPA**：
+    - **拖曳偵測算子**：在 `DatumPlanes.tsx` 中藉由 `onPointerDown`、`onPointerMove` 與 `onPointerUp` 的高精度狀態機，計算滑鼠拖曳之歐式幾何距離。若移動距離大於 $0.8$ 單位，判定為 **Click-Drag (單條繪製)** 模式。
+    - **自動斷鍊 (Click-Drag Path)**：單條繪製在 `mouseup` 時立即放置終點，並在終點寫入 `'START'` tag（多鏈獨立折線標記），且主動設置 `sketchNewChain: true` 以終止當前橡皮筋預覽，達成完美的單段畫線體感。
+    - **雙擊/Esc 結束鏈 (Click-Click Path)**：點擊式畫線採用連續模式，雙擊或按下 `Esc` 鍵時會觸發 `handlePlaneDoubleClick` 退出當前折線鏈，自動 pop 掉多餘點並開始新折線鏈，但 **LINE 工具本身依舊保持 active 狀態**，隨時可畫新折線，完美復刻 SolidWorks。
+
+- **對稱中點直線 (Midpoint Line) 幾何引擎**：
+  - **RCA**：SolidWorks 教學影片第一步特別介紹了對稱中點直線的繪製，而我們之前僅有標準端點直線。
+  - **CAPA**：
+    - 在 Zustand 中擴展 `sketchTool` 支援 `'MIDPOINT_LINE'`，並在頂部功能區 (Ribbon) 補齊專屬中點直線 Command 按鈕。
+    - **對稱幾何鏡像算法**：在 `DatumPlanes.tsx` 的 R3F 橡皮筋渲染器中，當第一點點擊確定為 Symmetry Center 後，游標移動時動態計算對稱兩端座標：$P_{end1} = P_{center} + \vec{d}$，$P_{end2} = P_{center} - \vec{d}$。
+    - 點擊第二點時，將中心點替換為對稱的兩個實體端點，並在第一個端點標記 `'START'` 防止與之前的點黏合，最後自動結束當前鏈，達成 SolidWorks 般直覺的對稱畫線力學！
+
+- **智慧游標 Line-to-Arc 動態切換 (A-Arc switch)**：
+  - **RCA**：在畫直線過程中，缺乏 SolidWorks 經典的「將游標移回上一個端點即自動切換為圓弧」以及「按下 A 鍵切換為圓弧」的智慧切換。
+  - **CAPA**：
+    - **懸停回掃檢測器**：在 `DatumPlanes.tsx` 中實時計算當前游標與 `lastClickedUV` 的距離。若游標移開後再次回到 $1.0$ 單位捕捉半徑內，判定為回掃觸發。
+    - **動態切換圓弧**：觸發時，系統會發出亮麗的 **Concentric Magenta Circle (品紅雙環游標標示)**，並自動將 active `sketchTool` 切換為 `'ARC'`！圓弧繪製完成後，自動切回 `'LINE'` 進行下一段折線。
+    - **全域 A 鍵熱鍵切換**：在 `page.tsx` 中偵測 global keydown 事件，按下 `a` 鍵在草圖模式中一秒切換至 `'ARC'`。
+
+- **作為建構線 (For Construction) 與 composite centerlines 解析器**：
+  - **RCA**：先前的構造線標記方式過於單一，當特徵有多條鏈時，`'START'` 與 `'CENTER_LINE'` 互斥導致 parsing 出錯或斷線。
+  - **CAPA**：
+    - **複合標記架構 (Composite Tag)**：將點的第三個參數標記為逗號分隔的 composite string (例如 `pt[2] = 'START,CENTER_LINE'`)。
+    - **水平展開修訂**：重構 `page.tsx` 的 `entities` 與 `solidSketchPointCount` 解析器，使用 `includes('CENTER_LINE')` 進行安全過濾。這成功隔離了不參與 3D Extrusion 的構造線，並保證多鏈折線在 B-Rep 拉伸時完全無損。
+    - **PropertyManager 屬性卡片**：在左側側邊欄實裝精緻的 **「🛠️ 草圖對象屬性 (PropertyManager)」** 交互卡片，點選草圖線段即時顯示 checkbox「作為建構線 (For Construction)」，點選一鍵在實線與虛線中心線之間自由轉換！
+
+- **全域快捷熱鍵 L, A 與 Esc 鍵防盜對齊**：
+  - **CAPA**：在 `page.tsx` 中添加 input focus 隔離的 global keydown 監聽器。按 `L` / `l` 開啟畫線，按 `A` / `a` 開啟畫弧，按 `Esc` 完美結束當前折線鏈並清理 dangling helper coordinates，大幅提升建模效率。
+
+- **靜態編譯與軟體確效**：
+  - 全域 TypeScript 編譯 `npm run build` 通過率 100%，Exit code `0`！
+
+---
+
 ## [2026-05-18] 實裝 O-Snap 智慧游標吸附引擎與完美視角轉正鎖定 (v2.8.0-alpha)
 
 ### 任務內容
@@ -1641,3 +1739,234 @@
 - [x] 所有 parent/child 關係樹狀鏈高質感渲染，與色彩大師 Morandi 設計規範完美契合。
 - [x] `DEV_LOG.md` 與專案程式碼已 100% 同步，PDCA 循環完美閉環。
 
+
+---
+
+## [2026-05-19] 實裝 Phase 3.2 測量工具與更新手冊 (v3.1.0-alpha)
+
+### 任務內容
+
+- **Phase 3.2 測量工具核心引擎**：
+  - **RCA**：用戶反饋需要物理量測功能（距離、角度、面積、體積）來驗證 CAD 模型的幾何屬性，符合 SolidWorks "Evaluate" 功能標準。
+  - **CAPA**：
+    - 延續 Phase 3.1 的 `TopologySelector` 選取系統，擴展 `useCadStore.ts` 加入 `measurementMode` (NONE/DISTANCE/ANGLE/AREA/VOLUME)、`measurementPoints` (選取點陣列)、`measurementResults` (計算結果)。
+    - 在 `MeasurementService.ts` 中實作 OCCT 封裝測量方法：`calculateDistance` (兩點距離)、`calculateEdgeAngle` (兩邊夾角)、`calculateMeshArea` (網格表面積)、`calculateMeshVolume` (封閉網格體積)。
+    - 在 `page.tsx` 中實作 `useEffect` 監聽 `selectedTopology` 變化，根據當前 `measurementMode` 自動累積選取點並觸發計算：
+      - **DISTANCE**: 選取 2 個頂點 → 計算歐式距離
+      - **ANGLE**: 選取 2 條邊 → 計算兩邊向量夾角
+      - **AREA**: 選取 1 個面 → 計算面積
+      - **VOLUME**: 選取 1 個實體 → 計算體積
+    - 計算結果自動顯示於 PropertyManager 的「📋 量測屬性管理器」卡片中，包含模式、數值、單位與詳細描述。
+
+- **Sketch HUD 草圖 Heads-Up Display**：
+  - **RCA**：用戶反饋草圖模式缺乏 SolidWorks 標誌性的中央懸浮 HUD，無法即時查看草圖狀態（工具、節點數、閉合狀態）與快速操作（捨棄、離開）。
+  - **CAPA**：
+    - 建立 `SketchHUD.tsx` 組件，顯示草圖模式狀態、當前工具、網格吸附開關、節點計數。
+    - 提供「✗ 捨棄」與「✓ 離開並拉伸」快速按鈕，符合 SolidWorks 操作習慣。
+    - 使用 `glass-effect` 毛玻璃樣式與高對比度顏色（Emerald Green for snap, Blue for point count），確保視覺清晰度。
+
+- **手冊與文檔更新**：
+  - 更新 `handover_resume_guide.md` 至 v3.1.0-alpha，標記 Phase 3.1 COMPLETE、Phase 3.2 IMPLEMENTATION IN PROGRESS。
+  - 記錄所有變更於 `DEV_LOG.md`，包含 RCA 與 CAPA 流程。
+
+### 預防措施 (Preventative Measures)
+
+- 運行全域 TypeScript 靜態編譯檢測（`npx tsc --noEmit`），確保所有新引入的狀態與計算邏輯皆具備嚴格的類型定義，維持 **Exit Code 0** 的零錯誤標準。
+
+---
+---
+
+## [2026-05-19] 實裝 Electron 桌面應用程式 (v3.2.0-alpha)
+
+### 任務內容
+
+- **Electron 桌面包裝架構**：
+  - **RCA**：用戶詢問 SolidWorks 的原生介面技術，以及本專案能否建構相同介面。經過分析，SolidWorks 使用 MFC (Microsoft Foundation Classes) + DirectX/OpenGL 的原生 Windows 應用程式，而本專案目前是 Web 版本 (React + WebGL)。
+  - **CAPA**：
+    - **技術可行性分析**：Web 版本在 UI 層面 (CommandManager, FeatureManager, PropertyManager, 3D Viewport) 已高度對標 SolidWorks，差異主要在底層技術 (原生 GPU 加速 vs WebGL, 檔案系統存取限制)。
+    - **選項評估**：
+      - **Option 1 (保持 Web)**：跨平台、無需安裝，但受限於瀏覽器沙箱
+      - **Option 2 (Electron)**：保留 Web 開發效率 + 原生 API 存取權限，推薦方案
+      - **Option 3 (Tauri)**：輕量級桌面，但需學習 Rust 且生態系統較小
+    - **實作 Electron Main Process** (`electron/main.ts`)：
+      - 建立瀏覽器視窗 (1600x900, SolidWorks 淺色主題)
+      - 管理應用程式生命週期
+      - 實作 IPC handlers: `file:open`, `file:save`, `file:read`, `app:open-external`
+      - 開發/生產模式自動切換
+    - **實作 Preload Script** (`electron/preload.ts`)：
+      - 使用 `contextBridge.exposeInMainWorld` 提供安全的 IPC 通訊
+      - 暴露 `fileAPI` 和 `appAPI` 給 Renderer Process
+      - TypeScript 型別定義
+    - **實作 Renderer Integration** (`electron/renderer.ts`)：
+      - 封裝檔案操作 API
+      - 提供 `fileAPI.open()`, `fileAPI.save()`, `fileAPI.read()`
+      - 提供 `appAPI.openExternal()`
+      - IPC 訊息監聽
+    - **配置 Electron Build** (`package.json` + `electron/package.json`)：
+      - appId: `com.3dbuilder.cad`
+      - productName: `3D-Builder`
+      - 支援 Windows (NSIS), macOS (DMG), Linux (AppImage)
+      - 自動安裝依賴 (`electron-builder install-app-deps`)
+    - **建立啟動腳本** (`START-ELECTRON.ps1`)：
+      - 自動檢查 Node.js/npm
+      - 安裝依賴
+      - 建置 Next.js + Electron
+      - 啟動 Electron 應用
+
+- **技術優缺點分析**：
+  - **Electron 優點**：
+    - 保留 React/TypeScript 開發體驗
+    - 可使用原生 API (檔案系統、對話框)
+    - 生態系統成熟
+    - 跨平台支援
+  - **Electron 缺點**：
+    - 應用程式體積較大 (~150MB)
+    - 需要安裝
+  - **Tauri 優點**：
+    - 極致輕量 (~10MB)
+    - 原生性能
+  - **Tauri 缺點**：
+    - Rust 學習曲線陡峭
+    - 生態系統較小
+    - Web 前端仍受限於瀏覽器
+    - 與現有 Python/OCCT 整合困難
+
+### 預防措施 (Preventative Measures)
+
+- 運行全域 TypeScript 靜態編譯檢測（`npx tsc --noEmit`），確保所有新引入的 Electron 代碼皆具備嚴格的類型定義，維持 **Exit Code 0** 的零錯誤標準。
+
+---
+---
+
+## [2026-05-19] 修復 Electron TypeScript 錯誤與更新手冊 (v3.2.1-alpha)
+
+### 任務內容
+
+- **TypeScript 錯誤修復**：
+  - **RCA**：Electron 類型定義缺失與已棄用的 API 選項導致編譯錯誤。
+  - **CAPA**：
+    - 添加 `IpcMainInvokeEvent` 和 `IpcRendererEvent` 類型註解到 IPC handlers
+    - 移除已棄用的 `enableRemoteModule` 選項
+    - 修復 preload.ts 的事件類型定義
+  - **驗證**：`npx tsc --noEmit` 通過，Exit Code 0
+
+- **手冊更新**：
+  - 更新 `handover_resume_guide.md` 至 v3.2.0-alpha
+  - 標記 Electron Desktop Application 為 COMPLETE
+  - 更新 DEV_LOG.md 記錄 Electron 實作細節
+
+### 預防措施 (Preventative Measures)
+
+- 運行全域 TypeScript 靜態編譯檢測（`npx tsc --noEmit`），確保所有新引入的 Electron 代碼皆具備嚴格的類型定義，維持 **Exit Code 0** 的零錯誤標準。
+
+---
+---
+
+## [2026-05-19] 實裝 Phase 3.3 質量屬性與更新手冊 (v3.3.0-alpha)
+
+### 任務內容
+
+- **Mass Properties 計算核心**：
+  - **RCA**：用戶需要物理量測功能（重心、慣性張量）來驗證 CAD 模型的物理屬性，符合 SolidWorks "Evaluate" 功能標準。
+  - **CAPA**：
+    - 在 `MeasurementService.ts` 中實作 `calculateCenterOfGravity()` 方法，計算網格的幾何中心（所有頂點的平均座標）。
+    - 實作 `calculateInertiaTensor()` 方法，使用平行軸定理 (Parallel Axis Theorem) 計算慣性張量：
+      - 將網格分解為多個四面體 (Tetrahedrons)
+      - 計算每個四面體的慣性張量
+      - 使用平行軸定理將慣性張量轉換至全局座標系
+      - 累加所有四面體的慣性張量
+    - 實作 `formatInertiaTensor()` 方法，格式化顯示 3x3 慣性張量矩陣。
+    - 支援密度參數配置，可計算不同材質的質量屬性。
+
+- **手冊與文檔更新**：
+  - 更新 `handover_resume_guide.md` 至 v3.3.0-alpha
+  - 標記 Phase 3.3 COMPLETE
+  - 更新 DEV_LOG.md 記錄 Mass Properties 實作細節
+
+### 預防措施 (Preventative Measures)
+
+- 運行全域 TypeScript 靜態編譯檢測（`npx tsc --noEmit`），確保所有新引入的計算邏輯皆具備嚴格的類型定義，維持 **Exit Code 0** 的零錯誤標準。
+
+---
+
+---
+---
+
+## [2026-05-19] Phase 3.4 Integration of UI Components (v3.4.0-alpha)
+
+### Implementation Details
+
+- **MeasurementPanel Integration**:
+  - **RCA**: Measurement results were calculated in the kernel/service but lacked a dedicated UI panel for user feedback.
+  - **CAPA**: Integrated MeasurementPanel.tsx into the main sidebar. It dynamically renders when the "Evaluate" tab is active or measurement mode is engaged, providing a professional CAD PropertyManager experience.
+- **SketchHUD Integration**:
+  - **RCA**: Inline HUD code in page.tsx was becoming complex and hard to maintain.
+  - **CAPA**: Refactored the floating sketch HUD into a standalone SketchHUD.tsx component and integrated it into the main viewport. This improves code modularity and allows for easier future UI enhancements.
+
+### Verification Results
+
+- **Build**: 
+pm run build passes.
+- **Lint**: 
+px tsc --noEmit returns Exit Code 0.
+- **UI**: Components are correctly rendered and responsive to state changes.
+
+### Preventative Measures
+
+- Always verify component imports and usage after refactoring complex blocks in page.tsx.
+- Keep the handover_resume_guide.md in sync with completed phases to ensure a smooth transition for the next session.
+
+---
+
+---
+---
+
+## [2026-05-19] Phase 2: Assembly Mates Implementation (v3.4.1-alpha)
+
+### Implementation Details
+
+- **Data Structure Implementation**:
+  - **RCA**: The application only supported single-part editing without a concept of assembly or inter-part relationships.
+  - **CAPA**: Introduced CADComponent and CADMate types. Extended useCadStore with assembly state and persistent storage for components and mates.
+- **Assembly Service**:
+  - **CAPA**: Created AssemblyService.ts in the kernel to centralize mate validation and transformation logic.
+- **Mate Management UI**:
+  - **CAPA**: Developed MatePanel.tsx to provide a SolidWorks-like "Mate" property manager. Integrated an "Assembly" tab in the ribbon for top-level assembly operations.
+- **Renderer Enhancement**:
+  - **CAPA**: Modified OcctShape and Viewport to handle multiple instances of B-Rep geometry with independent transforms.
+
+### Verification Results
+
+- **Build**: 
+pm run build passed.
+- **Type Check**: 
+px tsc --noEmit returned Exit Code 0.
+- **Functionality**: Multiple components can be inserted and rendered. Mate selection is captured in the sidebar.
+
+---
+
+---
+---
+
+## [2026-05-19] Electron Desktop Application Enhancements (v3.5.0-alpha)
+
+### Implementation Details
+
+- **Native OS Integration**:
+  - **RCA**: The Electron app felt like a website in a wrapper, lacking native desktop behaviors like file associations and global shortcuts.
+  - **CAPA**: 
+    - Updated package.json with ileAssociations.
+    - Modified main.ts to handle file paths from process.argv and send them to the renderer.
+    - Registered globalShortcut for common CAD operations.
+    - Implemented pp:notify using Electron's Notification module.
+- **Bridge Refactoring**:
+  - **CAPA**: Updated preload.ts and enderer.ts to expose new event-driven listeners (onFileOpen, onSaveRequest, etc.), allowing the React app to respond to OS-level events.
+
+### Verification Results
+
+- **Type Check**: 
+px tsc --noEmit returned Exit Code 0.
+- **Shortcuts**: Ctrl+S, Ctrl+O, and Ctrl+N are correctly registered and handled in page.tsx.
+- **Icons**: Professional SVG icon added and configured for the build pipeline.
+
+---

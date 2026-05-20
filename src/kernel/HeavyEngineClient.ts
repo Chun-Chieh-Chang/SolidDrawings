@@ -88,5 +88,28 @@ export class HeavyEngineClient {
       return false;
     }
   }
-}
 
+  /**
+   * Request a 2D projection of the 3D model.
+   */
+  public async project(features: CADFeature[], plane: string = 'FRONT'): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/project`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ features, plane }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Engine error: ${response.statusText}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] Failed to project:', error);
+      return [];
+    }
+  }
+}
