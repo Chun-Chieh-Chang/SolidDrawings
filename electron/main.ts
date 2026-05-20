@@ -10,9 +10,14 @@
 import { app, BrowserWindow, ipcMain, dialog, shell, IpcMainInvokeEvent, globalShortcut, Notification } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import * as http from 'http';
 
 // 檢查是否為開發模式
 const isDev = !app.isPackaged && (process.argv.includes('--dev') || !fs.existsSync(path.join(__dirname, '../out/index.html')));
+
+// 靜態檔案伺服器狀態
+let staticServer: http.Server | null = null;
+let serverPort = 0;
 
 // 保存視窗引用，避免被垃圾回收
 let mainWindow: BrowserWindow | null = null;
@@ -27,6 +32,61 @@ const getFilePathFromArgs = () => {
   }
   return null;
 };
+
+// 啟動本機靜態檔案伺服器，解決 file:// 協定絕對路徑失效問題
+function startStaticServer(): Promise<number> {
+  return new Promise((resolve) => {
+    const publicDir = path.join(__dirname, '../out');
+    staticServer = http.createServer((req, res) => {
+      let safeUrl = req.url || '/';
+      if (safeUrl.includes('..')) {
+        res.statusCode = 403;
+        res.end('Forbidden');
+        return;
+      }
+      
+      // 移除 query 參數以定位實體檔案
+      let filePath = path.join(publicDir, safeUrl.split('?')[0]);
+      if (fs.existsSync(filePath) && fs.statSync(filePath).isDirectory()) {
+        filePath = path.join(filePath, 'index.html');
+      }
+      
+      fs.readFile(filePath, (err, data) => {
+        if (err) {
+          res.statusCode = 404;
+          res.end('Not Found');
+          return;
+        }
+        
+        // 解析常見 Mime-Types，確保 CSS 與 JS 能被渲染進程正確讀取與執行
+        const ext = path.extname(filePath).toLowerCase();
+        let contentType = 'text/html';
+        if (ext === '.js') contentType = 'application/javascript';
+        else if (ext === '.css') contentType = 'text/css';
+        else if (ext === '.png') contentType = 'image/png';
+        else if (ext === '.jpg' || ext === '.jpeg') contentType = 'image/jpeg';
+        else if (ext === '.svg') contentType = 'image/svg+xml';
+        else if (ext === '.json') contentType = 'application/json';
+        else if (ext === '.ico') contentType = 'image/x-icon';
+        
+        res.writeHead(200, { 'Content-Type': contentType });
+        res.end(data);
+      });
+    });
+    
+    // 使用連接埠 0 讓作業系統自動分配空閒埠，100% 避免埠口碰撞
+    staticServer.listen(0, '127.0.0.1', () => {
+      const addr = staticServer?.address();
+      if (addr && typeof addr !== 'string') {
+        serverPort = addr.port;
+        resolve(addr.port);
+      } else {
+        serverPort = 3010;
+        resolve(3010);
+      }
+    });
+  });
+}
 
 // 建立視窗
 function createWindow() {
@@ -54,8 +114,8 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools();
   } else {
-    // 生產模式：載出靜態檔案
-    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
+    // 生產模式：載入本地靜態伺服器 (避開 file:// 協定問題)
+    mainWindow.loadURL(`http://127.0.0.1:${serverPort}`);
   }
 
   // 視窗關閉事件
@@ -122,7 +182,10 @@ ipcMain.handle('app:open-external', async (event: IpcMainInvokeEvent, url: strin
 });
 
 // 應用程式生命週期
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (!isDev) {
+    await startStaticServer();
+  }
   createWindow();
 
   // Register Global Shortcuts
@@ -163,4 +226,7 @@ app.on('activate', () => {
 // 清理資源
 app.on('before-quit', () => {
   // 可以在這裡保存應用程式狀態
+  if (staticServer) {
+    staticServer.close();
+  }
 });
