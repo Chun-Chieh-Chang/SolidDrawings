@@ -12,7 +12,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 
 // 檢查是否為開發模式
-const isDev = !app.isPackaged;
+const isDev = !app.isPackaged && (process.argv.includes('--dev') || !fs.existsSync(path.join(__dirname, '../out/index.html')));
 
 // 保存視窗引用，避免被垃圾回收
 let mainWindow: BrowserWindow | null = null;
