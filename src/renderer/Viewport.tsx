@@ -69,6 +69,18 @@ const CameraHandler = () => {
         const yDir = new THREE.Vector3().crossVectors(normalVec, xDir).normalize();
         upVector.copy(yDir);
       }
+    } else if (activePlane && activePlane !== 'FACE') {
+      const activeCustomPlane = useCadStore.getState().referencePlanes.find(p => p.id === activePlane);
+      if (activeCustomPlane) {
+        const originVec = new THREE.Vector3(...activeCustomPlane.origin);
+        const normalVec = new THREE.Vector3(...activeCustomPlane.normal).normalize();
+        
+        targetOrbitCenter.copy(originVec);
+        targetPos.copy(originVec).addScaledVector(normalVec, DISTANCE * dir);
+        
+        const yDir = new THREE.Vector3(...activeCustomPlane.yDir).normalize();
+        upVector.copy(yDir);
+      }
     }
 
     // Cancel any active transitions to prevent conflicts
@@ -114,7 +126,7 @@ const CameraHandler = () => {
 };
 
 // Global topology selector instance
-let topologySelector: TopologySelector | null = null;
+export let topologySelector: TopologySelector | null = null;
 
 // R3F context initialization helper rendered inside Canvas
 const SceneSelector = () => {
@@ -221,10 +233,14 @@ const HighlightRenderer = () => {
 };
 
 const FeatureOutlines = () => {
-  const { features, selectedId, setSelectedId, isSketchMode } = useCadStore();
+  const { features, selectedId, setSelectedId, isSketchMode, selectedSubNodeType, setSelectedSubNodeType } = useCadStore();
   const [hoveredFeatureId, setHoveredFeatureId] = useState<string | null>(null);
 
   if (isSketchMode || features.length === 0) return null;
+
+  // If we are highlighting a 2D sketch in SolidWorks tree selection style, 
+  // suppress rendering the B-Rep solid highlights so they don't clash with magenta 2D wires!
+  const suppressSolidHighlights = selectedSubNodeType === 'SKETCH';
 
   // Helper to determine dependency color inside 3D viewport
   const getDependencyType = (featId: string) => {
@@ -283,8 +299,8 @@ const FeatureOutlines = () => {
         let lineWidth = 1.5;
         let opacityVal = 0.4;
 
-        if (isSelected) {
-          highlightColor = "#ec4899"; // Magenta
+        if (isSelected && !suppressSolidHighlights) {
+          highlightColor = "#60A5FA"; // SolidWorks Sky Blue/Cyan
           lineWidth = 4.5;
           opacityVal = 0.9;
         } else if (isHovered) {
@@ -372,6 +388,7 @@ const FeatureOutlines = () => {
                     onClick={(e) => {
                       e.stopPropagation();
                       setSelectedId(feat.id);
+                      setSelectedSubNodeType('FEATURE');
                     }}
                     onPointerOver={(e) => {
                       e.stopPropagation();
@@ -417,6 +434,7 @@ const FeatureOutlines = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedId(feat.id);
+                  setSelectedSubNodeType('FEATURE');
                 }}
                 onPointerOver={(e) => {
                   e.stopPropagation();
@@ -444,6 +462,7 @@ const FeatureOutlines = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedId(feat.id);
+                  setSelectedSubNodeType('FEATURE');
                 }}
                 onPointerOver={(e) => {
                   e.stopPropagation();
@@ -473,6 +492,7 @@ const FeatureOutlines = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedId(feat.id);
+                  setSelectedSubNodeType('FEATURE');
                 }}
                 onPointerOver={(e) => {
                   e.stopPropagation();
@@ -502,6 +522,7 @@ const FeatureOutlines = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedId(feat.id);
+                  setSelectedSubNodeType('FEATURE');
                 }}
                 onPointerOver={(e) => {
                   e.stopPropagation();
@@ -542,6 +563,7 @@ const FeatureOutlines = () => {
                 onClick={(e) => {
                   e.stopPropagation();
                   setSelectedId(feat.id);
+                  setSelectedSubNodeType('FEATURE');
                 }}
                 onPointerOver={(e) => {
                   e.stopPropagation();
@@ -561,39 +583,102 @@ const FeatureOutlines = () => {
   );
 };
 
+export const getFeatureDistance = (feat: any, clickPos: THREE.Vector3): number => {
+  if (feat.type === 'EXTRUDE') {
+    const params = feat.parameters;
+    const rawPoints = params?.points || [];
+    if (rawPoints.length === 0) return Infinity;
+    const plane = params.plane || 'TOP';
+    const depth = params.depth || 20.0;
+    const get3DPoint = (u: number, v: number, zOffset: number) => {
+      if (plane === 'FRONT') return new THREE.Vector3(u, v, zOffset);
+      if (plane === 'TOP') return new THREE.Vector3(u, zOffset, v);
+      if (plane === 'RIGHT') return new THREE.Vector3(zOffset, u, v);
+      return new THREE.Vector3(u, v, zOffset);
+    };
+    let minDist = Infinity;
+    for (const p of rawPoints) {
+      const basePt = get3DPoint(p[0], p[1], 0);
+      const topPt = get3DPoint(p[0], p[1], depth);
+      minDist = Math.min(minDist, clickPos.distanceTo(basePt), clickPos.distanceTo(topPt));
+    }
+    return minDist;
+  }
+  if (feat.type === 'REVOLVE') {
+    const params = feat.parameters;
+    const points = params?.points || [];
+    if (points.length === 0) return Infinity;
+    let minDist = Infinity;
+    for (const p of points) {
+      const pt = new THREE.Vector3(p[0], p[1], 0);
+      minDist = Math.min(minDist, clickPos.distanceTo(pt));
+    }
+    return minDist;
+  }
+  if (feat.type === 'BOX') {
+    const { width: w = 10, height: h = 10, depth: d = 10, x = 0, y = 0, z = 0 } = feat.parameters || {};
+    const vertices = [
+      new THREE.Vector3(x, y, z),
+      new THREE.Vector3(x + w, y, z),
+      new THREE.Vector3(x, y + h, z),
+      new THREE.Vector3(x + w, y + h, z),
+      new THREE.Vector3(x, y, z + d),
+      new THREE.Vector3(x + w, y, z + d),
+      new THREE.Vector3(x, y + h, z + d),
+      new THREE.Vector3(x + w, y + h, z + d),
+    ];
+    let minDist = Infinity;
+    for (const v of vertices) {
+      minDist = Math.min(minDist, clickPos.distanceTo(v));
+    }
+    return minDist;
+  }
+  if (feat.type === 'CYLINDER') {
+    const { radius: r = 5, height: h = 10, x = 0, y = 0, z = 0 } = feat.parameters || {};
+    const center = new THREE.Vector3(x, y, z + h/2);
+    return clickPos.distanceTo(center);
+  }
+  if (feat.type === 'SPHERE') {
+    const { radius: r = 5, x = 0, y = 0, z = 0 } = feat.parameters || {};
+    const center = new THREE.Vector3(x, y, z);
+    return Math.abs(clickPos.distanceTo(center) - r);
+  }
+  if (feat.type === 'FILLET' || feat.type === 'CHAMFER') {
+    const { edge_start, edge_end } = feat.parameters || {};
+    if (!edge_start || !edge_end) return Infinity;
+    const start = new THREE.Vector3(...edge_start);
+    const end = new THREE.Vector3(...edge_end);
+    const ab = new THREE.Vector3().subVectors(end, start);
+    const ap = new THREE.Vector3().subVectors(clickPos, start);
+    const abLenSq = ab.lengthSq();
+    if (abLenSq === 0) return clickPos.distanceTo(start);
+    let t = ap.dot(ab) / abLenSq;
+    t = Math.max(0, Math.min(1, t));
+    const proj = new THREE.Vector3().copy(start).addScaledVector(ab, t);
+    return clickPos.distanceTo(proj);
+  }
+  return Infinity;
+};
+
 interface ViewportProps {
   children?: React.ReactNode;
 }
 
 export default function Viewport({ children }: ViewportProps) {
-  const { isSketchMode, features, setControls, isCameraAnimating } = useCadStore();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  // Handle topology selection click
-  const handleCanvasClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    if (isSketchMode) return; // Don't select topology during sketching
-    
-    // Get mouse position
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const ndcX = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    const ndcY = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-    
-    if (topologySelector) {
-      const selected = topologySelector.selectAtPosition(ndcX, ndcY);
-      console.log('[Topology] Click at NDC:', ndcX, ndcY, 'Selected:', selected);
-    }
-  }, [isSketchMode, canvasRef]);
+  const { isSketchMode, features, setControls, isCameraAnimating, activePropertyManager, setSelectedId, setSelectedSubNodeType } = useCadStore();
 
   return (
     <div className="w-full h-full bg-linear-to-b from-[#FFFFFF] to-[#C8D2DF] relative">
       <Canvas 
         shadows 
         dpr={[1, 2]} 
-        ref={canvasRef}
-        onClick={handleCanvasClick}
+        onPointerMissed={() => {
+          // Click empty space: clear selections (SolidWorks behavior)
+          console.log('[Selection] Clicked empty space. Resetting selections.');
+          setSelectedId(null);
+          setSelectedSubNodeType(null);
+          useCadStore.getState().setSelectedTopology(null);
+        }}
       >
         <CameraHandler />
         <SceneSelector />

@@ -10,6 +10,33 @@
 > - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
 
 
+# DEV_LOG.md - Skill Architect 開發日誌
+
+> **⚠️ Anti-Vibe Coding 紀律宣告**
+> 所有 Bug 修復與系統變更，必須在此日誌留下 RCA (Root Cause Analysis) 與 CAPA (Corrective and Preventive Actions) 的結構化紀錄。禁止「猜測性」的盲目修復。
+> 
+> **標準診斷模板 (Standard Diagnostic Template)：**
+> - **Phase 1: Investigation (根因調查)** - 錯誤重現路徑與證據蒐集
+> - **Phase 2: Pattern (模式分析)** - 正常範例對比與參考文件查閱
+> - **Phase 3: Hypothesis (假設分析 RCA)** - 根本原因假設與驗證結果
+> - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
+
+
+
+
+
+# DEV_LOG.md - Skill Architect 開發日誌
+
+> **⚠️ Anti-Vibe Coding 紀律宣告**
+> 所有 Bug 修復與系統變更，必須在此日誌留下 RCA (Root Cause Analysis) 與 CAPA (Corrective and Preventive Actions) 的結構化紀錄。禁止「猜測性」的盲目修復。
+> 
+> **標準診斷模板 (Standard Diagnostic Template)：**
+> - **Phase 1: Investigation (根因調查)** - 錯誤重現路徑與證據蒐集
+> - **Phase 2: Pattern (模式分析)** - 正常範例對比與參考文件查閱
+> - **Phase 3: Hypothesis (假設分析 RCA)** - 根本原因假設與驗證結果
+> - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
+
+
 
 
 
@@ -18,6 +45,160 @@
 
 ## 🛑 專案開發鐵律 (Core Development Principles)
 1. **不重複造輪子 (Don't Reinvent the Wheel)**: 凡是有現成、穩定、工業標準的開源工具（如 OpenCASCADE, SolveSpace, React Three Fiber），必須直接引進並封裝對接，嚴禁從零自行開發底層數學或圖形邏輯。
+
+---
+## [2026-05-21] 實現 SolidWorks 式視埠與特徵樹雙向選取連動 (v3.3.2-alpha) ✅
+
+### 實裝成果
+- **雙向高亮與選取映射 (Task 1)**：
+  - 實作了空間近鄰求解器 `getFeatureDistance`，可精確計算滑鼠點擊面到特徵頂點/中點的最短距離。
+  - 當用戶點選 3D 視埠中的 B-Rep 實體表面時，系統會自動定位並點亮 FeatureManager 設計樹的對應主特徵。
+  - 點選 3D 視埠的空白處會重設所有選取狀態為 clean state。
+- **樹狀嵌套草圖與經典桃紅高亮 (Task 2)**：
+  - 點選 FeatureManager 中嵌套的子草圖（如 `↳ 草圖1`）時，Zustand store 的 `selectedSubNodeType` 被設為 `'SKETCH'`。
+  - 視埠立即以 SolidWorks 經典的 **桃紅色 (Magenta, `#ec4899`)** 與加粗線寬高亮顯示該特徵對應的 2D 草圖輪廓，並同時抑制實體邊線高亮，避免遮擋。
+- **草圖屬性管理器與無縫編輯 (Task 3)**：
+  - 當選中嵌套草圖時，隱藏標準的 PropertyManager，並渲染專屬的 **「✏️ 草圖屬性管理器 (Sketch Properties Manager)」** 卡片。
+  - 該卡片顯示了草圖基準面、幾何頂點數、父特徵名稱，並提供了顯著的 **「🛠️ 編輯草圖幾何 (Edit Sketch)」** 快捷按鈕。
+  - 點選「編輯草圖幾何」可無縫進入 2D 草圖編輯模式，退出後即可即時重建。
+- **多特徵相容擴充與語法確效 (Task 4)**：
+  - 擴充了 `handleEditFeatureSketch`，除了支援 `EXTRUDE` 外，現在也完美相容 `REVOLVE` 旋轉特徵的草圖二次編輯。
+  - 修復了 `SketchPreview.tsx` 中 implicit any parameter 的 TypeScript 編譯錯誤，全域 `npx tsc --noEmit` 通過率 100%。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 完美通過，Exit Code 0，無任何警告與錯誤。
+- 本地開發伺服器運行極度穩定流暢，3D Viewport 與 Sidebar 的雙向選取點擊事件毫秒級響應，Console 0 報錯。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 之前專案中，點選 3D 實體模型與左側設計樹沒有關聯機制，用戶無法通過點選模型快速定位特徵，或通過點選草圖預覽 3D 視埠中的 2D 輪廓。這增加了大型模型修改時尋找特徵的難度，且不符合 SolidWorks 的直覺建模流。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **雙向映射與過濾**：使用 Proximity Solver 在視埠中計算最近點，並在樹狀圖中設定雙向高亮；在 `PropertyManager` 渲染層加入互斥防禦（`selectedSubNodeType !== 'SKETCH'`），杜絕雙面板重疊顯示。
+  - **嚴格型別校驗**：每次變更代碼後均主動執行靜態型別編譯校驗，防止隱式 type 丟失。
+
+---
+
+## [2026-05-21] 刪除示範建構與精確特徵防禦 (v3.3.1-alpha) ✅
+
+### 實裝成果
+
+- **清除演示與狀態 (Task 1)**：
+  - 完全移除了 `src/app/page.tsx` 中的 `🎥 示範建構` (Demo Build) 按鈕。
+  - 完全清除了主介面的 `demoStep` 懸浮提示橫幅 (Interactive Construction Demo Banner) 與虛擬游標 `virtualCursor`。
+  - 徹底刪除與上述演示相關的輔助方法，如 `startInteractiveConstructionDemo` 和 `handleCokeBottleDemonstration`，使前端程式碼精簡並消除所有 TypeScript compile 隱患。
+- **精確特徵與防禦 (Task 2)**：
+  - 重構 `旋轉-實體` 特徵按鈕的觸發邏輯。若用戶未處於草圖模式下或草圖點數量不足 3 個，現在改為主動以 `appAPI.notify` (Electron 原生通知) 或網頁 `alert` 提示使用者「繪製閉合輪廓以進行旋轉特徵」，取代原本無預警下載預設可樂瓶的 Demo Fallback。
+  - 此舉徹底杜絕了用戶在未確認操作的情況下產生非預期固體 (Phantom Coke Bottle/Boxes) 的問題。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 完美通過 TypeScript 全域型別編譯檢驗，0 錯誤，0 警告。
+- 專案在 Next.js 的本地 Hot Reload 運作非常流暢，主控台（Console）與 Dev Server Log 無任何紅色或黃色錯誤輸出。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 之前的 "示範建構" 行為雖然方便展示，但其內含的 Fallback（即空草圖下觸發 Revolve 自動加載可樂瓶）與 "未建立方塊卻出現方塊" 等非預期幾何生成交互直接衝突。
+  - 且在前幾次重構中，雖清除了狀態宣告，但調用端（如 `startInteractiveConstructionDemo` 方法與 JSX 元件）被部分遺留，導致編譯錯誤。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **精準移除**：利用 MECE 原則對全專案的 demo 代碼進行清掃，只保留核心建模、約束與基準幾何邏輯，不留殘餘。
+  - **防禦阻斷**：任何基於草圖的凸長 (Extrude) 或旋轉 (Revolve) 特徵，若不符合執行條件（無效草圖），皆應跳出明晰的彈窗引導，而不進行任何「猜測性」的預設特徵生成。
+
+---
+## [2026-05-20] 完成高階基準幾何 & PropertyManager 全鏈路實裝 (v3.3.0-alpha) ✅
+
+### 實裝成果
+
+- **後端 OCC 核心 (Task 1)**：
+  - `generate_reference_plane()`: 支援 OFFSET / THREE_POINTS / POINT_NORMAL 三種建構模式
+  - `generate_reference_axis()`: 支援 TWO_POINTS / CYLINDER_AXIS / PLANE_INTERSECTION 三種建構模式
+  - API 路由 `POST /ref_plane` 和 `POST /ref_axis` 已上線
+
+- **前端 API & 狀態 (Task 2)**：
+  - `HeavyEngineClient.ts` 新增 `createRefPlane()` / `createRefAxis()`
+  - `useCadStore.ts` 新增 `referencePlanes[]`, `referenceAxes[]`, `activePropertyManager`
+
+- **選取過濾器 & 視口 Gizmo (Task 3)**：
+  - `TopologySelector.ts` 支援 `filterType: FACE_ONLY | VERTEX_ONLY | EDGE_ONLY | FACE_EDGE | ALL`
+  - `DatumPlanes.tsx` 渲染莫蘭迪紫藍半透明基準面 (#6366f1) + 天藍虛線基準軸 (#60A5FA)
+  - `Viewport.tsx` 自動將選取拓撲累積進 PropertyManager refs
+
+- **Ribbon & PropertyManager UI (Task 4)**：
+  - FEATURES Ribbon 新增「基準幾何 📐」下拉選單（基準面 🟦 / 基準軸 ➖）
+  - 左側 PropertyManager 面板：深色主題、建構模式選擇、智能引導、選取列表、偏置滑桿、過濾器指示
+
+### 確效結果 (Validation)
+
+| 檢查項目 | 結果 |
+|---------|------|
+| `npx tsc --noEmit` | ✅ 零錯誤 |
+| `npm run build` (Next.js 16.2.6 Turbopack) | ✅ 7.1s 編譯, 3.8s TS, 448ms 靜態生成 |
+
+### RCA & CAPA
+
+- **無失敗嘗試**：本次實裝依循嚴謹的 PDCA 流程，先完成後端→狀態→選取→UI 的依賴順序，無回歸錯誤。
+- **預防措施**：`removeFeature()` 已內建 cascade cleanup，刪除特徵時自動清除關聯的 referencePlanes/referenceAxes，防止 ghost gizmo。
+- **設計決策**：PropertyManager 採用 `#0F172A` 深色主題，與常規白底側邊欄形成強烈視覺對比，讓用戶一眼辨識「工具啟動中」的模態狀態。
+
+---
+## [2026-05-20] 規劃高階基準幾何、跨維度幾何約束與模組化 PropertyManager 工具鏈 (v3.3.0-alpha)
+
+### 任務內容
+
+- **詳細設計計畫與評估 (Reference Geometry, Cross-Dimensional Constraints & PropertyManager UX)**：
+  - **診斷 (Diagnosis)**：
+    - 目前 `3D-Builder` 雖已成功實裝面上草圖、特徵陣列，以及 v3.2.0 的實體引用投影 (Convert, Offset, Section) 等功能。但在「自訂非預設基準幾何」(如任意斜切基準面、圓柱心軸、兩點基準軸) 領域，以及「跨維度幾何約束」(限制 2D 草圖幾何與 3D 實體拓撲共線/共點/同心) 領域仍非常缺乏，無法發揮 SolidWorks 的完全參數化聯動優勢。
+  - **計畫 (PDCA - Plan)**：
+    - **動態自訂基準幾何 (Reference Geometry)**：
+      - 後端依據 OpenCASCADE 構造任意等距偏置面、三點斜切面與圓柱表面中心軸。
+      - 前端 React/ThreeJS 動態渲染半透明 Morandi 紫藍色面/線 Gizmos，並支援 Normal To 相機對齊。
+    - **跨維度參數約束與命名保存 (Cross-Dimensional Solver & Persistent Naming)**：
+      - 前後端協同處理，將 3D 面/邊參照投影至草圖 LCS 的 UV 空間，轉為 2D 共線/共點/同心約束。
+      - 實作 **B-Rep 拓撲路徑雜湊 (Path Hashing)** 與 **近鄰回歸匹配 (Proximity Matching)**，徹底解決 3D 重新拉伸時 2D 草圖依賴 ID 丟失而「崩潰」的 CAD 開發終極難題。
+    - **模組化 PropertyManager 與過濾器 (PropertyManager UX & Filters)**：
+      - 於左側 Sidebar 提供 SolidWorks 風格的 PropertyManager 引導，加入智能選取過濾（如鎖定只選取 Face），並支援 60 FPS 基準偏置微調 preview 動畫。
+
+---
+## [2026-05-20] 成功實裝 SolidWorks 參考幾何與引用實體工具鏈 (v3.2.0-alpha)
+
+### 任務內容
+
+- **參考幾何與引用實體功能實裝 (Convert & Offset & Section)**：
+  - **根因分析 (RCA)**：本專案工具原先缺乏 2D 草圖與 3D 拓撲之間的交互引用功能。用戶在繪製 2D 草圖時，無法調用已長出的 3D 實體邊線、表面輪廓或實體剖面，必須手動重複繪製，這極易導致參數化尺寸失真，且不符合 SolidWorks 典型的高效工業級 3D 建模工作流。
+  - **矯正與預防措施 (CAPA)**：
+    - **轉換實體引用 (Convert Entities)**：
+      - 前端擴展 `HeavyEngineClient` 的 `convertEntities` 方法。
+      - 後端 FastAPI 路由增加 `/convert_entities` POST 介面，並於 `geometry_service.py` 實作拓撲點/邊 spatial matching。
+      - 運用 `BRepAdaptor_Curve` 解析 3D 邊界 Edge 的幾何類型（直線或三點圓弧），高精度投影到 activePlane 的局部座標系 (LCS) 2D UV 空間，返回前端完美寫入 Zustand 的 `sketchPoints` 中。
+    - **偏置實體引用 (Offset Entities)**：
+      - 前端實現偏置距離輸入控制項（支援以 0.5 mm 步長手動或按鈕調整）。
+      - 後端 `/offset_entities` 調用 OpenCASCADE 的 C++ 級魯棒 2D 偏移引擎 `BRepOffsetAPI_MakeOffset` 進行等距偏移計算。自動在幾何核心處理尖角、自相交與圓角干涉，保證了數學的絕對魯棒性，解決了前端 JS 偏移失真的痛點。
+    - **交叉曲線 (Intersection Curve)**：
+      - 後端 `/intersection_curve` 基於 activePlane LCS 構造無窮 `gp_Pln`。
+      - 使用 OpenCASCADE 的 `BRepAlgoAPI_Section` 切割 3D 實體，精確取出交線，投影回 UV 2D 座標返回，完成剖面輪廓的秒級自動生成。
+    - **3D 視口選取放寬與 B-Rep 標記**：
+      - 升級 `Viewport.tsx` 中的 `handleCanvasClick`。在 `isSketchMode` (草圖模式) 下放寬 3D 拓撲選取限制，同時採用 `preserveIfNoHit` 機制：如果點擊擊中 3D 實體則選取，點擊空白/草圖面則保留當前選取，完美防止選取與草圖繪製手勢衝突。
+      - 為 `OcctShape.tsx` 的 3D 實體 meshes 標記 `userData={{ type: 'B_REP_SHAPE' }}`，使 `TopologySelector.ts` 能夠在 `isSketchMode` 下利用 `intersectObjects` 遞迴穿透 Stage 並精準過濾掉 DatumPlanes 與 Grid 等 UI 輔助網格，只選取 3D CAD 面/邊。
+    - **Ribbon UI 整合**：
+      - 在草圖模式下的頂部 Ribbon 欄位中，整合一個具備 SolidWorks 設計氣質的 **「引用實體 (Entity Referencing)」** 按鈕分欄。
+      - 採用莫蘭迪灰藍專業色調，微調高飽和度視覺。新增 **轉換實體 🔄**、**偏置實體 ↔️** (帶有微調輸入框) 與 **交叉曲線 ⚔️** 三組動作按鈕，提供細微 hover 懸浮陰影，完美對標國際級 CAD 用戶體驗。
+  - **確效與編譯檢測**：
+    - 前端 TypeScript typecheck `npx tsc --noEmit` 通過，Exit Code 0 零警告。
+    - Next.js 全局生產環境打包 `npm run build` 通過，prerendered HTML 與 Turbopack 100% 成功，零錯誤。
+    - 後端 pythonOCC與 FastAPI 完美掛接，Port 8400 自檢幾何運算均為毫秒級響應，軟體功能確效成功！
+
+---
+
+## [2026-05-20] 規劃 SolidWorks 專業參考幾何與實體引用工具鏈 (v3.2.0-alpha)
+
+### 任務內容
+
+- **參考幾何與實體引用詳細設計計畫書 (Convert & Offset & Section)**：
+  - **診斷**：目前 `3D-Builder` 已有面上草圖及特徵陣列功能，但 2D 草圖與 3D 拓撲之間仍屬孤立狀態，無法直接調用已有 3D 幾何特徵。本專案工具非常缺乏將 3D 邊界、面輪廓或實體相交幾何「引用/投影」到當前草圖面的功能。
+  - **計畫 (PDCA - Plan)**：
+    - **轉換實體引用 (Convert Entities)**：在後端實作空間點與 B-Rep 面/邊匹配，解析曲線類型 (直線或圓弧)，投影回當前基準面 local UV 座標，前端寫入 `sketchPoints`。
+    - **偏置實體引用 (Offset Entities)**：呼叫後端 OpenCASCADE 2D 偏移引擎 `BRepOffsetAPI_MakeOffset` 進行高精度等距偏移計算（自動處理自相交與圓角干涉），解決前端 JavaScript 計算偏移極易失真的物理瓶頸。
+    - **交叉曲線 (Intersection Curve)**：在後端利用基準面 LCS 建構剖面，調用 `BRepAlgoAPI_Section` 切割 3D 實體，取出交線並投影回 local UV 返回。
+    - **UX 面板與選取放寬**：在草圖模式頂部 Ribbon 欄位新增「參考幾何」分欄，並在草圖模式下放寬 3D 拓撲 (FACE/EDGE) 的選取限制，讓用戶能隨時點選 3D 特徵進行引用。
+  - **預防策略 (CAPA)**：本擴充遵循「零破壞性覆蓋」原則，所有引用點格式與現有 `sketchPoints` 對齊，不會破壞原有 ExtrudeBoolean 與 Rebuild 歷史樹邏輯。
 
 ---
 
@@ -1993,3 +2174,40 @@ px tsc --noEmit returned Exit Code 0.
 - **Icons**: Professional SVG icon added and configured for the build pipeline.
 
 ---
+
+---
+---
+
+## [2026-05-21] Viewport Phantom Box & Extruded Cylinder Rendering Surface Fix (v3.5.1-alpha)
+
+### 任務內容
+
+- **解決 Viewport 錯誤顯示方塊與圓柱體缺乏表層渲染的問題**：
+  - **問題現象**：在草圖繪製圓並進行拉伸 (Custom Extrude 1) 後，Viewport 中未出現圓柱體，反而無故出現一個實體方塊（Cube），且圓柱拉伸特徵缺乏表層渲染。
+
+### 診斷與原因分析 (RCA)
+
+1. **後端環境混淆**：
+   - 通過 `Get-Process` 追蹤 Port 8400 後端進程 PID，發現 FastAPI 伺服器是由系統預設 Python (`C:\Python314\python.exe`) 啟動的。
+   - 該系統預設環境並未安裝 C++ `pythonocc-core` (OpenCASCADE) 庫。當 `geometry_service.py` 執行 `import OCC` 時發生 `ModuleNotFoundError`，並自動觸發 fallback 降級機制，將 `HAS_OCC` 設為 `False`。
+2. **Fallback 重建預設缺陷**：
+   - 在 `HAS_OCC = False` 模式下，後端幾何核心重建會直接呼叫 `generate_mock_mesh()`。
+   - `generate_mock_mesh()` 在處理沒有 `operation: 'CUT'` 的 `EXTRUDE` 幾何時，因無對應的圓柱/自訂形狀純 Python fallback 運算，最終落入預設分支 `return make_mock_box_mesh(20, 20, 20, -10, -10, -10)`。
+   - 這就是為什麼 Viewport 中會無故出現一個實體方塊，且真正的圓柱體拉伸特徵完全缺乏表面渲染的原因。
+
+### 矯正與預防措施 (CAPA)
+
+1. **關閉錯誤進程**：
+   - 透過 `manage_task` 終止了基於系統 Python 的後端服務進程 `task-644`。
+2. **啟動正確的 OCC 幾何核環境**：
+   - 偵測到 C 槽根目錄存在已完整配置 OpenCASCADE 與 pythonOCC-core 的 Conda 環境 `C:\3D_ENV_FINAL`。
+   - 改用正確的直譯器啟動 FastAPI 服務：`C:\3D_ENV_FINAL\python.exe -m uvicorn app.main:app --port 8400`。
+   - 服務成功啟動，且 `import OCC` 100% 成功，`HAS_OCC` 設定為 `True`，OpenCASCADE 重建引擎完美接管！
+3. **驗證重建**：
+   - 執行獨立腳本 `test_circle.py` 驗證 36 分段圓周 Wire 重建，OCC 核心完美長出圓柱 Solid（Exit Code 0 🟢）。
+
+### 預防措施 (Preventative Measures)
+
+- 確保未來啟動後端時，一律強制使用 OCC 幾何核環境之 Python 直譯器 (`C:\3D_ENV_FINAL\python.exe`)。
+- 檢修 pure-Python fallback 機制，使其在無 OCC 庫時亦能正確將圓形草圖點渲染為 Cylinder Mockup，而非粗暴返回 Box。
+

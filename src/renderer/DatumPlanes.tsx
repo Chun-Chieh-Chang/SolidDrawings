@@ -16,7 +16,9 @@ export const DatumPlanes = () => {
     sketchNewChain, setSketchNewChain,
     activeFaceOrigin,
     activeFaceNormal,
-    activeFaceId
+    activeFaceId,
+    referencePlanes,
+    referenceAxes
   } = useCadStore();
   
   const [hovered, setHovered] = useState<string | null>(null);
@@ -46,11 +48,30 @@ export const DatumPlanes = () => {
     return { origin, normal, xDir, yDir };
   }, [activePlane, activeFaceOrigin, activeFaceNormal]);
 
+  const customBasis = useMemo(() => {
+    if (!activePlane || ['FRONT', 'TOP', 'RIGHT', 'FACE'].includes(activePlane)) {
+      return null;
+    }
+    const plane = referencePlanes.find(p => p.id === activePlane);
+    if (!plane) return null;
+    const origin = new THREE.Vector3(...plane.origin);
+    const normal = new THREE.Vector3(...plane.normal).normalize();
+    const xDir = new THREE.Vector3(...plane.xDir).normalize();
+    const yDir = new THREE.Vector3(...plane.yDir).normalize();
+    return { origin, normal, xDir, yDir };
+  }, [activePlane, referencePlanes]);
+
+  const activeBasis = useMemo(() => {
+    if (activePlane === 'FACE') return faceBasis;
+    return customBasis;
+  }, [activePlane, faceBasis, customBasis]);
+
   const getCustomFaceUV = (point: THREE.Vector3) => {
-    if (!faceBasis) return { u: 0, v: 0 };
-    const diff = point.clone().sub(faceBasis.origin);
-    const u = diff.dot(faceBasis.xDir);
-    const v = diff.dot(faceBasis.yDir);
+    const basis = activeBasis;
+    if (!basis) return { u: 0, v: 0 };
+    const diff = point.clone().sub(basis.origin);
+    const u = diff.dot(basis.xDir);
+    const v = diff.dot(basis.yDir);
     return { u, v };
   };
 
@@ -58,10 +79,11 @@ export const DatumPlanes = () => {
     if (activePlane === 'FRONT') return new THREE.Vector3(u, v, 0);
     if (activePlane === 'TOP') return new THREE.Vector3(u, 0, v);
     if (activePlane === 'RIGHT') return new THREE.Vector3(0, u, v);
-    if (activePlane === 'FACE' && faceBasis) {
-      return faceBasis.origin.clone()
-        .addScaledVector(faceBasis.xDir, u)
-        .addScaledVector(faceBasis.yDir, v);
+    const basis = activeBasis;
+    if (basis) {
+      return basis.origin.clone()
+        .addScaledVector(basis.xDir, u)
+        .addScaledVector(basis.yDir, v);
     }
     return new THREE.Vector3(u, v, 0);
   };
@@ -84,13 +106,16 @@ export const DatumPlanes = () => {
         if (activePlane === 'FRONT') { u = x; v = y; }
         else if (activePlane === 'TOP') { u = x; v = z; }
         else if (activePlane === 'RIGHT') { u = y; v = z; }
-        else if (activePlane === 'FACE' && faceBasis) {
-          const P = new THREE.Vector3(x, y, z);
-          const diff = P.clone().sub(faceBasis.origin);
-          u = diff.dot(faceBasis.xDir);
-          v = diff.dot(faceBasis.yDir);
-        } else {
-          continue;
+        else {
+          const basis = activeBasis;
+          if (basis) {
+            const P = new THREE.Vector3(x, y, z);
+            const diff = P.clone().sub(basis.origin);
+            u = diff.dot(basis.xDir);
+            v = diff.dot(basis.yDir);
+          } else {
+            continue;
+          }
         }
         
         // Deduplicate
@@ -99,7 +124,7 @@ export const DatumPlanes = () => {
       }
     }
     return points;
-  }, [isSketchMode, activePlane, meshData, faceBasis]);
+  }, [isSketchMode, activePlane, meshData, activeBasis]);
 
   const getSnappedUV = (rawU: number, rawV: number) => {
     const SNAP_RADIUS = 2.5;
@@ -131,7 +156,7 @@ export const DatumPlanes = () => {
     return { u: rawU, v: rawV, type: null };
   };
 
-  const handlePointerDown = (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE', event: any) => {
+  const handlePointerDown = (plane: string, event: any) => {
     if (!isSketchMode || activePlane !== plane) return;
     event.stopPropagation();
     
@@ -140,7 +165,7 @@ export const DatumPlanes = () => {
     if (plane === 'FRONT') { rawU = point.x; rawV = point.y; }
     else if (plane === 'TOP') { rawU = point.x; rawV = point.z; }
     else if (plane === 'RIGHT') { rawU = point.y; rawV = point.z; }
-    else if (plane === 'FACE') {
+    else {
       const uv = getCustomFaceUV(point);
       rawU = uv.u;
       rawV = uv.v;
@@ -151,7 +176,7 @@ export const DatumPlanes = () => {
     setIsDragging(false);
   };
 
-  const handlePointerUp = (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE', event: any) => {
+  const handlePointerUp = (plane: string, event: any) => {
     if (!isSketchMode || activePlane !== plane || !dragStartUV) return;
     event.stopPropagation();
     
@@ -160,7 +185,7 @@ export const DatumPlanes = () => {
     if (plane === 'FRONT') { rawU = point.x; rawV = point.y; }
     else if (plane === 'TOP') { rawU = point.x; rawV = point.z; }
     else if (plane === 'RIGHT') { rawU = point.y; rawV = point.z; }
-    else if (plane === 'FACE') {
+    else {
       const uv = getCustomFaceUV(point);
       rawU = uv.u;
       rawV = uv.v;
@@ -204,7 +229,7 @@ export const DatumPlanes = () => {
     setIsDragging(false);
   };
 
-  const handlePointerMove = (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE', event: any) => {
+  const handlePointerMove = (plane: string, event: any) => {
     if (!isSketchMode || activePlane !== plane) {
       if (cursorState) setCursorState(null);
       return;
@@ -216,7 +241,7 @@ export const DatumPlanes = () => {
     if (plane === 'FRONT') { rawU = point.x; rawV = point.y; }
     else if (plane === 'TOP') { rawU = point.x; rawV = point.z; }
     else if (plane === 'RIGHT') { rawU = point.y; rawV = point.z; }
-    else if (plane === 'FACE') {
+    else {
       const uv = getCustomFaceUV(point);
       rawU = uv.u;
       rawV = uv.v;
@@ -253,7 +278,7 @@ export const DatumPlanes = () => {
   const hoverOpacity = 0.3;
   const activeOpacity = 0.5;
 
-  const handlePlaneClick = (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE', event: any) => {
+  const handlePlaneClick = (plane: string, event: any) => {
     if (!isSketchMode) {
       event.stopPropagation();
       setEditingFeatureId(null);
@@ -277,7 +302,7 @@ export const DatumPlanes = () => {
     if (plane === 'FRONT') { rawU = point.x; rawV = point.y; }
     else if (plane === 'TOP') { rawU = point.x; rawV = point.z; }
     else if (plane === 'RIGHT') { rawU = point.y; rawV = point.z; }
-    else if (plane === 'FACE') {
+    else {
       const uv = getCustomFaceUV(point);
       rawU = uv.u;
       rawV = uv.v;
@@ -398,7 +423,7 @@ export const DatumPlanes = () => {
     }
   };
 
-  const handlePlaneDoubleClick = (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE', event: any) => {
+  const handlePlaneDoubleClick = (plane: string, event: any) => {
     if (!isSketchMode || activePlane !== plane) return;
     event.stopPropagation();
     
@@ -660,6 +685,129 @@ export const DatumPlanes = () => {
           </Text>
         </group>
       )}
+
+      {/* Custom Reference Planes */}
+      {referencePlanes.map((plane) => {
+        const origin = new THREE.Vector3(...plane.origin);
+        const normal = new THREE.Vector3(...plane.normal).normalize();
+        const xDir = new THREE.Vector3(...plane.xDir).normalize();
+        const yDir = new THREE.Vector3(...plane.yDir).normalize();
+        const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+        
+        return (
+          <group key={plane.id}>
+            <Plane 
+              args={[size, size]} 
+              position={origin}
+              quaternion={quaternion}
+              onPointerDown={(e) => handlePointerDown(plane.id, e)}
+              onPointerUp={(e) => handlePointerUp(plane.id, e)}
+              onPointerOver={(e) => { e.stopPropagation(); setHovered(plane.id); }}
+              onPointerOut={() => { setHovered(null); setCursorState(null); }}
+              onPointerMove={(e) => handlePointerMove(plane.id, e)}
+              onDoubleClick={(e) => handlePlaneDoubleClick(plane.id, e)}
+              onClick={(e) => {
+                e.stopPropagation();
+                const mgr = useCadStore.getState().activePropertyManager;
+                if (mgr) {
+                  const alreadyExists = mgr.refs.some((r: any) => r.id === plane.id);
+                  if (!alreadyExists) {
+                    useCadStore.setState({
+                      activePropertyManager: {
+                        ...mgr,
+                        refs: [...mgr.refs, {
+                          type: 'FACE',
+                          id: plane.id,
+                          coordinates: plane.origin,
+                          normal: plane.normal
+                        }]
+                      }
+                    });
+                  }
+                }
+              }}
+            >
+              <meshStandardMaterial 
+                color="#6366f1" 
+                transparent 
+                opacity={getOpacity(plane.id)} 
+                side={THREE.DoubleSide} 
+                depthWrite={false} 
+              />
+            </Plane>
+            <Text 
+              position={[
+                origin.x + xDir.x * (size/2) + yDir.x * (size/2),
+                origin.y + xDir.y * (size/2) + yDir.y * (size/2),
+                origin.z + xDir.z * (size/2) + yDir.z * (size/2)
+              ]} 
+              fontSize={2} 
+              color="#6366f1"
+              quaternion={quaternion}
+            >
+              {plane.name || plane.id.toUpperCase()}
+            </Text>
+          </group>
+        );
+      })}
+
+      {/* Custom Reference Axes */}
+      {referenceAxes.map((axis) => {
+        const originVec = new THREE.Vector3(...axis.origin);
+        const dirVec = new THREE.Vector3(...axis.direction).normalize();
+        
+        const startPoint = originVec.clone().addScaledVector(dirVec, -size / 2);
+        const endPoint = originVec.clone().addScaledVector(dirVec, size / 2);
+        const points = [
+          [startPoint.x, startPoint.y, startPoint.z],
+          [endPoint.x, endPoint.y, endPoint.z]
+        ] as [number, number, number][];
+
+        const isHovered = hovered === axis.id;
+
+        return (
+          <group key={axis.id}>
+            <Line
+              points={points}
+              color={isHovered ? "#3B82F6" : "#60A5FA"}
+              lineWidth={isHovered ? 4.0 : 2.0}
+              dashed
+              dashSize={1.5}
+              gapSize={1.0}
+              onPointerOver={(e) => { e.stopPropagation(); setHovered(axis.id); }}
+              onPointerOut={() => setHovered(null)}
+              onClick={(e) => {
+                e.stopPropagation();
+                // Add to PropertyManager selection if active
+                const mgr = useCadStore.getState().activePropertyManager;
+                if (mgr) {
+                  const alreadyExists = mgr.refs.some((r: any) => r.id === axis.id);
+                  if (!alreadyExists) {
+                    useCadStore.setState({
+                      activePropertyManager: {
+                        ...mgr,
+                        refs: [...mgr.refs, {
+                          type: 'EDGE',
+                          id: axis.id,
+                          coordinates: axis.origin,
+                          edgeData: { start: points[0], end: points[1] }
+                        }]
+                      }
+                    });
+                  }
+                }
+              }}
+            />
+            <Text
+              position={[originVec.x, originVec.y + 2, originVec.z]}
+              fontSize={1.5}
+              color="#60A5FA"
+            >
+              {axis.name || axis.id.toUpperCase()}
+            </Text>
+          </group>
+        );
+      })}
 
       {/* Context Menu Overlay */}
       {contextMenu && (

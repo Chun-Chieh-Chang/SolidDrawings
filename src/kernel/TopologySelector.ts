@@ -58,18 +58,16 @@ export class TopologySelector {
    */
   public selectAtPosition(
     ndcX: number,
-    ndcY: number
+    ndcY: number,
+    preserveIfNoHit: boolean = false,
+    filterType: 'ALL' | 'FACE_ONLY' | 'EDGE_ONLY' | 'VERTEX_ONLY' | 'FACE_EDGE' = 'ALL'
   ): SelectedTopology | null {
     // Update raycaster
     this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
 
-    // Get all mesh objects in scene
-    const meshes = this.scene.children.filter(
-      (child): child is THREE.Mesh => child instanceof THREE.Mesh
-    );
-
-    // Intersect with meshes
-    const intersects = this.raycaster.intersectObjects(meshes, true);
+    // Intersect recursively with all objects in the scene, then filter for standard B-Rep solid meshes
+    const intersects = this.raycaster.intersectObjects(this.scene.children, true)
+      .filter(hit => hit.object instanceof THREE.Mesh && hit.object.userData && hit.object.userData.type === 'B_REP_SHAPE');
 
     if (intersects.length > 0) {
       const hit = intersects[0];
@@ -95,95 +93,112 @@ export class TopologySelector {
 
       const hitPoint = hit.point;
 
-      // 1. VERTEX PICKING: Check distance to each vertex
-      const distA = hitPoint.distanceTo(vA);
-      const distB = hitPoint.distanceTo(vB);
-      const distC = hitPoint.distanceTo(vC);
+      // 1. VERTEX PICKING
+      if (filterType === 'ALL' || filterType === 'VERTEX_ONLY') {
+        const distA = hitPoint.distanceTo(vA);
+        const distB = hitPoint.distanceTo(vB);
+        const distC = hitPoint.distanceTo(vC);
 
-      if (distA < this.threshold) {
-        const topology: SelectedTopology = {
-          type: 'VERTEX',
-          id: `${mesh.uuid}_v_${idxA}`,
-          coordinates: [vA.x, vA.y, vA.z],
-        };
-        useCadStore.getState().setSelectedTopology(topology);
-        return topology;
+        if (distA < this.threshold) {
+          const topology: SelectedTopology = {
+            type: 'VERTEX',
+            id: `${mesh.uuid}_v_${idxA}`,
+            coordinates: [vA.x, vA.y, vA.z],
+          };
+          useCadStore.getState().setSelectedTopology(topology);
+          return topology;
+        }
+        if (distB < this.threshold) {
+          const topology: SelectedTopology = {
+            type: 'VERTEX',
+            id: `${mesh.uuid}_v_${idxB}`,
+            coordinates: [vB.x, vB.y, vB.z],
+          };
+          useCadStore.getState().setSelectedTopology(topology);
+          return topology;
+        }
+        if (distC < this.threshold) {
+          const topology: SelectedTopology = {
+            type: 'VERTEX',
+            id: `${mesh.uuid}_v_${idxC}`,
+            coordinates: [vC.x, vC.y, vC.z],
+          };
+          useCadStore.getState().setSelectedTopology(topology);
+          return topology;
+        }
+        
+        if (filterType === 'VERTEX_ONLY') {
+          if (!preserveIfNoHit) useCadStore.getState().setSelectedTopology(null);
+          return null;
+        }
       }
-      if (distB < this.threshold) {
-        const topology: SelectedTopology = {
-          type: 'VERTEX',
-          id: `${mesh.uuid}_v_${idxB}`,
-          coordinates: [vB.x, vB.y, vB.z],
-        };
-        useCadStore.getState().setSelectedTopology(topology);
-        return topology;
-      }
-      if (distC < this.threshold) {
-        const topology: SelectedTopology = {
-          type: 'VERTEX',
-          id: `${mesh.uuid}_v_${idxC}`,
-          coordinates: [vC.x, vC.y, vC.z],
-        };
-        useCadStore.getState().setSelectedTopology(topology);
-        return topology;
-      }
 
-      // 2. EDGE PICKING: Check distance to each edge of the face
-      const projAB = new THREE.Vector3();
-      const projBC = new THREE.Vector3();
-      const projCA = new THREE.Vector3();
+      // 2. EDGE PICKING
+      if (filterType === 'ALL' || filterType === 'EDGE_ONLY' || filterType === 'FACE_EDGE') {
+        const projAB = new THREE.Vector3();
+        const projBC = new THREE.Vector3();
+        const projCA = new THREE.Vector3();
 
-      const distAB = this.distanceToSegment(hitPoint, vA, vB, projAB);
-      const distBC = this.distanceToSegment(hitPoint, vB, vC, projBC);
-      const distCA = this.distanceToSegment(hitPoint, vC, vA, projCA);
+        const distAB = this.distanceToSegment(hitPoint, vA, vB, projAB);
+        const distBC = this.distanceToSegment(hitPoint, vB, vC, projBC);
+        const distCA = this.distanceToSegment(hitPoint, vC, vA, projCA);
 
-      const minDist = Math.min(distAB, distBC, distCA);
+        const minDist = Math.min(distAB, distBC, distCA);
 
-      if (minDist < this.threshold) {
-        let selectedEdge: [THREE.Vector3, THREE.Vector3] = [vA, vB];
-        let edgeId = `${mesh.uuid}_e_${idxA}_${idxB}`;
-        let centerPoint = projAB;
+        if (minDist < this.threshold) {
+          let selectedEdge: [THREE.Vector3, THREE.Vector3] = [vA, vB];
+          let edgeId = `${mesh.uuid}_e_${idxA}_${idxB}`;
+          let centerPoint = projAB;
 
-        if (minDist === distBC) {
-          selectedEdge = [vB, vC];
-          edgeId = `${mesh.uuid}_e_${idxB}_${idxC}`;
-          centerPoint = projBC;
-        } else if (minDist === distCA) {
-          selectedEdge = [vC, vA];
-          edgeId = `${mesh.uuid}_e_${idxC}_${idxA}`;
-          centerPoint = projCA;
+          if (minDist === distBC) {
+            selectedEdge = [vB, vC];
+            edgeId = `${mesh.uuid}_e_${idxB}_${idxC}`;
+            centerPoint = projBC;
+          } else if (minDist === distCA) {
+            selectedEdge = [vC, vA];
+            edgeId = `${mesh.uuid}_e_${idxC}_${idxA}`;
+            centerPoint = projCA;
+          }
+
+          const topology: SelectedTopology = {
+            type: 'EDGE',
+            id: edgeId,
+            coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
+            edgeData: {
+              start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
+              end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
+            },
+          };
+          useCadStore.getState().setSelectedTopology(topology);
+          return topology;
         }
 
+        if (filterType === 'EDGE_ONLY') {
+          if (!preserveIfNoHit) useCadStore.getState().setSelectedTopology(null);
+          return null;
+        }
+      }
+
+      // 3. FACE PICKING
+      if (filterType === 'ALL' || filterType === 'FACE_ONLY' || filterType === 'FACE_EDGE') {
         const topology: SelectedTopology = {
-          type: 'EDGE',
-          id: edgeId,
-          coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
-          edgeData: {
-            start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
-            end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
-          },
+          type: 'FACE',
+          id: `${mesh.uuid}_f_${hit.faceIndex}`,
+          coordinates: [hitPoint.x, hitPoint.y, hitPoint.z],
+          normal: hit.face.normal
+            ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z]
+            : undefined,
         };
+
         useCadStore.getState().setSelectedTopology(topology);
         return topology;
       }
-
-      // 3. FACE PICKING: Fall back to face selection
-      const topology: SelectedTopology = {
-        type: 'FACE',
-        id: `${mesh.uuid}_f_${hit.faceIndex}`,
-        coordinates: [hitPoint.x, hitPoint.y, hitPoint.z],
-        normal: hit.face.normal
-          ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z]
-          : undefined,
-      };
-
-      // Tag target geometry if available for area/volume mesh references
-      useCadStore.getState().setSelectedTopology(topology);
-      return topology;
     }
 
     // Clear selection if nothing hit
-    useCadStore.getState().setSelectedTopology(null);
+    if (!preserveIfNoHit) {
+      useCadStore.getState().setSelectedTopology(null);
+    }
     return null;
   }
 

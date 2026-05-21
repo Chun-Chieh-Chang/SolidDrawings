@@ -55,6 +55,7 @@ async def create_sphere(params: SphereParams):
 @router.post("/rebuild")
 async def rebuild_assembly(request: AssemblyRequest):
     try:
+        print("[DEBUG] Rebuild Request Features:", [f.dict() for f in request.features])
         # We now process the entire feature tree as a single B-Rep solid (SolidWorks Part style)
         result = geometry_service.process_features(request.features)
         if result:
@@ -112,6 +113,119 @@ class ProjectRequest(BaseModel):
 async def project_2d(request: ProjectRequest):
     try:
         return geometry_service.project_2d(request.features, request.plane)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SelectedTopologyDefinition(BaseModel):
+    type: str  # 'FACE' or 'EDGE' or 'VERTEX'
+    id: str
+    coordinates: List[float]
+    normal: Optional[List[float]] = None
+    edgeData: Optional[dict] = None
+
+class ConvertEntitiesRequest(BaseModel):
+    features: List[FeatureDefinition]
+    selectedTopology: SelectedTopologyDefinition
+    activePlane: str
+    activeFaceOrigin: Optional[List[float]] = None
+    activeFaceNormal: Optional[List[float]] = None
+
+class OffsetEntitiesRequest(BaseModel):
+    points: List[list]
+    distance: float
+    planeType: str
+    activeFaceOrigin: Optional[List[float]] = None
+    activeFaceNormal: Optional[List[float]] = None
+
+class IntersectionCurveRequest(BaseModel):
+    features: List[FeatureDefinition]
+    activePlane: str
+    activeFaceOrigin: Optional[List[float]] = None
+    activeFaceNormal: Optional[List[float]] = None
+
+
+@router.post("/convert_entities")
+async def convert_entities(request: ConvertEntitiesRequest):
+    try:
+        return geometry_service.convert_entities(
+            request.features,
+            request.selectedTopology.dict(),
+            request.activePlane,
+            request.activeFaceOrigin,
+            request.activeFaceNormal
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/offset_entities")
+async def offset_entities(request: OffsetEntitiesRequest):
+    try:
+        return geometry_service.offset_entities(
+            request.points,
+            request.distance,
+            request.planeType,
+            request.activeFaceOrigin,
+            request.activeFaceNormal
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/intersection_curve")
+async def get_intersection_curve(request: IntersectionCurveRequest):
+    try:
+        return geometry_service.get_intersection_curve(
+            request.features,
+            request.activePlane,
+            request.activeFaceOrigin,
+            request.activeFaceNormal
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class RefPlaneRequest(BaseModel):
+    planeType: str
+    refs: List[dict]
+    offset: Optional[float] = 0.0
+    features: List[FeatureDefinition]
+
+class RefAxisRequest(BaseModel):
+    axisType: str
+    refs: List[dict]
+    features: List[FeatureDefinition]
+
+
+@router.post("/ref_plane")
+async def create_ref_plane(request: RefPlaneRequest):
+    try:
+        return geometry_service.generate_reference_plane(
+            request.planeType,
+            request.refs,
+            request.offset,
+            request.features
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/ref_axis")
+async def create_ref_axis(request: RefAxisRequest):
+    try:
+        return geometry_service.generate_reference_axis(
+            request.axisType,
+            request.refs,
+            request.features
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()

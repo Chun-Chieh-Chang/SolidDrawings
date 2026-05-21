@@ -32,7 +32,7 @@ export interface CADComponent {
 }
 
 export interface CADContextMenu {
-  plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE';
+  plane: string;
   position: [number, number, number];
 }
 
@@ -45,7 +45,7 @@ export interface MeasurementResult {
 
 export interface CADFeature {
   id: string;
-  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'REVOLVE' | 'FILLET' | 'CHAMFER' | 'PATTERN';
+  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'REVOLVE' | 'FILLET' | 'CHAMFER' | 'PATTERN' | 'REFERENCE_PLANE' | 'REFERENCE_AXIS';
   name: string;
   parameters: any;
 }
@@ -56,8 +56,8 @@ interface CadState {
 
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
-  activePlane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' | null;
-  setActivePlane: (plane: 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' | null) => void;
+  activePlane: string | null;
+  setActivePlane: (plane: string | null) => void;
 
   activeFaceOrigin: [number, number, number] | null;
   setActiveFaceOrigin: (origin: [number, number, number] | null) => void;
@@ -69,6 +69,9 @@ interface CadState {
   sketchPoints: any[]; // 2D points on the active plane
   setSketchPoints: (points: any[]) => void;
   sketchTool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC' | 'MIDPOINT_LINE';
+  /** Circle creation mode */
+  activeCircleMode: 'CENTER_RADIUS' | 'DIAMETER' | 'THREE_POINTS' | 'TANGENT' | 'COINCIDENT';
+  setActiveCircleMode: (mode: CadState['activeCircleMode']) => void;
   setSketchTool: (tool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC' | 'MIDPOINT_LINE') => void;
   gridSnap: boolean;
   setGridSnap: (snap: boolean) => void;
@@ -93,6 +96,8 @@ interface CadState {
 
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
+  selectedSubNodeType: 'SKETCH' | 'FEATURE' | null;
+  setSelectedSubNodeType: (type: 'SKETCH' | 'FEATURE' | null) => void;
 
   // Topology Selection State
   selectedTopology: any; // SelectedTopology from TopologySelector
@@ -139,6 +144,16 @@ interface CadState {
   setControls: (controls: any | null) => void;
   isCameraAnimating: boolean;
   setIsCameraAnimating: (isAnimating: boolean) => void;
+
+  // Reference Geometry & PropertyManager
+  referencePlanes: any[];
+  setReferencePlanes: (planes: any[]) => void;
+  addReferencePlane: (plane: any) => void;
+  referenceAxes: any[];
+  setReferenceAxes: (axes: any[]) => void;
+  addReferenceAxis: (axis: any) => void;
+  activePropertyManager: any | null;
+  setActivePropertyManager: (mgr: any | null) => void;
 }
 
 export const useCadStore = create<CadState>()(
@@ -163,6 +178,9 @@ export const useCadStore = create<CadState>()(
       setSketchPoints: (points) => set({ sketchPoints: points }),
       sketchTool: 'LINE',
       setSketchTool: (tool) => set({ sketchTool: tool }),
+      // Circle mode defaults to center‑radius
+      activeCircleMode: 'CENTER_RADIUS',
+      setActiveCircleMode: (mode) => set({ activeCircleMode: mode }),
       gridSnap: true,
       setGridSnap: (snap) => set({ gridSnap: snap }),
       sketchRelations: [],
@@ -189,7 +207,9 @@ export const useCadStore = create<CadState>()(
       removeFeature: (id) => set((state) => ({
         features: state.features.filter(f => f.id !== id),
         selectedId: state.selectedId === id ? null : state.selectedId,
-        editingFeatureId: state.editingFeatureId === id ? null : state.editingFeatureId
+        editingFeatureId: state.editingFeatureId === id ? null : state.editingFeatureId,
+        referencePlanes: state.referencePlanes.filter(p => p.id !== id),
+        referenceAxes: state.referenceAxes.filter(a => a.id !== id)
       })),
 
       updateFeatureParams: (id, params) => set((state) => {
@@ -204,6 +224,8 @@ export const useCadStore = create<CadState>()(
 
       selectedId: null,
       setSelectedId: (id) => set({ selectedId: id }),
+      selectedSubNodeType: null,
+      setSelectedSubNodeType: (selectedSubNodeType) => set({ selectedSubNodeType }),
 
       selectedTopology: null,
       setSelectedTopology: (topology) => set({ selectedTopology: topology }),
@@ -250,6 +272,15 @@ export const useCadStore = create<CadState>()(
       setControls: (controls) => set({ controls }),
       isCameraAnimating: false,
       setIsCameraAnimating: (isCameraAnimating) => set({ isCameraAnimating }),
+
+      referencePlanes: [],
+      setReferencePlanes: (planes) => set({ referencePlanes: planes }),
+      addReferencePlane: (plane) => set((state) => ({ referencePlanes: [...state.referencePlanes, plane] })),
+      referenceAxes: [],
+      setReferenceAxes: (axes) => set({ referenceAxes: axes }),
+      addReferenceAxis: (axis) => set((state) => ({ referenceAxes: [...state.referenceAxes, axis] })),
+      activePropertyManager: null,
+      setActivePropertyManager: (activePropertyManager) => set({ activePropertyManager }),
     }),
     {
       name: 'cad-storage',
@@ -259,6 +290,7 @@ export const useCadStore = create<CadState>()(
         projectName: state.projectName,
         features: state.features,
         selectedId: state.selectedId,
+        selectedSubNodeType: state.selectedSubNodeType,
         selectedTopology: state.selectedTopology,
         selectedEntityIds: state.selectedEntityIds,
         components: state.components,
@@ -267,6 +299,8 @@ export const useCadStore = create<CadState>()(
         activeFaceOrigin: state.activeFaceOrigin,
         activeFaceNormal: state.activeFaceNormal,
         activeFaceId: state.activeFaceId,
+        referencePlanes: state.referencePlanes,
+        referenceAxes: state.referenceAxes,
       }), // Don't persist meshData and transient measurement state as they can be large or dynamic
     }
   )

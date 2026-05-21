@@ -30,21 +30,52 @@ def _shape_to_mesh(shape, deflection=0.01):
     indices = []
     normals = []
     
+    from OCC.Core.TopAbs import TopAbs_REVERSED
+    from OCC.Core.TopoDS import topods
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+    from OCC.Core.BRepLProp import BRepLProp_SLProps
+    
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while explorer.More():
-        face = explorer.Current()
+        face = topods.Face(explorer.Current())
         location = face.Location()
         triangulation = BRep_Tool.Triangulation(face, location)
         
         if triangulation:
             node_offset = len(vertices) // 3
-            # Extract vertices and apply location transformation
             trsf = location.Transformation()
+            is_reversed = (face.Orientation() == TopAbs_REVERSED)
+            
+            # Extract vertices and apply location transformation
             for i in range(1, triangulation.NbNodes() + 1):
                 pnt = triangulation.Node(i)
-                # Apply transformation to pnt
                 pnt.Transform(trsf)
                 vertices.extend([pnt.X(), pnt.Y(), pnt.Z()])
+                
+            # Compute and extract high-precision normals at each node
+            has_uv = triangulation.HasUVNodes()
+            if has_uv:
+                try:
+                    adaptor = BRepAdaptor_Surface(face)
+                    for i in range(1, triangulation.NbNodes() + 1):
+                        uv = triangulation.UVNode(i)
+                        props = BRepLProp_SLProps(adaptor, uv.X(), uv.Y(), 1, 1e-6)
+                        if props.IsNormalDefined():
+                            normal = props.Normal()
+                            normal.Transform(trsf)
+                            nx, ny, nz = normal.X(), normal.Y(), normal.Z()
+                            if is_reversed:
+                                nx, ny, nz = -nx, -ny, -nz
+                            normals.extend([nx, ny, nz])
+                        else:
+                            normals.extend([0.0, 0.0, 1.0])
+                except Exception as norm_err:
+                    print(f"[WARNING] Normal extraction failed for face: {norm_err}")
+                    for _ in range(triangulation.NbNodes()):
+                        normals.extend([0.0, 0.0, 1.0])
+            else:
+                for _ in range(triangulation.NbNodes()):
+                    normals.extend([0.0, 0.0, 1.0])
                 
             # Extract triangles (indices)
             for i in range(1, triangulation.NbTriangles() + 1):
@@ -139,9 +170,7 @@ def build_feature_shape_in_isolation(f_type, params):
         points_2d = filtered_points
 
         if not points_2d or len(points_2d) < 3:
-            w = float(params.get('width', 10.0))
-            h = float(params.get('height', 10.0))
-            points_2d = [[0, 0], [w, 0], [w, h], [0, h]]
+            return None
 
         x_origin = float(params.get('x', 0.0))
         y_origin = float(params.get('y', 0.0))
@@ -149,13 +178,10 @@ def build_feature_shape_in_isolation(f_type, params):
 
         if plane_type == 'FRONT':
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
-            vec = gp_Vec(0, 0, depth)
         elif plane_type == 'TOP':
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
-            vec = gp_Vec(0, depth, 0)
         elif plane_type == 'RIGHT':
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
-            vec = gp_Vec(depth, 0, 0)
         elif plane_type == 'FACE':
             face_origin = params.get('faceOrigin', [0.0, 0.0, 0.0])
             face_normal = params.get('faceNormal', [0.0, 0.0, 1.0])
@@ -180,27 +206,21 @@ def build_feature_shape_in_isolation(f_type, params):
                 xx, xy = xx/x_len, xy/x_len
 
             ax2 = gp_Ax2(gp_Pnt(ox, oy, oz), gp_Dir(nx, ny, nz), gp_Dir(xx, xy, xz))
-            vec = gp_Vec(nx * depth, ny * depth, nz * depth)
         else:
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-            vec = gp_Vec(0, 0, depth)
+
+        # Extrude along plane normal in global coordinates
+        normal_dir = ax2.Direction()
+        vec = gp_Vec(normal_dir.X() * depth, normal_dir.Y() * depth, normal_dir.Z() * depth)
 
         try:
             make_wire = BRepBuilderAPI_MakeWire()
 
+            # Wire is built standard on the local XY plane
             def get_gp_pnt(p):
                 u_val = float(p[0])
                 v_val = float(p[1])
-                if plane_type == 'FRONT':
-                    return gp_Pnt(u_val, v_val, 0)
-                elif plane_type == 'TOP':
-                    return gp_Pnt(u_val, 0, v_val)
-                elif plane_type == 'RIGHT':
-                    return gp_Pnt(0, u_val, v_val)
-                elif plane_type == 'FACE':
-                    return gp_Pnt(u_val, v_val, 0)
-                else:
-                    return gp_Pnt(u_val, v_val, 0)
+                return gp_Pnt(u_val, v_val, 0.0)
 
             i = 0
             n_points = len(points_2d)
@@ -228,10 +248,10 @@ def build_feature_shape_in_isolation(f_type, params):
             wire = make_wire.Wire()
             face = BRepBuilderAPI_MakeFace(wire).Face()
 
+            # Move face to local plane
             trsf = gp_Trsf()
-            trsf.SetTransformation(gp_Ax3(ax2))
+            trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
             face.Move(TopLoc_Location(trsf))
-            vec.Transform(trsf)
 
             current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
         except Exception as sketch_err:
@@ -265,9 +285,7 @@ def build_feature_shape_in_isolation(f_type, params):
         points_2d = filtered_points
 
         if not points_2d or len(points_2d) < 3:
-            points_2d = [
-                [0, 0], [15, 0], [17.5, 10], [13.0, 35], [17.5, 60], [8.5, 85], [8.5, 120], [0, 120]
-            ]
+            return None
 
         x_origin = float(params.get('x', 0.0))
         y_origin = float(params.get('y', 0.0))
@@ -275,13 +293,10 @@ def build_feature_shape_in_isolation(f_type, params):
 
         if plane_type == 'FRONT':
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
-            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
         elif plane_type == 'TOP':
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
-            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0))
         elif plane_type == 'RIGHT':
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
-            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
         elif plane_type == 'FACE':
             face_origin = params.get('faceOrigin', [0.0, 0.0, 0.0])
             face_normal = params.get('faceNormal', [0.0, 0.0, 1.0])
@@ -306,28 +321,17 @@ def build_feature_shape_in_isolation(f_type, params):
                 xx, xy = xx/x_len, xy/x_len
 
             ax2 = gp_Ax2(gp_Pnt(ox, oy, oz), gp_Dir(nx, ny, nz), gp_Dir(xx, xy, xz))
-            yx, yy, yz = ny*xz - nz*xy, nz*xx - nx*xz, nx*xy - ny*xx
-            ax1 = gp_Ax1(gp_Pnt(ox, oy, oz), gp_Dir(yx, yy, yz))
         else:
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
-            ax1 = gp_Ax1(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0))
 
         try:
             make_wire = BRepBuilderAPI_MakeWire()
 
+            # Wire is built standard on local XY plane
             def get_gp_pnt(p):
                 u_val = float(p[0])
                 v_val = float(p[1])
-                if plane_type == 'FRONT':
-                    return gp_Pnt(u_val, v_val, 0)
-                elif plane_type == 'TOP':
-                    return gp_Pnt(u_val, 0, v_val)
-                elif plane_type == 'RIGHT':
-                    return gp_Pnt(0, u_val, v_val)
-                elif plane_type == 'FACE':
-                    return gp_Pnt(u_val, v_val, 0)
-                else:
-                    return gp_Pnt(u_val, v_val, 0)
+                return gp_Pnt(u_val, v_val, 0.0)
 
             i = 0
             n_points = len(points_2d)
@@ -355,12 +359,16 @@ def build_feature_shape_in_isolation(f_type, params):
             wire = make_wire.Wire()
             face = BRepBuilderAPI_MakeFace(wire).Face()
 
-            trsf = gp_Trsf()
-            trsf.SetTransformation(gp_Ax3(ax2))
-            face.Move(TopLoc_Location(trsf))
-            ax1.Transform(trsf)
+            # Revolve around local Y-axis in local space
+            local_axis = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0))
+            revol_shape = BRepPrimAPI_MakeRevol(face, local_axis, angle).Shape()
 
-            current_feat_shape = BRepPrimAPI_MakeRevol(face, ax1, angle).Shape()
+            # Move and rotate the revolved solid to ax2 plane
+            trsf = gp_Trsf()
+            trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
+            revol_shape.Move(TopLoc_Location(trsf))
+
+            current_feat_shape = revol_shape
         except Exception as e:
             print(f"[ERROR] Revolve failed inside build_feature_shape_in_isolation: {e}")
             current_feat_shape = None
@@ -963,3 +971,553 @@ def project_2d(features, plane_type='FRONT'):
         explorer.Next()
     
     return projected_lines
+
+
+def project_3d_to_2d(x, y, z, plane_type, face_origin=None, face_normal=None):
+    """Projects a 3D world space coordinate onto the active plane local 2D UV coordinate space."""
+    if plane_type == 'FRONT':
+        return [x, y]
+    elif plane_type == 'TOP':
+        return [x, z]
+    elif plane_type == 'RIGHT':
+        return [y, z]
+    elif plane_type == 'FACE' and face_origin and face_normal:
+        ox, oy, oz = float(face_origin[0]), float(face_origin[1]), float(face_origin[2])
+        nx, ny, nz = float(face_normal[0]), float(face_normal[1]), float(face_normal[2])
+        
+        # Normalize normal
+        n_len = math.sqrt(nx*nx + ny*ny + nz*nz)
+        if n_len > 1e-6:
+            nx, ny, nz = nx/n_len, ny/n_len, nz/n_len
+        else:
+            nx, ny, nz = 0.0, 0.0, 1.0
+            
+        # Compute tangent xDir
+        if abs(nx) < 1e-5 and abs(ny) < 1e-5:
+            tx, ty, tz = 1.0, 0.0, 0.0
+        else:
+            tx, ty, tz = -ny, nx, 0.0
+            t_len = math.sqrt(tx*tx + ty*ty)
+            tx, ty = tx/t_len, ty/t_len
+            
+        # Compute bitangent yDir = normal x tangent
+        bx = ny * tz - nz * ty
+        by = nz * tx - nx * tz
+        bz = nx * ty - ny * tx
+        
+        # Project vector from origin
+        dx, dy, dz = x - ox, y - oy, z - oz
+        u = dx * tx + dy * ty + dz * tz
+        v = dx * bx + dy * by + dz * bz
+        return [u, v]
+        
+    return [x, y]
+
+
+def find_closest_face(shape, point_3d):
+    """Finds the closest B-Rep TopoDS_Face in the shape to the given 3D coordinate point."""
+    if not shape or shape.IsNull():
+        return None
+        
+    try:
+        target_pt = [float(point_3d[0]), float(point_3d[1]), float(point_3d[2])]
+    except Exception:
+        return None
+        
+    best_face = None
+    min_dist = float('inf')
+    
+    explorer = TopExp_Explorer(shape, TopAbs_FACE)
+    while explorer.More():
+        face = topods.Face(explorer.Current())
+        
+        # Traverse vertices to check distance
+        v_exp = TopExp_Explorer(face, TopAbs_VERTEX)
+        face_min_v_dist = float('inf')
+        sum_x, sum_y, sum_z = 0.0, 0.0, 0.0
+        v_count = 0
+        
+        while v_exp.More():
+            v = topods.Vertex(v_exp.Current())
+            pt = BRep_Tool.Pnt(v)
+            d = math.dist(target_pt, [pt.X(), pt.Y(), pt.Z()])
+            if d < face_min_v_dist:
+                face_min_v_dist = d
+            sum_x += pt.X()
+            sum_y += pt.Y()
+            sum_z += pt.Z()
+            v_count += 1
+            v_exp.Next()
+            
+        if v_count > 0:
+            center = [sum_x / v_count, sum_y / v_count, sum_z / v_count]
+            d_center = math.dist(target_pt, center)
+            effective_dist = min(face_min_v_dist, d_center)
+            
+            if effective_dist < min_dist:
+                min_dist = effective_dist
+                best_face = face
+                
+        explorer.Next()
+        
+    if min_dist < 10.0:
+        return best_face
+    return None
+
+
+def convert_entities(features, topology, plane_type, face_origin=None, face_normal=None):
+    """Projects outer boundaries of 3D selected faces or selected edges onto the sketch plane's LCS UV space."""
+    if not HAS_OCC:
+        return []
+        
+    shape = build_shape_only(features)
+    if not shape or shape.IsNull():
+        return []
+        
+    topo_type = topology.get('type')
+    coords = topology.get('coordinates', [0.0, 0.0, 0.0])
+    
+    projected_points = []
+    
+    if topo_type == 'EDGE':
+        edge_data = topology.get('edgeData')
+        if edge_data and 'start' in edge_data and 'end' in edge_data:
+            t_start = edge_data['start']
+            t_end = edge_data['end']
+            matched_edge = find_matching_edge(shape, t_start, t_end)
+            
+            if matched_edge:
+                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+                from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
+                
+                curve = BRepAdaptor_Curve(matched_edge)
+                c_type = curve.GetType()
+                
+                p_start = curve.Value(curve.FirstParameter())
+                p_end = curve.Value(curve.LastParameter())
+                
+                uv_start = project_3d_to_2d(p_start.X(), p_start.Y(), p_start.Z(), plane_type, face_origin, face_normal)
+                uv_end = project_3d_to_2d(p_end.X(), p_end.Y(), p_end.Z(), plane_type, face_origin, face_normal)
+                
+                if c_type == GeomAbs_Circle:
+                    mid_param = (curve.FirstParameter() + curve.LastParameter()) / 2.0
+                    p_mid = curve.Value(mid_param)
+                    uv_mid = project_3d_to_2d(p_mid.X(), p_mid.Y(), p_mid.Z(), plane_type, face_origin, face_normal)
+                    
+                    projected_points.append([uv_start[0], uv_start[1], 'START'])
+                    projected_points.append([uv_mid[0], uv_mid[1], 'ARC_CONTROL'])
+                    projected_points.append([uv_end[0], uv_end[1]])
+                else:
+                    projected_points.append([uv_start[0], uv_start[1], 'START'])
+                    projected_points.append([uv_end[0], uv_end[1]])
+        
+        if not projected_points:
+            uv = project_3d_to_2d(coords[0], coords[1], coords[2], plane_type, face_origin, face_normal)
+            projected_points.append([uv[0], uv[1], 'START'])
+            
+    elif topo_type == 'FACE':
+        matched_face = find_closest_face(shape, coords)
+        if matched_face:
+            from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+            from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
+            
+            edge_exp = TopExp_Explorer(matched_face, TopAbs_EDGE)
+            while edge_exp.More():
+                edge = topods.Edge(edge_exp.Current())
+                curve = BRepAdaptor_Curve(edge)
+                c_type = curve.GetType()
+                
+                p_start = curve.Value(curve.FirstParameter())
+                p_end = curve.Value(curve.LastParameter())
+                
+                uv_start = project_3d_to_2d(p_start.X(), p_start.Y(), p_start.Z(), plane_type, face_origin, face_normal)
+                uv_end = project_3d_to_2d(p_end.X(), p_end.Y(), p_end.Z(), plane_type, face_origin, face_normal)
+                
+                if c_type == GeomAbs_Circle:
+                    mid_param = (curve.FirstParameter() + curve.LastParameter()) / 2.0
+                    p_mid = curve.Value(mid_param)
+                    uv_mid = project_3d_to_2d(p_mid.X(), p_mid.Y(), p_mid.Z(), plane_type, face_origin, face_normal)
+                    
+                    projected_points.append([uv_start[0], uv_start[1], 'START'])
+                    projected_points.append([uv_mid[0], uv_mid[1], 'ARC_CONTROL'])
+                    projected_points.append([uv_end[0], uv_end[1]])
+                else:
+                    projected_points.append([uv_start[0], uv_start[1], 'START'])
+                    projected_points.append([uv_end[0], uv_end[1]])
+                    
+                edge_exp.Next()
+                
+    return projected_points
+
+
+def offset_entities(points_2d, distance, plane_type, face_origin=None, face_normal=None):
+    """Constructs a 2D B-Rep wire from sketch points, offsets it using BRepOffsetAPI_MakeOffset, and returns projected UV vertices."""
+    if not HAS_OCC or not points_2d:
+        return []
+        
+    try:
+        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
+        from OCC.Core.GeomAbs import GeomAbs_Arc
+        
+        make_wire = BRepBuilderAPI_MakeWire()
+        
+        i = 0
+        n_points = len(points_2d)
+        
+        while i < n_points:
+            p_start = points_2d[i]
+            p_next = points_2d[(i + 1) % n_points]
+            
+            if len(p_next) > 2 and 'START' in str(p_next[2]):
+                i += 1
+                continue
+                
+            p_start_pt = gp_Pnt(float(p_start[0]), float(p_start[1]), 0.0)
+            
+            if len(p_next) > 2 and 'ARC_CONTROL' in str(p_next[2]):
+                p_control = p_next
+                p_end = points_2d[(i + 2) % n_points]
+                p_control_pt = gp_Pnt(float(p_control[0]), float(p_control[1]), 0.0)
+                p_end_pt = gp_Pnt(float(p_end[0]), float(p_end[1]), 0.0)
+                
+                arc = GC_MakeArcOfCircle(p_start_pt, p_control_pt, p_end_pt)
+                if arc.IsDone():
+                    edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+                    make_wire.Add(edge)
+                else:
+                    edge = BRepBuilderAPI_MakeEdge(p_start_pt, p_end_pt).Edge()
+                    make_wire.Add(edge)
+                i += 2
+            else:
+                p_next_pt = gp_Pnt(float(p_next[0]), float(p_next[1]), 0.0)
+                edge = BRepBuilderAPI_MakeEdge(p_start_pt, p_next_pt).Edge()
+                make_wire.Add(edge)
+                i += 1
+                
+        wire = make_wire.Wire()
+        if wire.IsNull():
+            return []
+            
+        offset_tool = BRepOffsetAPI_MakeOffset()
+        offset_tool.Initialize(wire, GeomAbs_Arc)
+        offset_tool.Perform(float(distance))
+        
+        offset_points = []
+        if offset_tool.IsDone():
+            offset_shape = offset_tool.Shape()
+            explorer = TopExp_Explorer(offset_shape, TopAbs_EDGE)
+            while explorer.More():
+                edge = topods.Edge(explorer.Current())
+                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+                from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
+                
+                curve = BRepAdaptor_Curve(edge)
+                c_type = curve.GetType()
+                
+                p_start = curve.Value(curve.FirstParameter())
+                p_end = curve.Value(curve.LastParameter())
+                
+                if c_type == GeomAbs_Circle:
+                    mid_param = (curve.FirstParameter() + curve.LastParameter()) / 2.0
+                    p_mid = curve.Value(mid_param)
+                    offset_points.append([p_start.X(), p_start.Y(), 'START'])
+                    offset_points.append([p_mid.X(), p_mid.Y(), 'ARC_CONTROL'])
+                    offset_points.append([p_end.X(), p_end.Y()])
+                else:
+                    offset_points.append([p_start.X(), p_start.Y(), 'START'])
+                    offset_points.append([p_end.X(), p_end.Y()])
+                explorer.Next()
+                
+        if not offset_points:
+            offset_points = []
+            for p in points_2d:
+                tag = p[2] if len(p) > 2 else None
+                offset_points.append([float(p[0]) + float(distance), float(p[1]) + float(distance), tag])
+                
+        return offset_points
+        
+    except Exception as e:
+        print("[ERROR] Offset entities failed:", e)
+        offset_points = []
+        for p in points_2d:
+            tag = p[2] if len(p) > 2 else None
+            offset_points.append([float(p[0]) + float(distance), float(p[1]) + float(distance), tag])
+        return offset_points
+
+
+def get_intersection_curve(features, plane_type, face_origin=None, face_normal=None):
+    """Intersects 3D solid with the active sketch plane using BRepAlgoAPI_Section and returns the 2D UV wire points."""
+    if not HAS_OCC:
+        return []
+        
+    shape = build_shape_only(features)
+    if not shape or shape.IsNull():
+        return []
+        
+    try:
+        from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Section
+        from OCC.Core.gp import gp_Pln
+        
+        x_origin = 0.0
+        y_origin = 0.0
+        z_origin = 0.0
+        
+        if plane_type == 'FRONT':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
+        elif plane_type == 'TOP':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
+        elif plane_type == 'RIGHT':
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
+        elif plane_type == 'FACE' and face_origin and face_normal:
+            ox = float(face_origin[0])
+            oy = float(face_origin[1])
+            oz = float(face_origin[2])
+            nx = float(face_normal[0])
+            ny = float(face_normal[1])
+            nz = float(face_normal[2])
+            
+            n_len = math.sqrt(nx*nx + ny*ny + nz*nz)
+            if n_len > 1e-6:
+                nx, ny, nz = nx/n_len, ny/n_len, nz/n_len
+            else:
+                nx, ny, nz = 0.0, 0.0, 1.0
+                
+            if abs(nx) < 1e-5 and abs(ny) < 1e-5:
+                xx, xy, xz = 1.0, 0.0, 0.0
+            else:
+                xx, xy, xz = -ny, nx, 0.0
+                x_len = math.sqrt(xx*xx + xy*xy)
+                xx, xy = xx/x_len, xy/x_len
+                
+            ax2 = gp_Ax2(gp_Pnt(ox, oy, oz), gp_Dir(nx, ny, nz), gp_Dir(xx, xy, xz))
+        else:
+            ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
+            
+        slicing_plane = gp_Pln(ax2)
+        
+        section_tool = BRepAlgoAPI_Section(shape, slicing_plane)
+        section_tool.Build()
+        
+        intersection_points = []
+        if section_tool.IsDone():
+            section_shape = section_tool.Shape()
+            explorer = TopExp_Explorer(section_shape, TopAbs_EDGE)
+            while explorer.More():
+                edge = topods.Edge(explorer.Current())
+                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+                from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
+                
+                curve = BRepAdaptor_Curve(edge)
+                c_type = curve.GetType()
+                
+                p_start = curve.Value(curve.FirstParameter())
+                p_end = curve.Value(curve.LastParameter())
+                
+                uv_start = project_3d_to_2d(p_start.X(), p_start.Y(), p_start.Z(), plane_type, face_origin, face_normal)
+                uv_end = project_3d_to_2d(p_end.X(), p_end.Y(), p_end.Z(), plane_type, face_origin, face_normal)
+                
+                if c_type == GeomAbs_Circle:
+                    mid_param = (curve.FirstParameter() + curve.LastParameter()) / 2.0
+                    p_mid = curve.Value(mid_param)
+                    uv_mid = project_3d_to_2d(p_mid.X(), p_mid.Y(), p_mid.Z(), plane_type, face_origin, face_normal)
+                    
+                    intersection_points.append([uv_start[0], uv_start[1], 'START'])
+                    intersection_points.append([uv_mid[0], uv_mid[1], 'ARC_CONTROL'])
+                    intersection_points.append([uv_end[0], uv_end[1]])
+                else:
+                    intersection_points.append([uv_start[0], uv_start[1], 'START'])
+                    intersection_points.append([uv_end[0], uv_end[1]])
+                explorer.Next()
+                
+        return intersection_points
+        
+    except Exception as e:
+        print("[ERROR] Intersection section failed:", e)
+        return []
+
+
+def generate_reference_plane(plane_type, refs, offset=0.0, features=[]):
+    """
+    Computes a custom reference plane from topology references.
+    Returns: { "origin": [x,y,z], "normal": [x,y,z], "xDir": [x,y,z], "yDir": [x,y,z] }
+    """
+    origin = [0.0, 0.0, 0.0]
+    normal = [0.0, 0.0, 1.0]
+
+    try:
+        if plane_type == 'OFFSET' and len(refs) > 0:
+            ref = refs[0]
+            coords = ref.get('coordinates', [0.0, 0.0, 0.0])
+            norm = ref.get('normal', [0.0, 0.0, 1.0])
+            # Apply offset along normal
+            n_len = math.sqrt(norm[0]**2 + norm[1]**2 + norm[2]**2)
+            if n_len > 1e-6:
+                unorm = [norm[0]/n_len, norm[1]/n_len, norm[2]/n_len]
+            else:
+                unorm = [0.0, 0.0, 1.0]
+            origin = [
+                coords[0] + offset * unorm[0],
+                coords[1] + offset * unorm[1],
+                coords[2] + offset * unorm[2]
+            ]
+            normal = unorm
+
+        elif plane_type == 'THREE_POINTS' and len(refs) >= 3:
+            p1 = refs[0].get('coordinates', [0.0, 0.0, 0.0])
+            p2 = refs[1].get('coordinates', [0.0, 0.0, 0.0])
+            p3 = refs[2].get('coordinates', [0.0, 0.0, 0.0])
+
+            origin = p1
+            # v1 = p2 - p1, v2 = p3 - p1
+            v1 = [p2[0]-p1[0], p2[1]-p1[1], p2[2]-p1[2]]
+            v2 = [p3[0]-p1[0], p3[1]-p1[1], p3[2]-p1[2]]
+
+            # Normal = cross product v1 x v2
+            nx = v1[1]*v2[2] - v1[2]*v2[1]
+            ny = v1[2]*v2[0] - v1[0]*v2[2]
+            nz = v1[0]*v2[1] - v1[1]*v2[0]
+
+            n_len = math.sqrt(nx**2 + ny**2 + nz**2)
+            if n_len > 1e-6:
+                normal = [nx/n_len, ny/n_len, nz/n_len]
+            else:
+                normal = [0.0, 0.0, 1.0]
+
+        elif plane_type == 'POINT_NORMAL' and len(refs) >= 2:
+            p = refs[0].get('coordinates', [0.0, 0.0, 0.0])
+            ref_norm = refs[1]
+            origin = p
+
+            if ref_norm.get('type') == 'EDGE' and 'edgeData' in ref_norm:
+                e_data = ref_norm['edgeData']
+                estart = e_data.get('start', [0.0, 0.0, 0.0])
+                eend = e_data.get('end', [0.0, 0.0, 0.0])
+                nx = eend[0] - estart[0]
+                ny = eend[1] - estart[1]
+                nz = eend[2] - estart[2]
+            else:
+                norm_dir = ref_norm.get('normal', [0.0, 0.0, 1.0])
+                nx, ny, nz = norm_dir[0], norm_dir[1], norm_dir[2]
+
+            n_len = math.sqrt(nx**2 + ny**2 + nz**2)
+            if n_len > 1e-6:
+                normal = [nx/n_len, ny/n_len, nz/n_len]
+            else:
+                normal = [0.0, 0.0, 1.0]
+
+        # Calculate a robust orthogonal basis X and Y for ThreeJS
+        nx, ny, nz = normal[0], normal[1], normal[2]
+        if abs(nx) < 1e-5 and abs(ny) < 1e-5:
+            xx, xy, xz = 1.0, 0.0, 0.0
+        else:
+            xx, xy, xz = -ny, nx, 0.0
+            x_len = math.sqrt(xx**2 + xy**2)
+            xx, xy = xx/x_len, xy/x_len
+
+        # Y = Z x X
+        yx = ny*xz - nz*xy
+        yy = nz*xx - nx*xz
+        yz = nx*xy - ny*xx
+        y_len = math.sqrt(yx**2 + yy**2 + yz**2)
+        if y_len > 1e-6:
+            yx, yy, yz = yx/y_len, yy/y_len, yz/y_len
+        else:
+            yx, yy, yz = 0.0, 1.0, 0.0
+
+        return {
+            "origin": origin,
+            "normal": normal,
+            "xDir": [xx, xy, xz],
+            "yDir": [yx, yy, yz]
+        }
+    except Exception as e:
+        print("[ERROR] generate_reference_plane failed:", e)
+        return {
+            "origin": origin,
+            "normal": normal,
+            "xDir": [1.0, 0.0, 0.0],
+            "yDir": [0.0, 1.0, 0.0]
+        }
+
+
+def generate_reference_axis(axis_type, refs, features=[]):
+    """
+    Computes a custom reference axis from topology references.
+    Returns: { "origin": [x,y,z], "direction": [x,y,z] }
+    """
+    origin = [0.0, 0.0, 0.0]
+    direction = [0.0, 0.0, 1.0]
+
+    try:
+        if axis_type == 'TWO_POINTS' and len(refs) >= 2:
+            p1 = refs[0].get('coordinates', [0.0, 0.0, 0.0])
+            p2 = refs[1].get('coordinates', [0.0, 0.0, 0.0])
+            origin = p1
+            dx = p2[0] - p1[0]
+            dy = p2[1] - p1[1]
+            dz = p2[2] - p1[2]
+            d_len = math.sqrt(dx**2 + dy**2 + dz**2)
+            if d_len > 1e-6:
+                direction = [dx/d_len, dy/d_len, dz/d_len]
+
+        elif axis_type == 'CYLINDER_AXIS' and len(refs) > 0 and HAS_OCC:
+            ref = refs[0]
+            coords = ref.get('coordinates', [0.0, 0.0, 0.0])
+            shape = build_shape_only(features)
+            if shape and not shape.IsNull():
+                face = find_closest_face(shape, coords)
+                if face:
+                    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+                    from OCC.Core.GeomAbs import GeomAbs_Cylinder
+                    
+                    surf = BRepAdaptor_Surface(face)
+                    if surf.GetType() == GeomAbs_Cylinder:
+                        cyl = surf.Cylinder()
+                        axis = cyl.Axis()
+                        loc = axis.Location()
+                        direc = axis.Direction()
+                        return {
+                            "origin": [loc.X(), loc.Y(), loc.Z()],
+                            "direction": [direc.X(), direc.Y(), direc.Z()]
+                        }
+            # Fallback using normal as direction if no shape or not cylinder
+            origin = coords
+            norm = ref.get('normal', [0.0, 0.0, 1.0])
+            n_len = math.sqrt(norm[0]**2 + norm[1]**2 + norm[2]**2)
+            if n_len > 1e-6:
+                direction = [norm[0]/n_len, norm[1]/n_len, norm[2]/n_len]
+
+        elif axis_type == 'PLANE_INTERSECTION' and len(refs) >= 2:
+            # Solve plane intersection: we have normals and origins of two planes
+            p1 = refs[0].get('coordinates', [0.0, 0.0, 0.0])
+            n1 = refs[0].get('normal', [0.0, 0.0, 1.0])
+            p2 = refs[1].get('coordinates', [0.0, 0.0, 0.0])
+            n2 = refs[1].get('normal', [0.0, 1.0, 0.0])
+
+            # Line direction = n1 x n2
+            dx = n1[1]*n2[2] - n1[2]*n2[1]
+            dy = n1[2]*n2[0] - n1[0]*n2[2]
+            dz = n1[0]*n2[1] - n1[1]*n2[0]
+
+            d_len = math.sqrt(dx**2 + dy**2 + dz**2)
+            if d_len > 1e-6:
+                direction = [dx/d_len, dy/d_len, dz/d_len]
+                # Find a point on both planes
+                origin = [
+                    (p1[0] + p2[0])/2.0,
+                    (p1[1] + p2[1])/2.0,
+                    (p1[2] + p2[2])/2.0
+                ]
+            else:
+                origin = p1
+
+        return {
+            "origin": origin,
+            "direction": direction
+        }
+    except Exception as e:
+        print("[ERROR] generate_reference_axis failed:", e)
+        return {
+            "origin": origin,
+            "direction": direction
+        }

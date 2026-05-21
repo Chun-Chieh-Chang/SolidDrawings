@@ -83,6 +83,7 @@ export default function Home() {
     features, addFeature, removeFeature, updateFeatureParams,
     editingFeatureId, setEditingFeatureId,
     selectedId, setSelectedId,
+    selectedSubNodeType, setSelectedSubNodeType,
     meshData, setMeshData,
     isSketchMode, setSketchMode,
     activePlane, setActivePlane,
@@ -835,8 +836,9 @@ export default function Home() {
 
   const handleEditFeatureSketch = useCallback((feature: CADFeature) => {
     const rawPoints = feature.parameters?.points;
-    if (feature.type !== 'EXTRUDE' || !Array.isArray(rawPoints) || rawPoints.length < 3) {
+    if ((feature.type !== 'EXTRUDE' && feature.type !== 'REVOLVE') || !Array.isArray(rawPoints) || rawPoints.length < 3) {
       setSelectedId(feature.id);
+      setSelectedSubNodeType('FEATURE');
       return;
     }
 
@@ -844,6 +846,7 @@ export default function Home() {
     const relations = Array.isArray(feature.parameters?.relations) ? [...feature.parameters.relations] : [];
 
     setSelectedId(feature.id);
+    setSelectedSubNodeType(null);
     setEditingFeatureId(feature.id);
     setSketchPoints(cloneSketchPoints(rawPoints));
     setSketchRelations(relations);
@@ -861,7 +864,7 @@ export default function Home() {
     setSketchMode(true);
     setActiveTab('SKETCH');
     setSmartDimensionActive(false);
-  }, [setSelectedId, setEditingFeatureId, setSketchPoints, setSketchRelations, setActivePlane, setSketchTool, setSketchMode, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
+  }, [setSelectedId, setSelectedSubNodeType, setEditingFeatureId, setSketchPoints, setSketchRelations, setActivePlane, setSketchTool, setSketchMode, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
 
   const handleExitAndExtrude = useCallback((operationOverride?: 'ADD' | 'CUT') => {
     const solidPoints = cloneSketchPoints(sketchPoints.filter(pt => !pt[2] || !pt[2].includes('CENTER_LINE')));
@@ -2441,12 +2444,12 @@ export default function Home() {
                         >
                           {/* Feature Row */}
                           <div
-                            onClick={() => setSelectedId(f.id)}
+                            onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('FEATURE'); }}
                             onDoubleClick={() => handleEditFeatureSketch(f)}
                             className={`group flex items-center justify-between p-1.5 rounded cursor-pointer transition-all border ${
                               editingFeatureId === f.id
                                 ? 'bg-emerald-50 border-emerald-300 text-slate-900 font-bold'
-                                : selectedId === f.id
+                                : selectedId === f.id && selectedSubNodeType === 'FEATURE'
                                 ? 'bg-primary/10 border-primary/30 text-slate-800 font-bold'
                                 : relState === 'PARENT'
                                 ? 'bg-blue-50/70 border-blue-200 text-blue-900 font-medium'
@@ -2489,9 +2492,13 @@ export default function Home() {
                           {/* Nested Sketch Child Node */}
                           {isExtrudeOrRevolve && (
                             <div
-                              onClick={() => { setSelectedId(f.id); }}
+                              onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('SKETCH'); }}
                               onDoubleClick={() => handleEditFeatureSketch(f)}
-                              className="pl-7 py-1 flex items-center justify-between gap-1.5 text-slate-500 hover:text-primary cursor-pointer text-[14px] select-none hover:bg-slate-100/50 rounded transition-all"
+                              className={`pl-7 pr-2 py-1 flex items-center justify-between gap-1.5 cursor-pointer text-[14px] select-none rounded transition-all border border-transparent ${
+                                selectedId === f.id && selectedSubNodeType === 'SKETCH'
+                                  ? 'bg-pink-100/90 border border-pink-300 text-pink-700 font-bold shadow-xs'
+                                  : 'text-slate-500 hover:text-primary hover:bg-slate-100/50'
+                              }`}
                               title="雙擊編輯此特徵所屬的草圖幾何"
                             >
                               <div className="flex items-center gap-1.5">
@@ -2567,7 +2574,7 @@ export default function Home() {
           )}
 
           {/* PropertyManager (左下角特徵屬性面板) */}
-          {!isSketchMode && selectedFeature && measurementMode === 'NONE' && (!selectedTopology || selectedTopology.type !== 'FACE') && (
+          {!isSketchMode && selectedFeature && selectedSubNodeType !== 'SKETCH' && measurementMode === 'NONE' && (!selectedTopology || selectedTopology.type !== 'FACE') && (
             <div className="h-[250px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex flex-col p-3 z-10 shrink-0">
               <div className="text-[14px] uppercase tracking-wider text-slate-500 mb-2 font-bold flex justify-between items-center border-b border-[#D1D5DB]/40 pb-1">
                 <span>📋 PropertyManager</span>
@@ -2835,6 +2842,53 @@ export default function Home() {
                     </div>
                   );
                 })()}
+              </div>
+            </div>
+          )}
+
+          {/* Sketch Properties Manager (左下角草圖屬性面板) */}
+          {!isSketchMode && selectedSubNodeType === 'SKETCH' && selectedFeature && measurementMode === 'NONE' && (
+            <div className="h-[250px] w-full border-t border-[#D1D5DB] bg-[#FDF2F8] flex flex-col p-3 z-10 shrink-0 shadow-[0_-2px_10px_rgba(219,39,119,0.05)]">
+              <div className="text-[14px] uppercase tracking-wider text-pink-600 mb-2 font-bold flex justify-between items-center border-b border-pink-200 pb-1">
+                <span className="flex items-center gap-1.5">✏️ 草圖屬性管理器</span>
+                <span className="text-[13px] bg-pink-100 text-pink-600 px-1.5 rounded uppercase font-mono">Sketch Node</span>
+              </div>
+
+              <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 text-[14px]">
+                <div className="bg-white p-2.5 rounded border border-pink-200 shadow-sm space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">草圖名稱</span>
+                    <span className="font-bold text-slate-800 font-mono">
+                      {selectedFeature.name.replace('伸長-', '草圖').replace('旋轉-', '草圖')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">基準面</span>
+                    <span className="font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded font-mono">
+                      {selectedFeature.parameters.plane || 'FRONT'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">幾何頂點數</span>
+                    <span className="font-bold text-slate-800 font-mono">
+                      {Array.isArray(selectedFeature.parameters.points) ? selectedFeature.parameters.points.length : 0}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-slate-500 font-medium">所屬父特徵</span>
+                    <span className="font-semibold text-primary font-mono bg-blue-50 border border-blue-100 px-1 rounded">
+                      {selectedFeature.name}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleEditFeatureSketch(selectedFeature)}
+                  className="w-full py-2 bg-pink-600 hover:bg-pink-700 active:bg-pink-800 text-white rounded font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm text-[14px] hover:shadow-pink-200"
+                >
+                  <span>🛠️</span>
+                  <span>編輯草圖幾何 (Edit Sketch)</span>
+                </button>
               </div>
             </div>
           )}

@@ -2,6 +2,8 @@
 
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
+import { useCadStore } from '../store/useCadStore';
+import { topologySelector, getFeatureDistance } from './Viewport';
 
 export interface MeshData {
   vertices: number[];
@@ -22,6 +24,8 @@ export default function OcctShape({
   position = [0, 0, 0],
   rotation = [0, 0, 0]
 }: OcctShapeProps) {
+  const { isSketchMode, activePropertyManager, features, setSelectedId, setSelectedSubNodeType } = useCadStore();
+
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     
@@ -42,8 +46,64 @@ export default function OcctShape({
     return geo;
   }, [data]);
 
+  const handleMeshClick = (e: any) => {
+    e.stopPropagation();
+    
+    if (topologySelector) {
+      const ndcX = e.pointer ? e.pointer.x : 0;
+      const ndcY = e.pointer ? e.pointer.y : 0;
+      const filterType = activePropertyManager?.selectionFilter || 'ALL';
+      const preserve = isSketchMode || activePropertyManager !== null;
+      
+      const selected = topologySelector.selectAtPosition(ndcX, ndcY, preserve, filterType);
+      console.log('[OcctShape Topology] Clicked mesh at NDC:', ndcX, ndcY, 'Selected:', selected);
+      
+      if (selected && activePropertyManager) {
+        const mgr = useCadStore.getState().activePropertyManager;
+        if (mgr) {
+          const alreadyExists = mgr.refs.some((r: any) => r.id === selected.id);
+          if (!alreadyExists) {
+            useCadStore.setState({
+              activePropertyManager: {
+                ...mgr,
+                refs: [...mgr.refs, selected]
+              }
+            });
+          }
+        }
+      } else if (!activePropertyManager && !isSketchMode) {
+        // SolidWorks viewport selection & proximity mapping logic
+        if (selected) {
+          const clickPos = new THREE.Vector3(...selected.coordinates);
+          let closestFeat = null;
+          let minDistance = Infinity;
+          
+          for (const feat of features) {
+            const dist = getFeatureDistance(feat, clickPos);
+            if (dist < minDistance) {
+              minDistance = dist;
+              closestFeat = feat;
+            }
+          }
+          
+          if (closestFeat) {
+            console.log('[OcctShape Selection] Proximity matches feature:', closestFeat.name, 'with distance:', minDistance);
+            setSelectedId(closestFeat.id);
+            setSelectedSubNodeType('FEATURE');
+          }
+        }
+      }
+    }
+  };
+
   return (
-    <mesh geometry={geometry} position={position} rotation={rotation}>
+    <mesh 
+      geometry={geometry} 
+      position={position} 
+      rotation={rotation} 
+      userData={{ type: 'B_REP_SHAPE' }}
+      onClick={handleMeshClick}
+    >
       <meshStandardMaterial 
         color={color} 
         roughness={0.3} 
@@ -59,3 +119,4 @@ export default function OcctShape({
     </mesh>
   );
 }
+
