@@ -2211,3 +2211,33 @@ px tsc --noEmit returned Exit Code 0.
 - 確保未來啟動後端時，一律強制使用 OCC 幾何核環境之 Python 直譯器 (`C:\3D_ENV_FINAL\python.exe`)。
 - 檢修 pure-Python fallback 機制，使其在無 OCC 庫時亦能正確將圓形草圖點渲染為 Cylinder Mockup，而非粗暴返回 Box。
 
+
+## [2026-05-21] Topological Naming Service (TNS) for Parametric CAD Rebuilds (v3.5.2-alpha)
+
+### 任務內容
+
+- **解決參數化特徵重建時的下游幾何參考丟失問題（草圖與特徵懸空）**：
+  - **問題現象**：當使用者在實體表面（如 Box 頂面）建立圓形草圖並拉伸切除後，一旦回頭編輯父級實體（Box）的高度，下游的草圖仍保留在原來的靜態座標（z=10.0）而懸空，無法隨表面的移動（z=20.0）進行參數化對齊重建。
+
+### 診斷與原因分析 (RCA)
+
+1. **重建鏈缺乏上下文拓撲資訊**：
+   - 先前的 `build_feature_shape_in_isolation()` 函數僅接受特徵類型 `f_type` 與特徵參數 `params`，沒有獲取在此特徵之前的已生成實體（`final_shape`）。
+   - 在 `plane_type == 'FACE'` 分支中，系統只能死板地讀取儲存在草圖參數中固定的 `faceOrigin` 與 `faceNormal` 座標，導致無法追蹤面在父特徵修改後發生的位置偏移。
+
+### 矯正與預防措施 (CAPA)
+
+1. **實作 Topological Naming Service (TNS) 面匹配器**：
+   - 在 `geometry_service.py` 中新增 `find_matching_face(shape, ref_origin, ref_normal)` 函數。
+   - **法線對齊過濾**：使用 `BRepAdaptor_Surface` 遍歷重建後固體的所有面，篩選出與參考法線對齊（夾角 < 18度）的所有候選面。
+   - **唯一匹配 & 空間打分**：若僅有一個候選面（如 Box 的頂面），則 100% 精確匹配；若有多個候選面（如 parallel faces），則透過與原參考中心點的空間距離進行打分選擇。
+2. **重構重建流程傳遞 Parent Shape**：
+   - 擴充 `build_feature_shape_in_isolation` 函數簽名，使其接受 `parent_shape` 參數。
+   - 當草圖面為 `'FACE'` 時，自動呼叫 `find_matching_face`，解析出重建後的最新表面 center 與 normal，動態取代靜態座標來建立 `gp_Ax2` 本地工作平面，使 2D 輪廓與拉伸方向自動對位。
+   - 在 `process_features` 和 `build_shape_only` 循環中，正確傳入當前的 `final_shape` 到 isolation 函數中。
+3. **單元與前端確效**：
+   - 撰寫單元測試 `test_tns_matching.py`，驗證 Box 高度由 10.0 拉伸至 20.0 時，草圖成功追隨上移，圓柱拉伸順利長在 `z=20` 表面，頂端 Z 座標精確達到 `25.0`。
+   - 執行 `npx tsc --noEmit`，前端 TypeScript 依然 100% 類型安全。
+   - 重啟 Uvicorn 後端進程，使網頁應用程式加載最新的 TNS 服務。
+
+

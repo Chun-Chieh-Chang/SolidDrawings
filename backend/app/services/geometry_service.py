@@ -137,7 +137,7 @@ def find_matching_edge(shape, target_start, target_end):
     return None
 
 
-def build_feature_shape_in_isolation(f_type, params):
+def build_feature_shape_in_isolation(f_type, params, parent_shape=None):
     if not HAS_OCC:
         return None
 
@@ -185,6 +185,14 @@ def build_feature_shape_in_isolation(f_type, params):
         elif plane_type == 'FACE':
             face_origin = params.get('faceOrigin', [0.0, 0.0, 0.0])
             face_normal = params.get('faceNormal', [0.0, 0.0, 1.0])
+            
+            # Resolve face topology naming on rebuilt parent shape
+            if parent_shape is not None and not parent_shape.IsNull():
+                matched_origin, matched_normal, _ = find_matching_face(parent_shape, face_origin, face_normal)
+                face_origin = matched_origin
+                face_normal = matched_normal
+                print(f"[TNS Face Matching] Mapped face reference {params.get('faceOrigin')} -> {face_origin}")
+
             ox = float(face_origin[0])
             oy = float(face_origin[1])
             oz = float(face_origin[2])
@@ -300,6 +308,14 @@ def build_feature_shape_in_isolation(f_type, params):
         elif plane_type == 'FACE':
             face_origin = params.get('faceOrigin', [0.0, 0.0, 0.0])
             face_normal = params.get('faceNormal', [0.0, 0.0, 1.0])
+
+            # Resolve face topology naming on rebuilt parent shape
+            if parent_shape is not None and not parent_shape.IsNull():
+                matched_origin, matched_normal, _ = find_matching_face(parent_shape, face_origin, face_normal)
+                face_origin = matched_origin
+                face_normal = matched_normal
+                print(f"[TNS Face Matching] Mapped face reference {params.get('faceOrigin')} -> {face_origin}")
+
             ox = float(face_origin[0])
             oy = float(face_origin[1])
             oz = float(face_origin[2])
@@ -460,7 +476,7 @@ def process_features(features):
             continue
 
         if f_type in ['SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE']:
-            current_feat_shape = build_feature_shape_in_isolation(f_type, params)
+            current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape)
 
         elif f_type == 'PATTERN':
             target_id = params.get('target_feature_id')
@@ -580,7 +596,7 @@ def build_shape_only(features):
             continue
 
         if f_type in ['SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE']:
-            current_feat_shape = build_feature_shape_in_isolation(f_type, params)
+            current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape)
 
         elif f_type == 'PATTERN':
             target_id = params.get('target_feature_id')
@@ -1063,6 +1079,98 @@ def find_closest_face(shape, point_3d):
     if min_dist < 10.0:
         return best_face
     return None
+
+
+def find_matching_face(shape, ref_origin, ref_normal):
+    """
+    Topological Naming Service (TNS) for faces:
+    Attempts to locate the corresponding face on the rebuilt `shape` that matches
+    the original `ref_origin` and `ref_normal`.
+    """
+    if not shape or shape.IsNull():
+        return ref_origin, ref_normal, None
+        
+    try:
+        r_ori = [float(ref_origin[0]), float(ref_origin[1]), float(ref_origin[2])]
+        r_nrm = [float(ref_normal[0]), float(ref_normal[1]), float(ref_normal[2])]
+    except Exception:
+        return ref_origin, ref_normal, None
+
+    # Normalize reference normal
+    n_len = math.sqrt(r_nrm[0]**2 + r_nrm[1]**2 + r_nrm[2]**2)
+    if n_len > 1e-6:
+        r_nrm = [r_nrm[0]/n_len, r_nrm[1]/n_len, r_nrm[2]/n_len]
+    else:
+        r_nrm = [0.0, 0.0, 1.0]
+
+    candidate_faces = []
+    
+    explorer = TopExp_Explorer(shape, TopAbs_FACE)
+    while explorer.More():
+        face = topods.Face(explorer.Current())
+        
+        # Calculate geometric center of gravity
+        v_exp = TopExp_Explorer(face, TopAbs_VERTEX)
+        v_count = 0
+        sum_x, sum_y, sum_z = 0.0, 0.0, 0.0
+        while v_exp.More():
+            v = topods.Vertex(v_exp.Current())
+            pt = BRep_Tool.Pnt(v)
+            sum_x += pt.X()
+            sum_y += pt.Y()
+            sum_z += pt.Z()
+            v_count += 1
+            v_exp.Next()
+            
+        if v_count == 0:
+            explorer.Next()
+            continue
+            
+        center = [sum_x / v_count, sum_y / v_count, sum_z / v_count]
+        
+        # Resolve normal direction of surface using Adaptor
+        surf_normal = None
+        try:
+            from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+            adaptor = BRepAdaptor_Surface(face)
+            surf_type = adaptor.GetType()
+            if surf_type == 0: # GeomAbs_Plane
+                gp_pln = adaptor.Plane()
+                gp_dir = gp_pln.Position().Direction()
+                surf_normal = [gp_dir.X(), gp_dir.Y(), gp_dir.Z()]
+                from OCC.Core.TopAbs import TopAbs_REVERSED
+                if face.Orientation() == TopAbs_REVERSED:
+                    surf_normal = [-surf_normal[0], -surf_normal[1], -surf_normal[2]]
+        except Exception:
+            pass
+            
+        if not surf_normal:
+            surf_normal = r_nrm  # Fallback
+
+        # Check normal alignment (dot product > 0.95, roughly within 18 degrees)
+        dot = surf_normal[0]*r_nrm[0] + surf_normal[1]*r_nrm[1] + surf_normal[2]*r_nrm[2]
+        if dot > 0.95:
+            proj_dist = center[0]*r_nrm[0] + center[1]*r_nrm[1] + center[2]*r_nrm[2]
+            candidate_faces.append({
+                "face": face,
+                "center": center,
+                "normal": surf_normal,
+                "proj_dist": proj_dist
+            })
+            
+        explorer.Next()
+
+    if not candidate_faces:
+        return ref_origin, ref_normal, None
+
+    # If only one candidate aligns with normal, it is a perfect match (e.g. box faces)
+    if len(candidate_faces) == 1:
+        best = candidate_faces[0]
+        return best["center"], best["normal"], best["face"]
+
+    # If there are multiple candidates, pick the one closest to the reference coordinates
+    best_candidate = min(candidate_faces, key=lambda x: math.dist(x["center"], r_ori))
+    return best_candidate["center"], best_candidate["normal"], best_candidate["face"]
 
 
 def convert_entities(features, topology, plane_type, face_origin=None, face_normal=None):
