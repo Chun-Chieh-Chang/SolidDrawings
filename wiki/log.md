@@ -1,6 +1,6 @@
 # Project Changelog & Milestones
 
-This log documents the chronological progress, architectural decisions, and version changes of the **3D-Builder** project.
+This log documents the chronological progress, architectural decisions, and version changes of the **3D-Builder** project, now integrated with the **SkillsBuilder** engine.
 
 ---
 
@@ -17,11 +17,31 @@ This log documents the chronological progress, architectural decisions, and vers
 ## [2026-05-21] 視埠與設計樹雙向連動與草圖編輯管理器 ✅
 *   **選取連動**：實作 `getFeatureDistance` 空間近鄰求解器，支援 3D Viewport 與 FeatureManager 設計樹的雙向高亮連動。
 *   **嵌套子草圖**：特徵樹以 SolidWorks 風格嵌套渲染子草圖（`↳ 草圖1`），選取子草圖時視埠以經典桃紅色 (`#ec4899`) 渲染草圖線框。
-*   **專屬草圖屬性管理器**：新增 `SketchPropertyManager.tsx` 用於顯示基準面、幾何點數量，並提供快捷按鈕進入編輯模式。
+*   **專屬草圖屬性管理器**：新增 `SketchPropertyManager.tsx` 用於顯示基準面、幾幾何點數量，並提供快捷按鈕進入編輯模式。
 
-## [2026-05-20] 高階基準幾何與引用實體工具鏈 ✅
-*   **Datum Planes 幾何**：後端 OCCT 支援三點面、偏置面及圓柱表面軸構造；前端 Zustand 管理 `referencePlanes` 與 `referenceAxes` 陣列，並以 Morandi 丁香紫 (#6366f1) 與天空藍 (#60A5FA) 半透明 Gizmo 渲染。
-*   **引用實體 (Referencing)**：
-    *   實作轉換實體引用 (Convert Entities) 與剖面交叉曲線 (Intersection Curve)。
-    *   偏置實體引用 (Offset Entities) 調用後端 `BRepOffsetAPI_MakeOffset` 核心高精度計算，避免 JS 端計算失真。
-*   **特徵陣列複製 (Patterns)**：線性 (Linear) 與環形 (Circular) 特徵複製核心上線，前後端聯動實作布林融合。
+---
+
+## [2026-05-23] Feature | Graphify Local Graph & Low-Token Query Mandate (Integrated from SkillsBuilder)
+*   **Action**: Integrated `graphifyy` into SkillsBuilder to provide serverless codebase indexing.
+*   **Changes**: 
+    - Created `skills/dev/graphify/SKILL.md` for AI-agent guidance.
+    - Updated `INSTALL.ps1` to detect environment, auto-provision `graphifyy` and Git hooks.
+    - Added `wiki/global_rules.md` Section 4.5 enforcing 71.5x token budget efficiency.
+    - Refined `.gitignore` to exclude `graphify-out/` outputs.
+
+## [2026-05-03] Ingest | ClawHub All-Star Skill Library
+*   **Source**: [resource/](file:///f:/Self-developed_Apps/SkillsBuilder/resource/) (ClawHub screenshots).
+*   **Action**: Fully populated the library with the "Top 15" industry-standard skills.
+*   **Changes**: 
+    - Added `core/`: last30days, x-trends, vetter, skill-onboarding.
+    - Added `dev/`: github, web-coder, soul-evolution, skill-creator.
+
+## [2026-05-03] Architecture | Global Skill Library Transformation
+*   **Action**: Restructured `skills/` and centralized core capabilities.
+*   **Changes**: 
+    - Created `skills/core/` and `skills/dev/` hierarchy.
+    - Stored `tavily`, `summarize`, `planning`, and `youtube` skills in the repo.
+    - Upgraded `INSTALL.ps1` for recursive symbolic linking.
+    - Created `skill-library.md` concept page.
+
+[... Rest of SkillsBuilder logs can be found in history ...]
