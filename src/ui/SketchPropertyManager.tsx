@@ -41,6 +41,48 @@ export const SketchPropertyManager: React.FC = () => {
     } else if (type === 'EQUAL') {
       if (selectedEdges.length !== 2) return;
       newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+    } else if (type === 'CONCENTRIC') {
+      if (selectedEdges.length !== 2) return;
+      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+    } else if (type === 'TANGENT') {
+      if (selectedEdges.length !== 2) return;
+      const hasLine = selectedEdges.some(e => e.type === 'LINE');
+      const hasCircle = selectedEdges.some(e => e.type === 'CIRCLE');
+      if (!hasLine || !hasCircle) return;
+      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+    } else if (type === 'ANGLE') {
+      if (selectedEdges.length !== 2) return;
+      if (selectedEdges[0].type !== 'LINE' || selectedEdges[1].type !== 'LINE') return;
+      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+      
+      const e1 = selectedEdges[0];
+      const e2 = selectedEdges[1];
+      const p1a = sketchNodes[e1.nodeIds[0]];
+      const p1b = sketchNodes[e1.nodeIds[1]];
+      const p2a = sketchNodes[e2.nodeIds[0]];
+      const p2b = sketchNodes[e2.nodeIds[1]];
+      if (p1a && p1b && p2a && p2b) {
+        const dx1 = p1b.x - p1a.x;
+        const dy1 = p1b.y - p1a.y;
+        const dx2 = p2b.x - p2a.x;
+        const dy2 = p2b.y - p2a.y;
+        const len1 = Math.hypot(dx1, dy1);
+        const len2 = Math.hypot(dx2, dy2);
+        if (len1 > 1e-4 && len2 > 1e-4) {
+          const angle1 = Math.atan2(dy1, dx1);
+          const angle2 = Math.atan2(dy2, dx2);
+          let currentAngleDeg = Math.abs((angle2 - angle1) * 180.0 / Math.PI);
+          if (currentAngleDeg > 180.0) currentAngleDeg = 360.0 - currentAngleDeg;
+          
+          const valStr = prompt(`請輸入夾角角度 (當前夾角為 ${currentAngleDeg.toFixed(1)}°):`, currentAngleDeg.toFixed(1));
+          if (valStr !== null) {
+            const val = parseFloat(valStr);
+            newConstraint.value = isNaN(val) ? currentAngleDeg : val;
+          } else {
+            return;
+          }
+        }
+      }
     }
 
     const nextConstraints = { ...sketchConstraints, [cid]: newConstraint };
@@ -134,6 +176,30 @@ export const SketchPropertyManager: React.FC = () => {
             className="col-span-2 flex items-center justify-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
           >
             <span>📏</span> 設定距離 (固定長度)
+          </button>
+
+          <button
+            onClick={() => applyConstraint('CONCENTRIC')}
+            disabled={!(selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'CIRCLE'))}
+            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
+          >
+            <span>◎</span> 同心
+          </button>
+
+          <button
+            onClick={() => applyConstraint('TANGENT')}
+            disabled={!(selectedEdges.length === 2 && selectedEdges.some(e => e.type === 'LINE') && selectedEdges.some(e => e.type === 'CIRCLE'))}
+            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
+          >
+            <span>🎯</span> 相切
+          </button>
+
+          <button
+            onClick={() => applyConstraint('ANGLE')}
+            disabled={!(selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'LINE'))}
+            className="col-span-2 flex items-center justify-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
+          >
+            <span>📐</span> 設定角度 (夾角)
           </button>
         </div>
       </div>

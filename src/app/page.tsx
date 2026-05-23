@@ -12,6 +12,8 @@ import { onFileOpen, onSaveRequest, onNewFile, appAPI, fileAPI } from '../../ele
 import { MatePanel } from '@/ui/MatePanel';
 import { DrawingSheet } from '@/ui/DrawingSheet';
 import { SketchPropertyManager } from '@/ui/SketchPropertyManager';
+import { v4 as uuidv4 } from 'uuid';
+import { extractClosedLoop, extractAllClosedLoops } from '@/utils/geometry/GraphAdapter';
 
 const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' => (
   plane === 'FRONT' || plane === 'TOP' || plane === 'RIGHT' || plane === 'FACE'
@@ -102,7 +104,8 @@ export default function Home() {
     activeFaceOrigin, setActiveFaceOrigin,
     activeFaceNormal, setActiveFaceNormal,
     activeFaceId, setActiveFaceId,
-    triggerCameraNormal
+    triggerCameraNormal,
+    sketchNodes, sketchEdges
   } = useCadStore();
 
   // Legacy stubs to prevent TS errors in dead code
@@ -841,7 +844,7 @@ export default function Home() {
 
   const handleEditFeatureSketch = useCallback((feature: CADFeature) => {
     const rawPoints = feature.parameters?.points;
-    if ((feature.type !== 'EXTRUDE' && feature.type !== 'REVOLVE') || !Array.isArray(rawPoints) || rawPoints.length < 3) {
+    if ((feature.type !== 'EXTRUDE' && feature.type !== 'REVOLVE') || !Array.isArray(rawPoints) || rawPoints.length === 0) {
       setSelectedId(feature.id);
       setSelectedSubNodeType('FEATURE');
       return;
@@ -853,8 +856,49 @@ export default function Home() {
     setSelectedId(feature.id);
     setSelectedSubNodeType(null);
     setEditingFeatureId(feature.id);
-    setSketchPoints(cloneSketchPoints(rawPoints));
+    
+    // Set legacy stubs for compatibility (wrap first loop if nested)
+    const isNested = Array.isArray(rawPoints[0]) && Array.isArray(rawPoints[0][0]);
+    const firstLoopPoints = isNested ? rawPoints[0] : rawPoints;
+    setSketchPoints(cloneSketchPoints(firstLoopPoints));
     setSketchRelations(relations);
+    
+    // Reconstruct topological graph nodes & edges supporting both single-loop and nested multi-loops
+    const nextNodes: Record<string, any> = {};
+    const nextEdges: Record<string, any> = {};
+    const loopsToLoad: any[][] = isNested ? rawPoints : [rawPoints];
+
+    loopsToLoad.forEach((loopPoints: any[]) => {
+      if (loopPoints.length < 3) return;
+      const pointsToLoad = [...loopPoints];
+      const first = pointsToLoad[0];
+      const last = pointsToLoad[pointsToLoad.length - 1];
+      if (Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-4) {
+        pointsToLoad.pop();
+      }
+
+      const nodeIds: string[] = [];
+      pointsToLoad.forEach((pt: any) => {
+        const id = uuidv4();
+        const isOrigin = Math.abs(pt[0]) < 1e-5 && Math.abs(pt[1]) < 1e-5;
+        nextNodes[id] = { id, x: pt[0], y: pt[1], isFixed: isOrigin };
+        nodeIds.push(id);
+      });
+
+      for (let i = 0; i < nodeIds.length; i++) {
+        const n1 = nodeIds[i];
+        const n2 = nodeIds[(i + 1) % nodeIds.length];
+        const eId = uuidv4();
+        nextEdges[eId] = { id: eId, type: 'LINE', nodeIds: [n1, n2] };
+      }
+    });
+
+    useCadStore.setState({
+      sketchNodes: nextNodes,
+      sketchEdges: nextEdges,
+      sketchConstraints: {}
+    });
+
     setActivePlane(plane);
     if (plane === 'FACE') {
       setActiveFaceOrigin(feature.parameters?.faceOrigin ?? null);
@@ -872,14 +916,14 @@ export default function Home() {
   }, [setSelectedId, setSelectedSubNodeType, setEditingFeatureId, setSketchPoints, setSketchRelations, setActivePlane, setSketchTool, setSketchMode, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
 
   const handleExitAndExtrude = useCallback((operationOverride?: 'ADD' | 'CUT') => {
-    const solidPoints = cloneSketchPoints(sketchPoints.filter(pt => !pt[2] || !pt[2].includes('CENTER_LINE')));
-    if (solidPoints.length < 3 || !activePlane) return;
+    const solidLoops = extractAllClosedLoops(sketchNodes, sketchEdges);
+    if (solidLoops.length === 0 || solidLoops[0].length < 3 || !activePlane) return;
 
     const existingFeature = editingFeatureId ? features.find(f => f.id === editingFeatureId) : null;
     const existingParams = existingFeature?.parameters ?? {};
     const nextParams = {
       ...existingParams,
-      points: solidPoints,
+      points: solidLoops,
       depth: existingParams.depth ?? 10,
       x: existingParams.x ?? 0,
       y: existingParams.y ?? 0,
@@ -911,7 +955,7 @@ export default function Home() {
     setSelectedId(featureId);
 
     setTimeout(handleRebuild, 50);
-  }, [sketchPoints, activePlane, editingFeatureId, features, sketchRelations, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId]);
+  }, [sketchNodes, sketchEdges, activePlane, editingFeatureId, features, sketchRelations, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId]);
 
   const applyHorizontalConstraint = useCallback(() => {
     if (sketchPoints.length < 2) return;

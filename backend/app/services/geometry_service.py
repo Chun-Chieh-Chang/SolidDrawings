@@ -137,6 +137,38 @@ def find_matching_edge(shape, target_start, target_end):
     return None
 
 
+def _build_wire_from_points(points):
+    make_wire = BRepBuilderAPI_MakeWire()
+    
+    def get_gp_pnt(p):
+        u_val = float(p[0])
+        v_val = float(p[1])
+        return gp_Pnt(u_val, v_val, 0.0)
+
+    i = 0
+    n_points = len(points)
+    while i < n_points:
+        p_start = points[i]
+        p_next = points[(i + 1) % n_points]
+
+        if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
+            p_control = p_next
+            p_end = points[(i + 2) % n_points]
+
+            arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
+            if arc.IsDone():
+                edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+                make_wire.Add(edge)
+            else:
+                edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
+                make_wire.Add(edge)
+            i += 2
+        else:
+            edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
+            make_wire.Add(edge)
+            i += 1
+    return make_wire.Wire()
+
 def build_feature_shape_in_isolation(f_type, params, parent_shape=None):
     if not HAS_OCC:
         return None
@@ -148,28 +180,38 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None):
         depth = float(params.get('depth', 10.0))
         points_2d = params.get('points', [])
 
-        filtered_points = []
-        for pt in points_2d:
-            if not pt:
-                continue
-            if not filtered_points:
-                filtered_points.append(pt)
-            else:
-                prev = filtered_points[-1]
-                dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
-                if dist > 1e-4:
+        # Check if nested list of loops (multi-loop)
+        is_nested = False
+        if points_2d and isinstance(points_2d[0], list) and len(points_2d[0]) > 0 and isinstance(points_2d[0][0], list):
+            is_nested = True
+
+        loops = points_2d if is_nested else [points_2d]
+        cleaned_loops = []
+
+        for loop in loops:
+            filtered_points = []
+            for pt in loop:
+                if not pt:
+                    continue
+                if not filtered_points:
                     filtered_points.append(pt)
+                else:
+                    prev = filtered_points[-1]
+                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
+                    if dist > 1e-4:
+                        filtered_points.append(pt)
 
-        if len(filtered_points) > 1:
-            first = filtered_points[0]
-            last = filtered_points[-1]
-            dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
-            if dist < 1e-4:
-                filtered_points.pop()
+            if len(filtered_points) > 1:
+                first = filtered_points[0]
+                last = filtered_points[-1]
+                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
+                if dist < 1e-4:
+                    filtered_points.pop()
 
-        points_2d = filtered_points
+            if len(filtered_points) >= 3:
+                cleaned_loops.append(filtered_points)
 
-        if not points_2d or len(points_2d) < 3:
+        if not cleaned_loops:
             return None
 
         x_origin = float(params.get('x', 0.0))
@@ -222,39 +264,16 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None):
         vec = gp_Vec(normal_dir.X() * depth, normal_dir.Y() * depth, normal_dir.Z() * depth)
 
         try:
-            make_wire = BRepBuilderAPI_MakeWire()
+            wires = []
+            for loop in cleaned_loops:
+                wire = _build_wire_from_points(loop)
+                wires.append(wire)
 
-            # Wire is built standard on the local XY plane
-            def get_gp_pnt(p):
-                u_val = float(p[0])
-                v_val = float(p[1])
-                return gp_Pnt(u_val, v_val, 0.0)
-
-            i = 0
-            n_points = len(points_2d)
-            while i < n_points:
-                p_start = points_2d[i]
-                p_next = points_2d[(i + 1) % n_points]
-
-                if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                    p_control = p_next
-                    p_end = points_2d[(i + 2) % n_points]
-
-                    arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
-                    if arc.IsDone():
-                        edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                        make_wire.Add(edge)
-                    else:
-                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
-                        make_wire.Add(edge)
-                    i += 2
-                else:
-                    edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
-                    make_wire.Add(edge)
-                    i += 1
-
-            wire = make_wire.Wire()
-            face = BRepBuilderAPI_MakeFace(wire).Face()
+            # Build face with holes (outermost is wires[0], rest are cutouts)
+            make_face = BRepBuilderAPI_MakeFace(wires[0])
+            for inner_wire in wires[1:]:
+                make_face.Add(inner_wire)
+            face = make_face.Face()
 
             # Move face to local plane
             trsf = gp_Trsf()
@@ -271,28 +290,37 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None):
         angle = float(params.get('angle', 360.0)) * math.pi / 180.0
         points_2d = params.get('points', [])
 
-        filtered_points = []
-        for pt in points_2d:
-            if not pt:
-                continue
-            if not filtered_points:
-                filtered_points.append(pt)
-            else:
-                prev = filtered_points[-1]
-                dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
-                if dist > 1e-4:
+        is_nested = False
+        if points_2d and isinstance(points_2d[0], list) and len(points_2d[0]) > 0 and isinstance(points_2d[0][0], list):
+            is_nested = True
+
+        loops = points_2d if is_nested else [points_2d]
+        cleaned_loops = []
+
+        for loop in loops:
+            filtered_points = []
+            for pt in loop:
+                if not pt:
+                    continue
+                if not filtered_points:
                     filtered_points.append(pt)
+                else:
+                    prev = filtered_points[-1]
+                    dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
+                    if dist > 1e-4:
+                        filtered_points.append(pt)
 
-        if len(filtered_points) > 1:
-            first = filtered_points[0]
-            last = filtered_points[-1]
-            dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
-            if dist < 1e-4:
-                filtered_points.pop()
+            if len(filtered_points) > 1:
+                first = filtered_points[0]
+                last = filtered_points[-1]
+                dist = math.hypot(float(first[0]) - float(last[0]), float(first[1]) - float(last[1]))
+                if dist < 1e-4:
+                    filtered_points.pop()
 
-        points_2d = filtered_points
+            if len(filtered_points) >= 3:
+                cleaned_loops.append(filtered_points)
 
-        if not points_2d or len(points_2d) < 3:
+        if not cleaned_loops:
             return None
 
         x_origin = float(params.get('x', 0.0))
@@ -341,39 +369,16 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None):
             ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
 
         try:
-            make_wire = BRepBuilderAPI_MakeWire()
+            wires = []
+            for loop in cleaned_loops:
+                wire = _build_wire_from_points(loop)
+                wires.append(wire)
 
-            # Wire is built standard on local XY plane
-            def get_gp_pnt(p):
-                u_val = float(p[0])
-                v_val = float(p[1])
-                return gp_Pnt(u_val, v_val, 0.0)
-
-            i = 0
-            n_points = len(points_2d)
-            while i < n_points:
-                p_start = points_2d[i]
-                p_next = points_2d[(i + 1) % n_points]
-
-                if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
-                    p_control = p_next
-                    p_end = points_2d[(i + 2) % n_points]
-
-                    arc = GC_MakeArcOfCircle(get_gp_pnt(p_start), get_gp_pnt(p_control), get_gp_pnt(p_end))
-                    if arc.IsDone():
-                        edge = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
-                        make_wire.Add(edge)
-                    else:
-                        edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
-                        make_wire.Add(edge)
-                    i += 2
-                else:
-                    edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
-                    make_wire.Add(edge)
-                    i += 1
-
-            wire = make_wire.Wire()
-            face = BRepBuilderAPI_MakeFace(wire).Face()
+            # Build face with holes
+            make_face = BRepBuilderAPI_MakeFace(wires[0])
+            for inner_wire in wires[1:]:
+                make_face.Add(inner_wire)
+            face = make_face.Face()
 
             # Revolve around local Y-axis in local space
             local_axis = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0))

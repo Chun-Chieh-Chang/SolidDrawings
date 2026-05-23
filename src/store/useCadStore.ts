@@ -66,7 +66,7 @@ export interface SketchEdge {
   isConstruction?: boolean;
 }
 
-export type ConstraintType = 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL';
+export type ConstraintType = 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE';
 
 export interface SketchConstraint {
   id: string;

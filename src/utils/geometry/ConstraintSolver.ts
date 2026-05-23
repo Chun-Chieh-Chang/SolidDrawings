@@ -176,5 +176,146 @@ function applyConstraint(
 
       break;
     }
+
+    case 'CONCENTRIC': {
+      if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
+      const c1 = edges[constraint.edgeIds[0]];
+      const c2 = edges[constraint.edgeIds[1]];
+      if (!c1 || !c2 || c1.nodeIds.length === 0 || c2.nodeIds.length === 0) return;
+      const n1 = nodes[c1.nodeIds[0]];
+      const n2 = nodes[c2.nodeIds[0]];
+      if (!n1 || !n2) return;
+
+      const dx = n2.x - n1.x;
+      const dy = n2.y - n1.y;
+
+      const w1 = n1.isFixed ? 0 : (n2.isFixed ? 1 : 0.5);
+      const w2 = n2.isFixed ? 0 : (n1.isFixed ? 1 : 0.5);
+
+      if (w1 > 0) {
+        n1.x += dx * w1;
+        n1.y += dy * w1;
+      }
+      if (w2 > 0) {
+        n2.x -= dx * w2;
+        n2.y -= dy * w2;
+      }
+      break;
+    }
+
+    case 'TANGENT': {
+      if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
+      const e1 = edges[constraint.edgeIds[0]];
+      const e2 = edges[constraint.edgeIds[1]];
+      if (!e1 || !e2) return;
+      const lineEdge = e1.type === 'LINE' ? e1 : (e2.type === 'LINE' ? e2 : null);
+      const circleEdge = e1.type === 'CIRCLE' ? e1 : (e2.type === 'CIRCLE' ? e2 : null);
+      if (!lineEdge || !circleEdge || lineEdge.nodeIds.length < 2 || circleEdge.nodeIds.length < 2) return;
+      
+      const p1 = nodes[lineEdge.nodeIds[0]];
+      const p2 = nodes[lineEdge.nodeIds[1]];
+      const pc = nodes[circleEdge.nodeIds[0]]; 
+      const pr = nodes[circleEdge.nodeIds[1]]; 
+      if (!p1 || !p2 || !pc || !pr) return;
+
+      const R = Math.hypot(pr.x - pc.x, pr.y - pc.y);
+      if (R < 1e-4) return;
+
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 1e-6) return;
+
+      const t = ((pc.x - p1.x) * dx + (pc.y - p1.y) * dy) / lenSq;
+      const projX = p1.x + t * dx;
+      const projY = p1.y + t * dy;
+
+      const dist = Math.hypot(projX - pc.x, projY - pc.y);
+      if (dist < 1e-6) return;
+
+      const err = dist - R;
+      const nx = (projX - pc.x) / dist;
+      const ny = (projY - pc.y) / dist;
+
+      const w_c = pc.isFixed ? 0 : 0.5;
+      const w_line = 1 - w_c;
+
+      if (w_c > 0) {
+        pc.x += nx * err * w_c;
+        pc.y += ny * err * w_c;
+      }
+
+      if (w_line > 0) {
+        const p1_w = p1.isFixed ? 0 : (p2.isFixed ? 1 : 0.5);
+        const p2_w = p2.isFixed ? 0 : (p1.isFixed ? 1 : 0.5);
+        
+        const corrX = -nx * err * w_line;
+        const corrY = -ny * err * w_line;
+
+        if (p1_w > 0) {
+          p1.x += corrX * (1 - t) * p1_w;
+          p1.y += corrY * (1 - t) * p1_w;
+        }
+        if (p2_w > 0) {
+          p2.x += corrX * t * p2_w;
+          p2.y += corrY * t * p2_w;
+        }
+      }
+      break;
+    }
+
+    case 'ANGLE': {
+      if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
+      const e1 = edges[constraint.edgeIds[0]];
+      const e2 = edges[constraint.edgeIds[1]];
+      if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return;
+
+      const p1a = nodes[e1.nodeIds[0]];
+      const p1b = nodes[e1.nodeIds[1]];
+      const p2a = nodes[e2.nodeIds[0]];
+      const p2b = nodes[e2.nodeIds[1]];
+      if (!p1a || !p1b || !p2a || !p2b) return;
+
+      const dx1 = p1b.x - p1a.x;
+      const dy1 = p1b.y - p1a.y;
+      const dx2 = p2b.x - p2a.x;
+      const dy2 = p2b.y - p2a.y;
+
+      const len1 = Math.hypot(dx1, dy1);
+      const len2 = Math.hypot(dx2, dy2);
+      if (len1 < 1e-4 || len2 < 1e-4) return;
+
+      const angle1 = Math.atan2(dy1, dx1);
+      const angle2 = Math.atan2(dy2, dx2);
+      const currentAngle = angle2 - angle1;
+      
+      const targetAngleRad = (constraint.value ?? 45.0) * Math.PI / 180.0;
+      let err = targetAngleRad - currentAngle;
+      
+      err = Math.atan2(Math.sin(err), Math.cos(err));
+      if (Math.abs(err) < 1e-6) return;
+
+      const rotatePoint = (pt: any, cx: number, cy: number, dTheta: number) => {
+        if (pt.isFixed) return;
+        const cos = Math.cos(dTheta);
+        const sin = Math.sin(dTheta);
+        const rx = pt.x - cx;
+        const ry = pt.y - cy;
+        pt.x = cx + rx * cos - ry * sin;
+        pt.y = cy + rx * sin + ry * cos;
+      };
+
+      const m1x = (p1a.x + p1b.x) / 2;
+      const m1y = (p1a.y + p1b.y) / 2;
+      const m2x = (p2a.x + p2b.x) / 2;
+      const m2y = (p2a.y + p2b.y) / 2;
+
+      rotatePoint(p1a, m1x, m1y, -err / 2);
+      rotatePoint(p1b, m1x, m1y, -err / 2);
+
+      rotatePoint(p2a, m2x, m2y, err / 2);
+      rotatePoint(p2b, m2x, m2y, err / 2);
+      break;
+    }
   }
 }
