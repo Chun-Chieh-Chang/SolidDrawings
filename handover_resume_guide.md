@@ -1,119 +1,42 @@
-﻿# 3D-Builder Handoff & Resume Guide
+# 3D Builder - Handover & Resume Guide
 
-## Current State of Development (2026-05-19)
-The project is currently implementing an industrial-grade **SolidWorks-like 3D Web CAD application**. The technology stack includes **Next.js, TailwindCSS, React Three Fiber (R3F), Zustand, and a FastAPI + PythonOCC backend**.
+## 1. 專案當前狀態 (Current Project State)
+**[2026-05-23] PBD Constraint Solver 與 Graph-based Model 重構完成**
 
-### Recent Major Achievements (v3.5.0-alpha)
+本專案剛完成核心架構的重大轉換，已拋棄舊版基於單一陣列的 `sketchPoints` 繪圖邏輯，全面升級為 **Graph-based (圖論)** 的草圖核心，並具備 PBD (Position-Based Dynamics) 約束求解器。
 
+### 核心模組與架構分配
+- **狀態管理 (`src/store/useCadStore.ts`)**:
+  - `sketchNodes`: `Record<string, SketchNode>` (頂點，包含 `isFixed` 狀態)
+  - `sketchEdges`: `Record<string, SketchEdge>` (邊線，由兩個節點 ID 構成)
+  - `sketchConstraints`: `Record<string, SketchConstraint>` (圖形約束條件)
+  - `selectedEntityIds`: `string[]` (用戶當前點選的物件，包含節點與邊線 ID)
+- **視覺渲染與 Hit-Testing (`src/renderer/SketchPreview.tsx`)**:
+  - 負責讀取 `sketchNodes` 與 `sketchEdges` 並繪製於 SVG/Canvas 上。
+  - 已實作點擊 (Hit-Testing) 偵測：節點直接透過距離判定；邊線則有隱形的加粗 Hitbox (`strokeWidth={15}`) 方便用戶點選。點選結果會寫入 `selectedEntityIds`。
+- **動態約束與 UI 面板 (`src/ui/SketchPropertyManager.tsx`)**:
+  - 這是最新的左側參數面板，採用「Sea Salt Blue」毛玻璃 (Glassmorphism) 設計。
+  - 會根據 `selectedEntityIds` 顯示當前選取的物件屬性，並提供相應的約束按鈕 (水平、垂直、共點、等長等)。
+  - 操作約束按鈕會直接連動 `src/utils/geometry/ConstraintSolver.ts`，由 PBD 演算法重新計算所有受影響的節點座標後，寫回 Zustand，形成**零延遲的畫面閉環**。
 
+## 2. 開發地雷與紀律 (Technical Debt & Rules)
+- **`page.tsx` 的 Legacy Stubs**:
+  - 由於之前 `page.tsx` 存在上千行的舊版繪圖控制邏輯 (與 `sketchPoints` 強耦合)，我們為了遵循「零錯誤 (0 Type Errors)」與「最小破壞原則」，採用了 Legacy Stubs。
+  - 在 `page.tsx` 中，我們移除了對 `useCadStore` 中 `sketchPoints` 的解構，改為注入 `const sketchPoints: any[] = []; const setSketchPoints = (pts: any) => {};`。這讓舊版的 `useEffect` 不會報錯，但同時不具備任何副作用。後續若需清理 `page.tsx`，請直接安全刪除那些不會被觸發的 `useEffect`。
+- **嚴格型別檢查**:
+  - 任何改動推送到遠端前，**必須**能通過 `npx tsc --noEmit`。嚴禁出現 "Any" 或 "Property does not exist" 等錯誤。
 
-1. **O-Snap Smart Sketch Snapping (?箸皜豢???撘?)**: 
-   - Implemented a dynamic `onPointerMove` cursor with `SNAP_RADIUS`.
-   - Advanced Object Snapping prioritization: Origin > Sketch EndPoints > 3D Feature Vertices > Grid.
-   - Built a high-performance `useMemo` orthographic projection engine that maps all existing 3D vertices from `meshData` onto the active 2D sketching plane, matching SolidWorks' reference geometry snapping perfectly.
-2. **History Rollback Bar & X-Ray Sketching (????? X-Ray 蝛輸?**:
-   - When editing a historical sketch, the system dynamically slices the `features` array before sending it to the backend (`HeavyEngineClient.getInstance().rebuild`), causing all future solids to instantly disappear (SolidWorks Rollback).
-   - Applied `depthTest={false}` to all sketch `<Line>` and marker components in `SketchPreview.tsx`, ensuring new sketch geometry perfectly overrides any existing obstructing 3D solids (X-Ray effect).
-3. **Double-Click "Flip Normal To" (?蝧餉?甇????**:
-   - "Normal To" camera transition was perfected by locking OrbitControls purely declaratively (`isCameraAnimating`).
-   - Implemented `cameraNormalFlip` in `useCadStore`. Clicking "Normal To" on the same plane twice elegantly flips the camera 180 degrees (Front/Back) while adjusting the Up-Vector to preserve the Right-Hand Rule and prevent upside-down sketching.
-4. **Phase 3.1: Topology Selection System - COMPLETE**:
-   - Created `TopologySelector.ts` with Raycaster wrapper for face/edge/vertex selection.
-   - Extended `useCadStore.ts` with `selectedTopology` state.
-   - Updated `Viewport.tsx` with click handlers and selection highlighting.
-   - Created `topology-mapping.ts` with OCCT mapping utilities.
-5. **Phase 3.2: Measurement Tools - COMPLETE**:
-   - Created `MeasurementService.ts` with distance, angle, area, and volume calculation methods.
-   - Extended `useCadStore.ts` with `measurementMode`, `measurementPoints`, and `measurementResults` state.
-   - Implemented measurement click handlers in `page.tsx` that respond to `selectedTopology` changes.
-   - Measurement modes: DISTANCE (2 vertices), ANGLE (2 edges), AREA (1 face), VOLUME (1 solid).
-   - Visual feedback: 3D dashed lines, floating HTML labels showing measurement values.
-   - Created `SketchHUD.tsx` component for Heads-Up Display in sketch mode.
-6. **Electron Desktop Application - COMPLETE**:
-   - Created Electron main process (`electron/main.ts`) with window management
-   - Created preload script (`electron/preload.ts`) for secure IPC communication
-   - Created renderer integration (`electron/renderer.ts`) for file system API
-   - Implemented file operations: open, save, read with native dialog
-   - Configured Electron build settings for Windows/macOS/Linux
-   - Created startup script (`START-ELECTRON.ps1`) for easy deployment
-7. **Phase 3.3: Mass Properties - COMPLETE**:
-   - Extended `MeasurementService.ts` with `calculateCenterOfGravity()` method
-   - Implemented `calculateInertiaTensor()` with parallel axis theorem
-   - Added `formatInertiaTensor()` for display formatting
-   - Supports density configuration for accurate mass property calculations
-   - TypeScript compilation passes with Exit Code 0
-8. **Phase 3.4: UI Component Integration - COMPLETE**:
-   - Integrated `MeasurementPanel.tsx` into the sidebar. It now displays real-time measurement results (Distance, Angle, Area, Volume) and Mass Properties.
-   - Integrated `SketchHUD.tsx` into the main viewport, providing heads-up status and quick actions (Reset/Exit) during sketch sessions.
-9. **Phase 2: Assembly Mates - COMPLETE**:
-   - Implemented `CADComponent` and `CADMate` data structures in the store.
-   - Created `AssemblyService.ts` for geometric constraint solving.
-   - Built `MatePanel.tsx` for managing assembly constraints (Coincident, Parallel, Concentric, Distance, etc.).
-   - Updated the renderer to support multi-component transform visualization.
-10. **Electron Desktop Application Enhancements - COMPLETE**:
-    - **Native File Associations**: Registered `.step`, `.iges`, `.stl`, and `.sldprt` with the OS. The app now handles opening these files via double-click.
-    - **Global Shortcuts**: Implemented `Ctrl+S` (Save), `Ctrl+O` (Open), and `Ctrl+N` (New) across the application.
-    - **System Notifications**: Integrated native OS notifications for feedback on file operations.
-    - **App Icon**: Created a professional `icon.svg` and configured the build pipeline to support native formats.
-    - **IPC Architecture**: Refactored the bridge to support bidirectional event-driven communication (Main to Renderer).
+## 3. 下一步開發建議 (Next Action Items)
+接手本專案的工程師或 AI 代理，請依據使用者的需求，優先考慮以下兩個擴展方向：
 
-### Known Issues & Next Steps
-- **Advanced Constraints Solver**: While sketch relations like "Horizontal" and "Equal" exist, they lack a true geometric degree-of-freedom (DOF) solver. The next milestone should be integrating an advanced 2D geometric constraint solver.
-- **Measurement UI Panel**: The measurement results are calculated but not yet displayed in a dedicated EVALUATE tab UI. Need to create `MeasurementPanel.tsx` component to show measurement results in the PropertyManager.
-- **Mass Properties**: **COMPLETE** - Implemented center of gravity and inertia tensor calculations in `MeasurementService.ts`.
-- **Sketch HUD Integration**: `SketchHUD.tsx` component created but needs to be integrated into the main viewport in `page.tsx`.
-- **Electron Desktop App**: Basic Electron configuration implemented. Next steps:
-  - Create application icon (SVG ??ICO/ICNS/PNG)
-  - Implement file association (.step, .stl, .iges)
-  - Add auto-update support
-  - Implement keyboard shortcuts (Ctrl+S, Ctrl+O, Ctrl+N)
-  - Add system notifications
+1. **後端 OCCT 幾何引擎對接 (3D Generation)**
+   - 目前我們在前端已經可以產生完美的 2D Graph (Nodes/Edges)。
+   - **目標**: 需要將 `sketchNodes` 與 `sketchEdges` 解析成封閉迴圈 (Closed Loops)，透過 `window.electron.appAPI.generate3D(...)` IPC 傳送給 Python OCCT 後端。
+   - **挑戰**: 需實作「尋找最小循環 (Minimum Cycle Basis)」的圖論演算法，以正確識別草圖內的封閉面，進而進行擠出 (Extrude)。
 
-## How to Resume
-1. **Server Boot**: Always start the backend first via `uvicorn app.main:app --host 0.0.0.0 --port 8400` in the `backend` folder.
-2. **Frontend Boot**: Run `npm run dev` in the root folder.
-3. **Electron Desktop**: Run `.\START-ELECTRON.ps1` to build and launch the desktop application.
-4. **Code Quality**: Always run `npx tsc --noEmit` after modifying React components to ensure strict type safety.
-5. **Agent Instructions**: Read `DEV_LOG.md` to understand the root causes of past issues (e.g. Gimbal Lock avoidance, React Reconciliation conflicts). Never guess; always apply standard CAPA diagnostics.
-
-## Electron Desktop Application
-
-### Quick Start
-```powershell
-# Run the startup script
-.\START-ELECTRON.ps1
-```
-
-### Manual Start
-```bash
-# Install dependencies
-cd electron
-npm install
-
-# Build application
-cd ..
-npm run electron:build
-
-# Start Electron
-npm run electron:start
-```
-
-### Build Distribution
-```bash
-# Build for current platform
-npm run electron:dist
-
-# Build for specific platform
-npx electron-builder --win
-npx electron-builder --mac
-npx electron-builder --linux
-```
-
-### Features
-- **Native File System Access**: Open, save, and read files with native dialogs
-- **Cross-Platform**: Windows (NSIS), macOS (DMG), Linux (AppImage)
-- **Secure**: Context isolation and sandboxed renderer process
-- **Type-Safe**: Full TypeScript support for main and preload scripts
-
-
-
+2. **擴充 PBD 約束求解器 (Solver Expansion)**
+   - `src/utils/geometry/ConstraintSolver.ts` 目前支援 `COINCIDENT`, `HORIZONTAL`, `VERTICAL`, `EQUAL_LENGTH`。
+   - **目標**: 實作更多約束類型，如：
+     - 固定角度 (Angle)
+     - 固定距離 (Distance)
+     - 圓形/相切 (Tangent, Concentric - 需先擴充 `SketchEdge` 支援弧線型別 ARC)
