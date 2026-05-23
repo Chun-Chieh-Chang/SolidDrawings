@@ -1,74 +1,53 @@
-# SkillsBuilder: 全球最大的 AI-Agentic Skill 開源圖書館 (ClawHub All-Star Library)
+# 3D Builder (Powered by SkillsBuilder)
 
-SkillsBuilder 是一個專為「自動化智慧開發」而設計的元平台。它不僅是打造 AI Agent 技能 (Skills) 的工廠，更是 Antigravity IDE 的**全域智慧來源 (Source of Truth)**，並已全面轉型為 **ClawHub 全明星技能儲備庫**。
+3D Builder 是一個基於 Web 的新世代參數化 3D CAD 建模工具，旨在提供工業級的草圖約束引擎與三維幾何構建能力，並透過 Electron 封裝成本地端應用程式。
 
-本專案融合了 Google 的設計模式、Karpathy 的 Wiki 模式與 Hermes 的代理能力，旨在實現代碼的「外科手術式精準」與知識的「複利式成長」。
-
----
-
-## 🎯 本專案能做什麼？(核心能力)
-
-### 1. 為 AI 裝備「工業級技能」 (Skill Library)
-專案內建了從 ClawHub 與開源社群嚴選的**頂尖 AI 技能庫**（位於 `skills/` 目錄），涵蓋兩大類：
-- **Core (生產力)**：例如 `tavily` (深度研究)、`last30days` (趨勢總結)、`skill-onboarding` (技能喚醒)、`vetter` (安全審查)。
-- **Dev (開發專用)**：例如 `gitnexus` (代碼圖譜)、`github-manager` (自動化管理)、`web-coder` (前端開發)、`skill-architect` (技能建築)。
-當這些技能被掛載後，AI 就能直接調用這些外部工具來幫您完成複雜任務。
-
-### 2. 「會學習」的專案大腦 (Karpathy LLM Wiki 模式)
-- **記憶複利**：傳統 AI 的記憶會在對話結束後消失，但 SkillsBuilder 實作了「持久化知識庫 (`wiki/`)」。您與 AI 共同制定過的架構決策、UI 規範（如莫蘭迪色系、SOP流程），都會被寫入 `wiki/` 當中。下次開新對話或新專案時，AI 只要讀取這裡的資料，就能立刻繼承過去的「開發智慧」，不需重新教導。
-
-### 3. 生產新技能 (Skill Architect)
-- 內建 `skill-architect` 技能，您可以直接命令 AI：「幫我寫一個能夠自動化備份資料庫的 Skill」。系統會運用標準化流程（探索-執行-驗證-歸檔）為您自動生成、測試並封裝成一個新技能。
+本專案底層採用了 **Graph-driven Development (圖論驅動)** 架構，並具備即時響應的 **Position-Based Dynamics (PBD)** 約束求解器。開發過程全程受到 [SkillsBuilder](https://github.com/Chun-Chieh-Chang) 智慧開發系統的護航，遵循嚴格的 PDCA 循環與防迴歸確效紀律。
 
 ---
 
-## 🚀 如何使用本專案？(操作指南)
+## 🎯 核心功能 (Core Features)
 
-### 步驟一：一鍵安裝與環境綁定 (只需做一次)
-當您在任何電腦上下載本專案後：
-1. **執行安裝腳本**：對 `INSTALL.ps1` 點擊右鍵，選擇**「以系統管理員身分執行」**。
-2. **它的作用**：這個腳本會建立 **Symbolic Link (符號連結)**，把本專案 `skills/` 資料夾裡的技能，直接「映射」到 Antigravity IDE 系統隱藏的技能池裡 (`~/.gemini/antigravity/skills`)。這樣您在專案裡更新技能，系統級的 AI 都會同步生效。
+### 1. Graph-based 2D 草圖引擎 (Sketcher)
+- 拋棄傳統的依賴陣列，改用原生的圖論結構 (`SketchNode` 與 `SketchEdge`)。
+- 內建 **PBD (Position-Based Dynamics) 約束求解器**，支援即時的水平、垂直、共點、等長等約束條件解算，畫面零延遲回饋。
+- **Hit-Testing**: 精準的滑鼠選取與懸浮高亮，並具備不可見的粗體選取框 (Hitbox) 以提升 UX。
 
-### 步驟二：喚醒與調用 (在對話框中)
-安裝完成後，您可以在任何對話框中透過以下指令來使用：
-- **啟動全局護欄與標準化開發**：「啟動 SkillsBuilder 開發模式」
-- **調用特定工具**：「幫我用 tavily-research 技能深入研究...」
-- **建造新工具**：「我想創建一個新技能...」
+### 2. 極致的使用者介面 (Premium UI/UX)
+- 採用 **Sea Salt Blue** 品牌色系。
+- 高質感的毛玻璃效果 (Glassmorphism) 參數面板 `<SketchPropertyManager />`，在淺色與深色模式下皆展現無可挑剔的對比與視覺層次。
 
----
-
-## 💡 如何應用於新開發專案？
-
-您不需要複製本專案，只需透過以下方式在新專案中繼承智慧：
-
-1. **繼承全域技能**：只要執行過 `INSTALL.ps1`，您在任何新資料夾開發時，我（AI 助理）都能直接調用 `tavily`、`gitnexus` 等工具，無需重複安裝。
-2. **初始化智慧環境**：在新專案目錄對我說**「啟動 SkillsBuilder 開發模式」**，我會自動為新專案建立 `DEV_LOG.md` 與 `wiki/` 架構，並載入所有設計規範與 PDCA 流程。
-3. **跨專案智慧共享**：您在 SkillsBuilder 中維護的通用規則（如 UI 規範或 SOP），會自動應用到您的所有新專案中，實現開發經驗的「複利成長」。
+### 3. IPC 與後端架構 (Electron + PythonOCC)
+- **Frontend**: Next.js 14, Zustand, TailwindCSS, React Three Fiber.
+- **Backend**: PythonOCC (基於 OpenCASCADE) 提供工業級的 3D 布林運算、圓角、抽殼能力。
+- **通訊**: 透過 Electron 的 `contextBridge` 進行高效率的 JSON 幾何指令傳遞，將前台的 2D 閉環草圖發送至後台進行 3D 擠出與渲染。
 
 ---
 
-## 📁 專案架構 (MECE 結構)
+## 🚀 系統架構與文件 (Documentation)
 
-```text
-SkillsBuilder/
-├── wiki/                 # 專案大腦：合成知識庫 (Karpathy Pattern)
-│   ├── entities/         # 實體定義：工具、IDE、系統組件
-│   ├── concepts/         # 概念定義：設計模式、SOP、哲學
-│   └── log.md            # 全局活動日誌
-├── skills/               # 技能目錄：包含 core (生產力) 與 dev (開發) 技能
-├── raw/                  # 原始素材：不可變的文檔與參考資料
-├── DEV_LOG.md            # 開發日誌：PDCA 執行紀錄與 RCA/CAPA 歸檔
-└── README.md             # 本手冊
+專案遵循嚴格的 **MECE (相互獨立、完全窮盡)** 原則進行文檔歸檔：
+
+- [系統架構總覽 (SYSTEM_DESIGN.md)](docs/architecture/SYSTEM_DESIGN.md)
+- [PBD 約束引擎規格 (constraint_solver_spec.md)](docs/constraint_solver_spec.md)
+- [開發日誌與錯誤追蹤 (DEV_LOG.md)](DEV_LOG.md)
+- [AI 交接與續寫指南 (handover_resume_guide.md)](handover_resume_guide.md)
+- [長期功能路線圖 (SOLIDWORKS_FEATURE_ROADMAP.md)](SOLIDWORKS_FEATURE_ROADMAP.md)
+
+---
+
+## 🛠️ 開發與建置 (Development)
+
+啟動開發伺服器：
+```bash
+npm install
+npm run dev
 ```
 
----
-
-## 💎 設計總監規範 (Digital Art Director)
-
-本專案的所有介面優化與文檔產出皆遵循 **Color Master Palette**：
-- **深色模式 (Base)**：`#0F172A` (Slate 900)
-- **品牌色 (Accent)**：`#60A5FA` (Sky Blue)
-- **文字 (Primary)**：`#F1F5F9` (Slate 100)
+嚴格型別檢查 (推送前必做)：
+```bash
+npx tsc --noEmit
+```
 
 ## 📜 許可證
 MIT License
