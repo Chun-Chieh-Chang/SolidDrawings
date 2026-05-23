@@ -2,7 +2,6 @@
   "name": "cad-app",
   "version": "3.1.0-alpha",
   "private": true,
-  "type": "module",
   "main": "out/main.js",
   "skillsBuilder": {
     "main": ".opencode/plugins/superpowers.js"
