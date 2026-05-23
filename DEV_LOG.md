@@ -48,6 +48,30 @@
 
 ---
 ---
+## [2026-05-23] RCA & CAPA: 徹底掃除「示範建構」與「可樂瓶演示」代碼殘留（PDCA 循環確效） ✅
+
+### 實裝成果
+- **完全清除演示狀態與函數 (State & Function Purge)**：
+  - 徹底自 `src/app/page.tsx` 中刪除了 `demoStep`、`virtualCursor` 和 `sidebarHighlight` 等殘留狀態定義（共計 13 行）。
+  - 徹底自 `src/app/page.tsx` 中刪除了長達 185 行的 `startInteractiveConstructionDemo` 自動演繹狀態機函數與 46 行的 `handleCokeBottleDemonstration` 可樂瓶演示函數，使代碼精簡了 230 多行。
+- **清除功能選單殘留按鈕 (Ribbon Purge)**：
+  - 徹底自頂部 Features 標籤頁中清除了 `🎥 示範建構` (Demo Build) 按鈕（共計 8 行），杜絕任何死按鈕/展示型 UI 的違和。
+  - 徹底自 Viewport 中清除了 `{demoStep && ...}` 的懸浮訊息橫幅渲染塊（共計 9 行）。
+- **旋轉特徵防禦阻斷 (Parametric Solid Revolve Defense)**：
+  - 重構 `旋轉-實體` 特徵按鈕的觸發邏輯。若用戶未處於草圖模式下或草圖點數量不足 3 個，主動進行安全判斷，呼叫 Electron 原生通知 `appAPI.notify` 或瀏覽器 `alert` 提示使用者「請先選取一個平面幾何進行旋轉特徵」，取代原本無預警載入 Demo 可樂瓶的不合理行為，完全對齊 SolidWorks 工業標準。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 全域 100% 成功，Exit Code 0，無任何變數未定義或型別隱患。
+- 執行 `npx tsc --project electron/tsconfig.json` 全域 compile 100% 成功。
+- MECE 清理完畢，整個專案無任何演示多餘變數或死代碼残存。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 在前次清理任務中，開發代理雖然在 `DEV_LOG.md` 中聲明移除了「示範建構」，但由於 `page.tsx` 檔案龐大且分散，僅部分清除了說明文字，而調用端的 React States、函數定義體、Ribbon Button JSX 以及 Viewport Banner JSX 皆被遺留在原始碼中。由於呼叫端與定義端同時存在，編譯器並未報錯，造成了「假性清除」的技術負債。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **精準覆蓋清掃與編譯確效**：制定「徹底代碼清掃計畫」，利用全域圖論搜尋與 ripGrep 對 `demoStep`、`virtualCursor` 等特徵進行徹底定位，逐行定點外科手術式刪除。在移除後強制執行 TypeScript 靜態編譯確效（Next.js + Electron 雙重檢驗），若代碼中仍有遺留 references 則會被編譯器立刻捕獲，以保證 100% 無代碼殘留與零死角清掃！
+
+---
 ## [2026-05-23] 成功實現 Phase 8 全參數化尺寸驅動與工程確效系統 ✅
 
 ### 實裝成果

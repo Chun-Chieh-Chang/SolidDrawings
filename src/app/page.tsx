@@ -263,19 +263,6 @@ export default function Home() {
   const [showMassPropsModal, setShowMassPropsModal] = useState(false);
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
   const [smartDimensionActive, setSmartDimensionActive] = useState(false);
-  const [demoStep, setDemoStep] = useState<string | null>(null);
-  const [virtualCursor, setVirtualCursor] = useState<{
-    x: string;
-    y: string;
-    visible: boolean;
-    label: string;
-    clicking: boolean;
-  } | null>(null);
-  const [sidebarHighlight, setSidebarHighlight] = useState<{
-    active: boolean;
-    target: 'SKETCH_COORDS' | 'SMART_DIM' | 'SIDEBAR_INPUT';
-    typeValue?: string;
-  } | null>(null);
 
   // Dynamic LocalStorage self-cleanup of legacy mockup features
   useEffect(() => {
@@ -541,244 +528,6 @@ export default function Home() {
     const num = parseFloat(value);
     if (isNaN(num)) return;
     updateFeatureParams(selectedId, { [key]: num });
-  };
-
-
-  const startInteractiveConstructionDemo = () => {
-    // 1. Clear everything and reset
-    useCadStore.setState({ features: [], selectedId: null });
-    resetSketchSession();
-    setSmartDimensionActive(false);
-    setSidebarHighlight(null);
-    
-    // Step 1: Start sketching on FRONT plane
-    setDemoStep("步驟 1：啟動草圖編輯器，並自動選定「前基準面 (Front Plane)」...");
-    setVirtualCursor({ x: '180px', y: '50px', visible: true, label: '點選: 草圖分頁', clicking: true });
-    setActiveTab('SKETCH');
-
-    setTimeout(() => {
-      setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null);
-    }, 400);
-
-    setTimeout(() => {
-      setVirtualCursor({ x: '120px', y: '330px', visible: true, label: '雙擊選定: 前基準面', clicking: true });
-      setSketchMode(true);
-      setActivePlane('FRONT');
-      setSketchTool('LINE');
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 800);
-    
-    // Step 2: Draw base outline sequentially (Base center to outer wall)
-    setTimeout(() => {
-      setDemoStep("步驟 2：逐步連續繪製草圖端點以定義工件剖面 (P1 ➔ P2 ➔ P3)...");
-      setVirtualCursor({ x: '60%', y: '52%', visible: true, label: '定位點 P1: (0, 0) mm', clicking: true });
-      setSketchPoints([
-        [0.0, 0.0]
-      ]);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 1800);
-
-    setTimeout(() => {
-      setVirtualCursor({ x: '68%', y: '52%', visible: true, label: '定位點 P2: (20.0, 0) mm', clicking: true });
-      setSketchPoints([
-        [0.0, 0.0],
-        [20.0, 0.0]
-      ]);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 3200);
-
-    setTimeout(() => {
-      setVirtualCursor({ x: '68%', y: '38%', visible: true, label: '定位點 P3: (20.0, 30.0) mm', clicking: true });
-      setSketchPoints([
-        [0.0, 0.0],
-        [20.0, 0.0],
-        [20.0, 30.0]
-      ]);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 4600);
-
-    // Step 3: Draw upper lip profile (P3 -> P4 -> P5 -> P6)
-    setTimeout(() => {
-      setDemoStep("步驟 3：繼續逆時針描繪內腔與壁厚，形成封閉的 2D 草圖輪廓...");
-      setVirtualCursor({ x: '60%', y: '52%', visible: true, label: '端點閉合於起點 P1', clicking: true });
-      setSketchPoints([
-        [0.0, 0.0],
-        [20.0, 0.0],
-        [20.0, 30.0],
-        [18.0, 30.0],
-        [18.0, 2.0],
-        [0.0, 2.0]
-      ]);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 6000);
-
-    // Step 4: Apply Smart Dimension to scale parametric segment
-    setTimeout(() => {
-      setDemoStep("步驟 4：啟用「智慧尺寸 (Smart Dimension)」工具進行幾何定量驅動...");
-      setVirtualCursor({ x: '210px', y: '110px', visible: true, label: '點選: 智慧尺寸', clicking: true });
-      setSmartDimensionActive(true);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 7500);
-
-    // Step 5: Double click to type dimension in Sidebar
-    setTimeout(() => {
-      setDemoStep("步驟 5：雙擊高度標記，將外壁高度從 30.0 mm 參數化調整為 50.0 mm（端點座標與相鄰拓撲自適應縮放，保持草圖閉合）...");
-      setVirtualCursor({ x: '180px', y: '730px', visible: true, label: '修改邊 P2➔P3 長度', clicking: true });
-      setSidebarHighlight({ active: true, target: 'SMART_DIM', typeValue: '30.' });
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 8800);
-
-    // Animate typing text values
-    setTimeout(() => {
-      setSidebarHighlight({ active: true, target: 'SMART_DIM', typeValue: '' });
-    }, 9200);
-    setTimeout(() => {
-      setSidebarHighlight({ active: true, target: 'SMART_DIM', typeValue: '5' });
-    }, 9500);
-    setTimeout(() => {
-      setSidebarHighlight({ active: true, target: 'SMART_DIM', typeValue: '50' });
-    }, 9800);
-    setTimeout(() => {
-      setSidebarHighlight({ active: true, target: 'SMART_DIM', typeValue: '50.0' });
-    }, 10100);
-
-    // Apply parametric rebuild
-    setTimeout(() => {
-      const scaledPoints = [
-        [0.0, 0.0],
-        [20.0, 0.0],
-        [20.0, 50.0],
-        [18.0, 50.0],
-        [18.0, 2.0],
-        [0.0, 2.0]
-      ];
-      setSketchPoints(scaledPoints);
-      setSketchRelations(["段邊 P2➔P3: 智慧尺寸 (已驅動值 50.00 mm)"]);
-      setVirtualCursor(prev => prev ? { ...prev, clicking: true, label: '定量完成！' } : null);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 10600);
-
-    // Step 5: Exit sketch and trigger B-Rep Revolve Solid!
-    setTimeout(() => {
-      setDemoStep("步驟 6：結束草圖！呼叫「旋轉-實體」，底層 OCCT 幾何核讀取閉合草圖並繞對稱 Y 軸旋轉 360 度...");
-      setVirtualCursor({ x: '100px', y: '50px', visible: true, label: '切換: 特徵分頁', clicking: true });
-      setActiveTab('FEATURES');
-      setSmartDimensionActive(false);
-      setSidebarHighlight(null);
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 11800);
-
-    setTimeout(() => {
-      setVirtualCursor({ x: '170px', y: '110px', visible: true, label: '點選: 旋轉-實體', clicking: true });
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 12600);
-
-    setTimeout(() => {
-      const solidPoints = [
-        [0.0, 0.0],
-        [20.0, 0.0],
-        [20.0, 50.0],
-        [18.0, 50.0],
-        [18.0, 2.0],
-        [0.0, 2.0]
-      ];
-      const id = "feat_revolve_cup";
-      const revolveFeature: CADFeature = {
-        id,
-        type: 'REVOLVE',
-        name: `旋轉-實體 1 (空腔杯形件)`,
-        parameters: {
-          plane: 'FRONT',
-          angle: 360.0,
-          points: solidPoints,
-          x: 0.0, y: 0.0, z: 0.0,
-          operation: 'ADD'
-        }
-      };
-      useCadStore.setState({ features: [revolveFeature], selectedId: id });
-      resetSketchSession();
-      setVirtualCursor({ x: '60%', y: '50%', visible: true, label: '3D 旋轉展示實體...', clicking: false });
-      setTimeout(handleRebuild, 50);
-    }, 13500);
-
-    // Step 6: Highlight final solid and display measurements
-    setTimeout(() => {
-      setDemoStep("🎉 成功！3D 中空杯形實體建模完成！我們已自動調用「測量工具」來分析表面積與體積屬性，完美實現 CAD 確效！");
-      setVirtualCursor({ x: '260px', y: '50px', visible: true, label: '切換: 評估分頁', clicking: true });
-      setActiveTab('EVALUATE');
-      setMeasurementMode('DISTANCE');
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 15800);
-
-    setTimeout(() => {
-      setVirtualCursor({ x: '58%', y: '48%', visible: true, label: '選取表面量測屬性', clicking: true });
-      useCadStore.setState({
-        selectedTopology: {
-          type: "FACE",
-          coordinates: [10.0, 25.0, 0.0],
-          normal: [1.0, 0.0, 0.0],
-          area: 6283.18,
-          volume: 5882.16
-        }
-      });
-      setTimeout(() => setVirtualCursor(prev => prev ? { ...prev, clicking: false } : null), 400);
-    }, 16800);
-
-    // Clear message banner and cursor
-    setTimeout(() => {
-      setDemoStep(null);
-      setVirtualCursor(null);
-      setSidebarHighlight(null);
-    }, 20500);
-  };
-
-
-  const handleCokeBottleDemonstration = () => {
-    const cokeWallProfile = [
-      [0.0, 0.0],
-      [15.0, 0.0],
-      [15.0, 10.0],
-      [17.5, 22.5, "ARC_CONTROL"],
-      [15.0, 35.0],
-      [12.5, 52.5, "ARC_CONTROL"],
-      [15.0, 70.0],
-      [17.5, 87.5, "ARC_CONTROL"],
-      [15.0, 105.0],
-      [8.5, 117.5, "ARC_CONTROL"],
-      [8.5, 130.0],
-      [10.0, 130.0],
-      [10.0, 135.0],
-      [9.0, 135.0],
-      [9.0, 130.0],
-      [7.5, 117.5, "ARC_CONTROL"],
-      [7.5, 105.0],
-      [16.5, 87.5, "ARC_CONTROL"],
-      [14.0, 70.0],
-      [11.5, 52.5, "ARC_CONTROL"],
-      [14.0, 35.0],
-      [16.5, 22.5, "ARC_CONTROL"],
-      [14.0, 10.0],
-      [14.0, 1.0],
-      [0.0, 1.0]
-    ];
-
-    const cokeFeature: CADFeature = {
-      id: "feat_coke_revolve",
-      type: "REVOLVE",
-      name: "旋轉-實體 1",
-      parameters: {
-        plane: "FRONT",
-        angle: 360.0,
-        points: cokeWallProfile,
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-        operation: "ADD"
-      }
-    };
-
-    useCadStore.setState({ features: [cokeFeature], selectedId: "feat_coke_revolve" });
-    setTimeout(handleRebuild, 50);
   };
 
 
@@ -1514,23 +1263,18 @@ export default function Home() {
                     resetSketchSession();
                     setTimeout(handleRebuild, 50);
                   } else {
-                    handleCokeBottleDemonstration();
+                    if (typeof window !== 'undefined' && (window as any).appAPI) {
+                      (window as any).appAPI.notify('旋轉失敗', '請先選取一個平面幾何進行旋轉特徵');
+                    } else {
+                      alert('請先選取一個平面幾何進行旋轉特徵');
+                    }
                   }
                 }}
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group text-indigo-600 font-bold border border-indigo-200/50 bg-indigo-50/30 shadow-sm"
-                title="執行 B-Rep 旋轉特徵（若在草圖模式下則旋轉當前草圖；否則載入可樂瓶）"
+                title="執行 B-Rep 旋轉特徵（若在草圖模式下則旋轉當前草圖；否則提示繪製輪廓）"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🍾</span>
                 <span className="text-[13px] leading-none">旋轉-實體</span>
-              </button>
-
-              <button
-                onClick={startInteractiveConstructionDemo}
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group text-emerald-600 font-bold border border-emerald-200/50 bg-emerald-50/30 shadow-sm"
-                title="自動演示從零草圖繪製、定量定量變更、到 3D 旋轉實體化與物理屬性分析的完整中間建構過程，親眼見證 CAD 解析與重建的真實能力！"
-              >
-                <span className="text-lg group-hover:scale-110 transition-all animate-bounce">🎥</span>
-                <span className="text-[13px] leading-none">示範建構</span>
               </button>
 
               {/* Divider and active feature list cleaned of placeholder/padlocked orphans */}
@@ -2635,16 +2379,7 @@ export default function Home() {
 
         {/* Right Area: Viewport (Graphics Area) */}
         <section className="flex-grow h-full relative">
-          {/* Interactive Construction Demo Banner */}
-          {demoStep && (
-            <div className="absolute top-20 left-1/2 -translate-x-1/2 bg-amber-50/95 border border-amber-300 text-amber-950 px-6 py-4 rounded-3xl shadow-2xl flex items-center gap-3.5 z-[999] animate-pulse w-[85%] max-w-[650px] pointer-events-none backdrop-blur-md">
-              <span className="text-2xl">🎥</span>
-              <div className="flex flex-col">
-                <span className="text-[14px] font-extrabold uppercase tracking-wider text-amber-700 leading-none">正在演示 CAD 逐步建構過程 (Live CAD Build Demo)</span>
-                <span className="text-[13px] font-bold mt-2 leading-relaxed text-amber-900">{demoStep}</span>
-              </div>
-            </div>
-          )}
+
 
           {isSketchMode && hasConflict && (
             <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-500/90 border border-red-400 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-2.5 z-[999] w-[85%] max-w-[500px] pointer-events-none backdrop-blur-md">
