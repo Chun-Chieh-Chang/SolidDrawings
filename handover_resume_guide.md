@@ -1,42 +1,50 @@
-# 3D Builder - Handover & Resume Guide
+# 3D Builder - 續寫與開發交接指南 (Handover & Resume Guide)
 
 ## 1. 專案當前狀態 (Current Project State)
-**[2026-05-23] PBD Constraint Solver 與 Graph-based Model 重構完成**
+**[2026-05-23] Phase 13+: 數據鏈路閉環與開發環境自動化完成**
 
-本專案剛完成核心架構的重大轉換，已拋棄舊版基於單一陣列的 `sketchPoints` 繪圖邏輯，全面升級為 **Graph-based (圖論)** 的草圖核心，並具備 PBD (Position-Based Dynamics) 約束求解器。
+本專案已成功實現從「草圖圖論」到「3D B-Rep 實體」的雙向參數化聯動，並導入了 **SkillsBuilder** 自動化開發框架。
 
-### 核心模組與架構分配
-- **狀態管理 (`src/store/useCadStore.ts`)**:
-  - `sketchNodes`: `Record<string, SketchNode>` (頂點，包含 `isFixed` 狀態)
-  - `sketchEdges`: `Record<string, SketchEdge>` (邊線，由兩個節點 ID 構成)
-  - `sketchConstraints`: `Record<string, SketchConstraint>` (圖形約束條件)
-  - `selectedEntityIds`: `string[]` (用戶當前點選的物件，包含節點與邊線 ID)
-- **視覺渲染與 Hit-Testing (`src/renderer/SketchPreview.tsx`)**:
-  - 負責讀取 `sketchNodes` 與 `sketchEdges` 並繪製於 SVG/Canvas 上。
-  - 已實作點擊 (Hit-Testing) 偵測：節點直接透過距離判定；邊線則有隱形的加粗 Hitbox (`strokeWidth={15}`) 方便用戶點選。點選結果會寫入 `selectedEntityIds`。
-- **動態約束與 UI 面板 (`src/ui/SketchPropertyManager.tsx`)**:
-  - 這是最新的左側參數面板，採用「Sea Salt Blue」毛玻璃 (Glassmorphism) 設計。
-  - 會根據 `selectedEntityIds` 顯示當前選取的物件屬性，並提供相應的約束按鈕 (水平、垂直、共點、等長等)。
-  - 操作約束按鈕會直接連動 `src/utils/geometry/ConstraintSolver.ts`，由 PBD 演算法重新計算所有受影響的節點座標後，寫回 Zustand，形成**零延遲的畫面閉環**。
+### 核心技術棧 (Tech Stack)
+- **前端**: Next.js 15+, Three.js (React Three Fiber), Zustand (狀態管理), GSAP (動畫).
+- **後端**: Python 3.10+, FastAPI, OpenCASCADE (pythonOCC) 幾何核心.
+- **桌面端**: Electron (提供原生檔案系統存取與 PDF 輸出).
+- **智庫**: SkillsBuilder (整合 193+ 專家角色與 Nexus 協作協議).
 
-## 2. 開發地雷與紀律 (Technical Debt & Rules)
-- **`page.tsx` 的 Legacy Stubs**:
-  - 由於之前 `page.tsx` 存在上千行的舊版繪圖控制邏輯 (與 `sketchPoints` 強耦合)，我們為了遵循「零錯誤 (0 Type Errors)」與「最小破壞原則」，採用了 Legacy Stubs。
-  - 在 `page.tsx` 中，我們移除了對 `useCadStore` 中 `sketchPoints` 的解構，改為注入 `const sketchPoints: any[] = []; const setSketchPoints = (pts: any) => {};`。這讓舊版的 `useEffect` 不會報錯，但同時不具備任何副作用。後續若需清理 `page.tsx`，請直接安全刪除那些不會被觸發的 `useEffect`。
-- **嚴格型別檢查**:
-  - 任何改動推送到遠端前，**必須**能通過 `npx tsc --noEmit`。嚴禁出現 "Any" 或 "Property does not exist" 等錯誤。
+### 關鍵功能實現
+- **全參數化數據鏈**: 特徵持久化儲存 `sketchNodes`、`sketchEdges` 與 `sketchConstraints`，確保 100% 編輯回溯。
+- **SolidWorks 對標 UI/UX**:
+  - **前景視圖工具欄 (Heads-up Toolbar)**.
+  - **設計樹退回控制棒 (Rollback Bar)**.
+  - **S-Key 模式感知快捷選單**.
+  - **草圖狀態視覺化**: 完全定義 (黑)、欠定義 (藍)、衝突 (紅).
+- **工業級輸出**: 支援 STEP, IGES, STL 導出及 A4 向量工程圖 PDF 輸出。
 
-## 3. 下一步開發建議 (Next Action Items)
-接手本專案的工程師或 AI 代理，請依據使用者的需求，優先考慮以下兩個擴展方向：
+## 2. 開發紀律與核心原則 (Core Principles)
+- **PDCA 循環**: 所有任務必須遵循 Plan (計畫) -> Do (執行) -> Check (確效) -> Act (優化) 流程。
+- **Anti-Vibe Coding**: 嚴禁猜測性修復。所有 Bug 必須在 `DEV_LOG.md` 留下 RCA (根因分析) 與 CAPA (預防措施) 紀錄。
+- **MECE 代碼清掃**: 定期執行代碼清掃（如已徹底移除 demo/可樂瓶相關代碼），保持專案純淨。
+- **型別守衛**: 提交前必須通過 `npx tsc --noEmit`，確保全域型別安全。
 
-1. **後端 OCCT 幾何引擎對接 (3D Generation)**
-   - 目前我們在前端已經可以產生完美的 2D Graph (Nodes/Edges)。
-   - **目標**: 需要將 `sketchNodes` 與 `sketchEdges` 解析成封閉迴圈 (Closed Loops)，透過 `window.electron.appAPI.generate3D(...)` IPC 傳送給 Python OCCT 後端。
-   - **挑戰**: 需實作「尋找最小循環 (Minimum Cycle Basis)」的圖論演算法，以正確識別草圖內的封閉面，進而進行擠出 (Extrude)。
+## 3. 續寫者必讀：如何接手 (How to Resume)
+### 步驟 1: 環境同步
+執行 `powershell .\INSTALL.ps1`。這會自動同步 SkillsBuilder 技能、配置 Git Hooks 並檢查 Python 環境。
 
-2. **擴充 PBD 約束求解器 (Solver Expansion)**
-   - `src/utils/geometry/ConstraintSolver.ts` 目前支援 `COINCIDENT`, `HORIZONTAL`, `VERTICAL`, `EQUAL_LENGTH`。
-   - **目標**: 實作更多約束類型，如：
-     - 固定角度 (Angle)
-     - 固定距離 (Distance)
-     - 圓形/相切 (Tangent, Concentric - 需先擴充 `SketchEdge` 支援弧線型別 ARC)
+### 步驟 2: 理解 Wiki
+查閱 `wiki/index.md`。專案大腦已將「幾何約束數學」、「圖論模型」與「渲染管線」實體化。
+
+### 步驟 3: 遵守 PDCA
+1. 讀取 `task_plan.md` 了解當前進度。
+2. 讀取 `DEV_LOG.md` 最後一筆記錄。
+3. 開始新的開發循環前，先更新 `task_plan.md`。
+
+## 4. 下一步開發藍圖 (Roadmap)
+1. **進階組合件約束 (Advanced Assembly Mates)**:
+   - 目前僅支援基本 Mate。需要實作路徑約束與機械連動。
+2. **性能優化 (Smart Rebuild)**:
+   - 實作「髒標記 (Dirty Flag)」機制，避免無關特徵的重複重構。
+3. **雲端協作預備**:
+   - 將目前的 Zustand 狀態部分遷移至 Nexus 協議支持的 CRDT 結構，為未來多人協作鋪路。
+
+---
+*本文件由 AI Agent 在 2026-05-23 自動更新，確保開發上下文無縫傳承。*

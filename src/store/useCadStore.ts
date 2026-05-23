@@ -32,8 +32,17 @@ export interface CADComponent {
 }
 
 export interface CADContextMenu {
-  plane: string;
-  position: [number, number, number];
+  visible: boolean;
+  x: number;
+  y: number;
+  type?: 'BACKGROUND' | 'ENTITY' | 'FEATURE';
+  data?: any;
+}
+
+export interface CADShortcutBox {
+  visible: boolean;
+  x: number;
+  y: number;
 }
 
 export interface MeasurementResult {
@@ -130,11 +139,15 @@ interface CadState {
   updateFeatureParams: (id: string, params: any) => void;
   editingFeatureId: string | null;
   setEditingFeatureId: (id: string | null) => void;
+  rollbackIndex: number | null; // Index in features array to rollback to
+  setRollbackIndex: (index: number | null) => void;
 
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
   selectedSubNodeType: 'SKETCH' | 'FEATURE' | null;
   setSelectedSubNodeType: (type: 'SKETCH' | 'FEATURE' | null) => void;
+  visibleSketches: string[]; // Set of feature IDs whose sketches should be visible in 3D
+  toggleSketchVisibility: (featureId: string) => void;
 
   // Topology Selection State
   selectedTopology: any; // SelectedTopology from TopologySelector
@@ -175,12 +188,20 @@ interface CadState {
   // Transient Context Menu HUD
   contextMenu: CADContextMenu | null;
   setContextMenu: (menu: CADContextMenu | null) => void;
+  shortcutBox: CADShortcutBox | null;
+  setShortcutBox: (menu: CADShortcutBox | null) => void;
 
   // Transient OrbitControls Reference & Animation Lock
   controls: any | null;
   setControls: (controls: any | null) => void;
   isCameraAnimating: boolean;
   setIsCameraAnimating: (isAnimating: boolean) => void;
+
+  // Status Bar Info
+  mousePos: [number, number, number] | null;
+  setMousePos: (pos: [number, number, number] | null) => void;
+  hint: string;
+  setHint: (hint: string) => void;
 
   // Reference Geometry & PropertyManager
   referencePlanes: any[];
@@ -274,11 +295,19 @@ export const useCadStore = create<CadState>()(
 
       editingFeatureId: null,
       setEditingFeatureId: (id) => set({ editingFeatureId: id }),
+      rollbackIndex: null,
+      setRollbackIndex: (index) => set({ rollbackIndex: index }),
 
       selectedId: null,
       setSelectedId: (id) => set({ selectedId: id }),
       selectedSubNodeType: null,
       setSelectedSubNodeType: (selectedSubNodeType) => set({ selectedSubNodeType }),
+      visibleSketches: [],
+      toggleSketchVisibility: (featureId) => set((state) => ({
+        visibleSketches: state.visibleSketches.includes(featureId)
+          ? state.visibleSketches.filter(id => id !== featureId)
+          : [...state.visibleSketches, featureId]
+      })),
 
       selectedTopology: null,
       setSelectedTopology: (topology) => set({ selectedTopology: topology }),
@@ -320,11 +349,18 @@ export const useCadStore = create<CadState>()(
 
       contextMenu: null,
       setContextMenu: (contextMenu) => set({ contextMenu }),
+      shortcutBox: null as CADShortcutBox | null,
+      setShortcutBox: (shortcutBox: CADShortcutBox | null) => set({ shortcutBox }),
 
       controls: null,
       setControls: (controls) => set({ controls }),
       isCameraAnimating: false,
       setIsCameraAnimating: (isCameraAnimating) => set({ isCameraAnimating }),
+
+      mousePos: null,
+      setMousePos: (mousePos) => set({ mousePos }),
+      hint: 'Ready',
+      setHint: (hint) => set({ hint }),
 
       referencePlanes: [],
       setReferencePlanes: (planes) => set({ referencePlanes: planes }),

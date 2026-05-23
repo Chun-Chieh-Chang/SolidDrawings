@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, Fragment } from 'react';
 import Viewport from '@/renderer/Viewport';
 import OcctShape, { type MeshData } from '@/renderer/OcctShape';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
@@ -15,6 +15,10 @@ import { SketchPropertyManager } from '@/ui/SketchPropertyManager';
 import { v4 as uuidv4 } from 'uuid';
 import { extractClosedLoop, extractAllClosedLoops } from '@/utils/geometry/GraphAdapter';
 import { analyzeSketchDefinitions } from '@/utils/geometry/ConstraintSolver';
+import { HeadsUpToolbar } from '@/ui/HeadsUpToolbar';
+import { StatusBar } from '@/ui/StatusBar';
+import { ShortcutBox } from '@/ui/ShortcutBox';
+import { ContextMenu } from '@/ui/ContextMenu';
 
 const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' => (
   plane === 'FRONT' || plane === 'TOP' || plane === 'RIGHT' || plane === 'FACE'
@@ -72,10 +76,18 @@ export default function Home() {
     drawingScale, setDrawingScale,
     drawnBy, setDrawnBy,
     approvedBy, setApprovedBy,
-    features, addFeature, removeFeature, updateFeatureParams,
-    editingFeatureId, setEditingFeatureId,
-    selectedId, setSelectedId,
+    features,
+    addFeature,
+    removeFeature,
+    updateFeatureParams,
+    editingFeatureId,
+    setEditingFeatureId,
+    rollbackIndex,
+    setRollbackIndex,
+    selectedId,
+    setSelectedId,
     selectedSubNodeType, setSelectedSubNodeType,
+    visibleSketches, toggleSketchVisibility,
     meshData, setMeshData,
     isSketchMode, setSketchMode,
     activePlane, setActivePlane,
@@ -87,6 +99,7 @@ export default function Home() {
     mateSelection, setMateSelection,
     addComponent, components, setComponents,
     setContextMenu,
+    shortcutBox, setShortcutBox,
     sketchNewChain, setSketchNewChain,
     selectedEntityIds, setSelectedEntityIds,
     selectedTopology, setSelectedTopology,
@@ -94,8 +107,32 @@ export default function Home() {
     activeFaceNormal, setActiveFaceNormal,
     activeFaceId, setActiveFaceId,
     triggerCameraNormal,
-    sketchNodes, sketchEdges, sketchConstraints
+    sketchNodes, sketchEdges, sketchConstraints,
+    hint, setHint
   } = useCadStore();
+
+  // Hint Logic Update
+  useEffect(() => {
+    if (isSketchMode) {
+      switch (sketchTool) {
+        case 'LINE': setHint('草圖模式：點擊並拖曳以繪製直線段 (Line)'); break;
+        case 'CENTER_LINE': setHint('草圖模式：繪製構造用中心線 (Centerline)'); break;
+        case 'CIRCLE': setHint('草圖模式：點擊中心點並向外拖曳繪製圓 (Circle)'); break;
+        case 'RECTANGLE': setHint('草圖模式：點擊兩個對角點繪製矩形 (Rectangle)'); break;
+        case 'ARC': setHint('草圖模式：點擊三點以定義圓弧 (3-Point Arc)'); break;
+        case 'MIDPOINT_LINE': setHint('草圖模式：從中心向兩側對稱繪製直線 (Midpoint Line)'); break;
+        default: setHint('草圖模式中');
+      }
+    } else if (measurementMode !== 'NONE') {
+      setHint(`量測模式 (${measurementMode})：選取幾何頂點或邊段進行測量`);
+    } else if (selectedTopology?.type === 'FACE') {
+      setHint('已選取表面：您可以選擇在此面上起草或進行特徵編輯');
+    } else if (selectedId) {
+      setHint(`已選取特徵: ${features.find(f => f.id === selectedId)?.name || '未知'}`);
+    } else {
+      setHint('零件編輯模式：請選取基準面或特徵開始操作');
+    }
+  }, [isSketchMode, sketchTool, measurementMode, selectedTopology, selectedId, features, setHint]);
 
   // Legacy stubs to prevent TS errors in dead code
   const sketchPoints: any[] = [];
@@ -304,6 +341,48 @@ export default function Home() {
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
   }, [isSketchMode, setSketchTool, setSketchNewChain]);
 
+  // Global Keyboard Shortcuts (S for Shortcut Box)
+  useEffect(() => {
+    const handleSKey = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 's') {
+        if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+          return;
+        }
+        e.preventDefault();
+        // Use last mouse position from store or center of screen if not available
+        const { mousePos } = useCadStore.getState();
+        // Since we need screen coordinates, we'll use the event if available, 
+        // but since this is a global listener, we might need to track clientX/Y
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      (window as any)._lastClientX = e.clientX;
+      (window as any)._lastClientY = e.clientY;
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key.toLowerCase() === 's') {
+        if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+          return;
+        }
+        e.preventDefault();
+        setShortcutBox({
+          visible: true,
+          x: (window as any)._lastClientX || window.innerWidth / 2,
+          y: (window as any)._lastClientY || window.innerHeight / 2
+        });
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [setShortcutBox]);
+
   const selectedFeature = useMemo(() => features.find(f => f.id === selectedId), [features, selectedId]);
   const solidSketchPointCount = useMemo(
     () => sketchPoints.filter(pt => !pt[2] || !pt[2].includes('CENTER_LINE')).length,
@@ -467,8 +546,17 @@ export default function Home() {
   };
 
   const handleRebuild = useCallback(async () => {
+    const { isSketchMode, editingFeatureId, rollbackIndex } = useCadStore.getState();
+    
     // Determine the active features based on the history rollback state
     let activeFeatures = features;
+    
+    // Priority 1: Rollback Index (Manual Bar)
+    if (rollbackIndex !== null) {
+      activeFeatures = features.slice(0, rollbackIndex + 1);
+    }
+    
+    // Priority 2: Auto-Rollback on Edit (SolidWorks behavior)
     if (isSketchMode && editingFeatureId) {
       const index = features.findIndex(f => f.id === editingFeatureId);
       if (index !== -1) {
@@ -508,10 +596,13 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }, [features, setMeshData, isSketchMode, editingFeatureId]);
+  }, [features, setMeshData]); // Removed unnecessary dependencies to use getState() internally
 
   useEffect(() => {
-    handleRebuild();
+    const timer = setTimeout(() => {
+      handleRebuild();
+    }, 150); // Debounce rebuilds for smoother live preview
+    return () => clearTimeout(timer);
   }, [handleRebuild]);
 
   const onParamChange = (key: string, value: string) => {
@@ -522,12 +613,15 @@ export default function Home() {
 
     if (stringParams.includes(key)) {
       updateFeatureParams(selectedId, { [key]: value });
+      // Trigger immediate rebuild for non-numeric params that change topology
+      setTimeout(handleRebuild, 0);
       return;
     }
 
     const num = parseFloat(value);
     if (isNaN(num)) return;
     updateFeatureParams(selectedId, { [key]: num });
+    // Numeric params are debounced by the handleRebuild useEffect
   };
 
 
@@ -685,47 +779,59 @@ export default function Home() {
     setSelectedSubNodeType(null);
     setEditingFeatureId(feature.id);
     
-    // Set legacy stubs for compatibility (wrap first loop if nested)
-    const isNested = Array.isArray(rawPoints[0]) && Array.isArray(rawPoints[0][0]);
-    const firstLoopPoints = isNested ? rawPoints[0] : rawPoints;
-    setSketchPoints(cloneSketchPoints(firstLoopPoints));
-    setSketchRelations(relations);
-    
-    // Reconstruct topological graph nodes & edges supporting both single-loop and nested multi-loops
-    const nextNodes: Record<string, any> = {};
-    const nextEdges: Record<string, any> = {};
-    const loopsToLoad: any[][] = isNested ? rawPoints : [rawPoints];
+    // Check if we have stored parametric sketch data
+    if (feature.parameters?.sketchNodes && feature.parameters?.sketchEdges) {
+      useCadStore.setState({
+        sketchNodes: { ...feature.parameters.sketchNodes },
+        sketchEdges: { ...feature.parameters.sketchEdges },
+        sketchConstraints: { ...feature.parameters.sketchConstraints || {} }
+      });
+      // Also set legacy stubs for compatibility
+      const loops = feature.parameters.points;
+      const firstLoop = Array.isArray(loops[0]) && Array.isArray(loops[0][0]) ? loops[0] : loops;
+      setSketchPoints(cloneSketchPoints(firstLoop));
+    } else {
+      // Reconstruct topological graph nodes & edges supporting both single-loop and nested multi-loops (Legacy Fallback)
+      const firstLoopPoints = Array.isArray(rawPoints[0]) && Array.isArray(rawPoints[0][0]) ? rawPoints[0] : rawPoints;
+      setSketchPoints(cloneSketchPoints(firstLoopPoints));
+      
+      const nextNodes: Record<string, any> = {};
+      const nextEdges: Record<string, any> = {};
+      const loopsToLoad: any[][] = Array.isArray(rawPoints[0]) && Array.isArray(rawPoints[0][0]) ? rawPoints : [rawPoints];
 
-    loopsToLoad.forEach((loopPoints: any[]) => {
-      if (loopPoints.length < 3) return;
-      const pointsToLoad = [...loopPoints];
-      const first = pointsToLoad[0];
-      const last = pointsToLoad[pointsToLoad.length - 1];
-      if (Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-4) {
-        pointsToLoad.pop();
-      }
+      loopsToLoad.forEach((loopPoints: any[]) => {
+        if (loopPoints.length < 3) return;
+        const pointsToLoad = [...loopPoints];
+        const first = pointsToLoad[0];
+        const last = pointsToLoad[pointsToLoad.length - 1];
+        if (Math.hypot(last[0] - first[0], last[1] - first[1]) < 1e-4) {
+          pointsToLoad.pop();
+        }
 
-      const nodeIds: string[] = [];
-      pointsToLoad.forEach((pt: any) => {
-        const id = uuidv4();
-        const isOrigin = Math.abs(pt[0]) < 1e-5 && Math.abs(pt[1]) < 1e-5;
-        nextNodes[id] = { id, x: pt[0], y: pt[1], isFixed: isOrigin };
-        nodeIds.push(id);
+        const nodeIds: string[] = [];
+        pointsToLoad.forEach((pt: any) => {
+          const id = uuidv4();
+          const isOrigin = Math.abs(pt[0]) < 1e-5 && Math.abs(pt[1]) < 1e-5;
+          nextNodes[id] = { id, x: pt[0], y: pt[1], isFixed: isOrigin };
+          nodeIds.push(id);
+        });
+
+        for (let i = 0; i < nodeIds.length; i++) {
+          const n1 = nodeIds[i];
+          const n2 = nodeIds[(i + 1) % nodeIds.length];
+          const eId = uuidv4();
+          nextEdges[eId] = { id: eId, type: 'LINE', nodeIds: [n1, n2] };
+        }
       });
 
-      for (let i = 0; i < nodeIds.length; i++) {
-        const n1 = nodeIds[i];
-        const n2 = nodeIds[(i + 1) % nodeIds.length];
-        const eId = uuidv4();
-        nextEdges[eId] = { id: eId, type: 'LINE', nodeIds: [n1, n2] };
-      }
-    });
+      useCadStore.setState({
+        sketchNodes: nextNodes,
+        sketchEdges: nextEdges,
+        sketchConstraints: {}
+      });
+    }
 
-    useCadStore.setState({
-      sketchNodes: nextNodes,
-      sketchEdges: nextEdges,
-      sketchConstraints: {}
-    });
+    setSketchRelations(relations);
 
     setActivePlane(plane);
     if (plane === 'FACE') {
@@ -752,6 +858,9 @@ export default function Home() {
     const nextParams = {
       ...existingParams,
       points: solidLoops,
+      sketchNodes: { ...sketchNodes },
+      sketchEdges: { ...sketchEdges },
+      sketchConstraints: { ...sketchConstraints },
       depth: existingParams.depth ?? 10,
       x: existingParams.x ?? 0,
       y: existingParams.y ?? 0,
@@ -780,6 +889,7 @@ export default function Home() {
     }
 
     resetSketchSession();
+    setRollbackIndex(null); // Clear rollback on exit
     setSelectedId(featureId);
 
     setTimeout(handleRebuild, 50);
@@ -1133,12 +1243,23 @@ export default function Home() {
               setMeasurementMode('NONE');
               setMeasurementPoints([]);
               setMeasurementResults(null);
-              // Auto trigger front plane sketch if not in sketch mode
+              // Auto trigger sketch mode if not already in it
               if (!isSketchMode) {
                 setEditingFeatureId(null);
                 setSketchPoints([]);
                 setSketchRelations([]);
-                setActivePlane('FRONT');
+                
+                // SolidWorks logic: If a face is selected, sketch on that face. Otherwise, default to Front Plane.
+                if (selectedTopology?.type === 'FACE' && selectedTopology.coordinates && selectedTopology.normal) {
+                  setActiveFaceOrigin(selectedTopology.coordinates);
+                  setActiveFaceNormal(selectedTopology.normal);
+                  setActiveFaceId(selectedTopology.id || `face_${Date.now()}`);
+                  setActivePlane('FACE');
+                  triggerCameraNormal();
+                } else {
+                  setActivePlane('FRONT');
+                }
+                
                 setSketchMode(true);
                 setSketchTool('LINE');
               }
@@ -1206,11 +1327,21 @@ export default function Home() {
                   if (solidSketchPointCount >= 3) {
                     handleExitAndExtrude();
                   } else {
-                    // Start sketch mode on Front plane
+                    // Start sketch mode
                     setEditingFeatureId(null);
                     setSketchPoints([]);
                     setSketchRelations([]);
-                    setActivePlane('FRONT');
+                    
+                    if (selectedTopology?.type === 'FACE' && selectedTopology.coordinates && selectedTopology.normal) {
+                      setActiveFaceOrigin(selectedTopology.coordinates);
+                      setActiveFaceNormal(selectedTopology.normal);
+                      setActiveFaceId(selectedTopology.id || `face_${Date.now()}`);
+                      setActivePlane('FACE');
+                      triggerCameraNormal();
+                    } else {
+                      setActivePlane('FRONT');
+                    }
+                    
                     setSketchMode(true);
                     setSketchTool('LINE');
                   }
@@ -1230,7 +1361,17 @@ export default function Home() {
                     setEditingFeatureId(null);
                     setSketchPoints([]);
                     setSketchRelations([]);
-                    setActivePlane('FRONT');
+                    
+                    if (selectedTopology?.type === 'FACE' && selectedTopology.coordinates && selectedTopology.normal) {
+                      setActiveFaceOrigin(selectedTopology.coordinates);
+                      setActiveFaceNormal(selectedTopology.normal);
+                      setActiveFaceId(selectedTopology.id || `face_${Date.now()}`);
+                      setActivePlane('FACE');
+                      triggerCameraNormal();
+                    } else {
+                      setActivePlane('FRONT');
+                    }
+                    
                     setSketchMode(true);
                     setSketchTool('LINE');
                   }
@@ -1714,10 +1855,16 @@ export default function Home() {
                       return (
                         <>
                           <div
-                            onClick={() => { 
+                            onClick={(e) => { 
                               setActivePlane('FRONT'); 
                               setSelectedId(null); 
-                              setContextMenu({ plane: 'FRONT', position: [0, 0, 40] });
+                              setContextMenu({ 
+                                visible: true, 
+                                x: e.clientX, 
+                                y: e.clientY,
+                                type: 'BACKGROUND',
+                                data: { plane: 'FRONT' }
+                              });
                             }}
                             onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('FRONT'); setSketchMode(true); setSketchTool('LINE'); setContextMenu(null); }}
                             onMouseEnter={() => setHoveredTreeId('FRONT')}
@@ -1745,10 +1892,16 @@ export default function Home() {
                           </div>
 
                           <div
-                            onClick={() => { 
+                            onClick={(e) => { 
                               setActivePlane('TOP'); 
                               setSelectedId(null); 
-                              setContextMenu({ plane: 'TOP', position: [0, 40, 0] });
+                              setContextMenu({ 
+                                visible: true, 
+                                x: e.clientX, 
+                                y: e.clientY,
+                                type: 'BACKGROUND',
+                                data: { plane: 'TOP' }
+                              });
                             }}
                             onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('TOP'); setSketchMode(true); setSketchTool('LINE'); setContextMenu(null); }}
                             onMouseEnter={() => setHoveredTreeId('TOP')}
@@ -1776,10 +1929,16 @@ export default function Home() {
                           </div>
 
                           <div
-                            onClick={() => { 
+                            onClick={(e) => { 
                               setActivePlane('RIGHT'); 
                               setSelectedId(null); 
-                              setContextMenu({ plane: 'RIGHT', position: [40, 0, 0] });
+                              setContextMenu({ 
+                                visible: true, 
+                                x: e.clientX, 
+                                y: e.clientY,
+                                type: 'BACKGROUND',
+                                data: { plane: 'RIGHT' }
+                              });
                             }}
                             onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('RIGHT'); setSketchMode(true); setSketchTool('LINE'); setContextMenu(null); }}
                             onMouseEnter={() => setHoveredTreeId('RIGHT')}
@@ -1832,11 +1991,20 @@ export default function Home() {
                   </div>
 
                   {/* Chronological History Tree */}
-                  <div className="pl-2 pt-2 space-y-1">
+                  <div className="pl-2 pt-2 space-y-1 relative">
                     <div className="text-[13px] uppercase tracking-wider text-slate-500 font-bold mb-1">模型歷史特徵</div>
+                    
+                    {/* Top-level Rollback Target (Rollback to start) */}
+                    <div 
+                      className={`h-1 w-full rounded-full transition-all cursor-row-resize ${rollbackIndex === -1 ? 'bg-blue-600 h-1.5 shadow-md' : 'bg-transparent hover:bg-blue-200'}`}
+                      onClick={() => setRollbackIndex(rollbackIndex === -1 ? null : -1)}
+                      title="退回到起始狀態"
+                    />
+
                     {features.map((f, fIdx) => {
                       const relState = getTreeRelation(f.id, hoveredTreeId);
                       const isExtrudeOrRevolve = f.type === 'EXTRUDE' || f.type === 'REVOLVE';
+                      const isRolledBack = rollbackIndex !== null && fIdx > rollbackIndex;
                       let sketchNum = 1;
                       if (f.id === 'feat_base_plate') sketchNum = 1;
                       else if (f.id === 'feat_center_hole') sketchNum = 2;
@@ -1847,81 +2015,103 @@ export default function Home() {
                       }
 
                       return (
-                        <div 
-                          key={f.id} 
-                          className="flex flex-col border border-transparent rounded transition-all"
-                          onMouseEnter={() => setHoveredTreeId(f.id)}
-                          onMouseLeave={() => setHoveredTreeId(null)}
-                        >
-                          {/* Feature Row */}
-                          <div
-                            onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('FEATURE'); }}
-                            onDoubleClick={() => handleEditFeatureSketch(f)}
-                            className={`group flex items-center justify-between p-1.5 rounded cursor-pointer transition-all border ${
-                              editingFeatureId === f.id
-                                ? 'bg-emerald-50 border-emerald-300 text-slate-900 font-bold'
-                                : selectedId === f.id && selectedSubNodeType === 'FEATURE'
-                                ? 'bg-primary/10 border-primary/30 text-slate-800 font-bold'
-                                : relState === 'PARENT'
-                                ? 'bg-blue-50/70 border-blue-200 text-blue-900 font-medium'
-                                : relState === 'CHILD'
-                                ? 'bg-purple-50/70 border-purple-200 text-purple-900 font-medium'
-                                : 'hover:bg-slate-100 border-transparent text-slate-700'
-                            }`}
+                        <Fragment key={f.id}>
+                          <div 
+                            className={`flex flex-col border border-transparent rounded transition-all ${isRolledBack ? 'opacity-40 grayscale-[0.5]' : ''}`}
+                            onMouseEnter={() => setHoveredTreeId(f.id)}
+                            onMouseLeave={() => setHoveredTreeId(null)}
                           >
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm">
-                                {f.type === 'REVOLVE' ? '🍾' : f.type === 'EXTRUDE' ? (f.parameters.operation === 'CUT' ? '🕳️' : '🏗️') : f.type === 'BOX' ? '📦' : f.type === 'CYLINDER' ? '🧪' : '🔮'}
-                              </span>
-                              <div className="flex flex-col">
-                                <span className="text-[14px] leading-tight">{f.name}</span>
-                                <span className="text-[13px] text-slate-500 font-mono leading-none uppercase">{f.type === 'EXTRUDE' ? f.parameters.operation : f.type}</span>
-                                {editingFeatureId === f.id && (
-                                  <span className="mt-0.5 text-[12px] text-emerald-700 font-bold uppercase leading-none">Editing sketch</span>
-                                )}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
-                              {relState === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
-                              {relState === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1.5 py-0.2 rounded">子 (Child)</span>}
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeFeature(f.id);
-                                  setSelectedId(null);
-                                  setTimeout(handleRebuild, 50);
-                                }}
-                                onDoubleClick={(e) => e.stopPropagation()}
-                                className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-error/20 rounded text-slate-500 hover:text-error transition-all"
-                                title="刪除特徵"
-                              >
-                                🗑️
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Nested Sketch Child Node */}
-                          {isExtrudeOrRevolve && (
+                            {/* Feature Row */}
                             <div
-                              onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('SKETCH'); }}
+                              onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('FEATURE'); }}
                               onDoubleClick={() => handleEditFeatureSketch(f)}
-                              className={`pl-7 pr-2 py-1 flex items-center justify-between gap-1.5 cursor-pointer text-[14px] select-none rounded transition-all border border-transparent ${
-                                selectedId === f.id && selectedSubNodeType === 'SKETCH'
-                                  ? 'bg-pink-100/90 border border-pink-300 text-pink-700 font-bold shadow-xs'
-                                  : 'text-slate-500 hover:text-primary hover:bg-slate-100/50'
+                              className={`group flex items-center justify-between p-1.5 rounded cursor-pointer transition-all border ${
+                                editingFeatureId === f.id
+                                  ? 'bg-emerald-50 border-emerald-300 text-slate-900 font-bold'
+                                  : selectedId === f.id && selectedSubNodeType === 'FEATURE'
+                                  ? 'bg-primary/10 border-primary/30 text-slate-800 font-bold'
+                                  : relState === 'PARENT'
+                                  ? 'bg-blue-50/70 border-blue-200 text-blue-900 font-medium'
+                                  : relState === 'CHILD'
+                                  ? 'bg-purple-50/70 border-purple-200 text-purple-900 font-medium'
+                                  : 'hover:bg-slate-100 border-transparent text-slate-700'
                               }`}
-                              title="雙擊編輯此特徵所屬的草圖幾何"
                             >
-                              <div className="flex items-center gap-1.5">
-                                <span>↳ ✏️</span>
-                                <span className="italic hover:underline">草圖{sketchNum} (Sketch{sketchNum})</span>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">
+                                  {f.type === 'REVOLVE' ? '🍾' : f.type === 'EXTRUDE' ? (f.parameters.operation === 'CUT' ? '🕳️' : '🏗️') : f.type === 'BOX' ? '📦' : f.type === 'CYLINDER' ? '🧪' : '🔮'}
+                                </span>
+                                <div className="flex flex-col">
+                                  <span className="text-[14px] leading-tight">{f.name}</span>
+                                  <span className="text-[13px] text-slate-500 font-mono leading-none uppercase">{f.type === 'EXTRUDE' ? f.parameters.operation : f.type}</span>
+                                  {editingFeatureId === f.id && (
+                                    <span className="mt-0.5 text-[12px] text-emerald-700 font-bold uppercase leading-none">Editing sketch</span>
+                                  )}
+                                </div>
                               </div>
-                              {editingFeatureId === f.id && (
-                                <span className="text-[12px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono mr-2 animate-pulse">編輯中</span>
-                              )}
+                              <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
+                                {relState === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded">父 (Parent)</span>}
+                                {relState === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1.5 py-0.2 rounded">子 (Child)</span>}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeFeature(f.id);
+                                    setSelectedId(null);
+                                    setTimeout(handleRebuild, 50);
+                                  }}
+                                  onDoubleClick={(e) => e.stopPropagation()}
+                                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:bg-error/20 rounded text-slate-500 hover:text-error transition-all"
+                                  title="刪除特徵"
+                                >
+                                  🗑️
+                                </button>
+                              </div>
                             </div>
-                          )}
-                        </div>
+
+                            {/* Nested Sketch Child Node */}
+                            {isExtrudeOrRevolve && (
+                              <div
+                                onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('SKETCH'); }}
+                                onDoubleClick={() => handleEditFeatureSketch(f)}
+                                className={`pl-7 pr-2 py-1 flex items-center justify-between gap-1.5 cursor-pointer text-[14px] select-none rounded transition-all border border-transparent ${
+                                  selectedId === f.id && selectedSubNodeType === 'SKETCH'
+                                    ? 'bg-pink-100/90 border border-pink-300 text-pink-700 font-bold shadow-xs'
+                                    : 'text-slate-500 hover:text-primary hover:bg-slate-100/50'
+                                }`}
+                                title="雙擊編輯此特徵所屬的草圖幾何"
+                              >
+                                <div className="flex items-center gap-1.5 overflow-hidden">
+                                  <span>↳ ✏️</span>
+                                  <span className="italic hover:underline truncate">草圖{sketchNum} (Sketch{sketchNum})</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {editingFeatureId === f.id && (
+                                    <span className="text-[12px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono animate-pulse">編輯中</span>
+                                  )}
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleSketchVisibility(f.id);
+                                    }}
+                                    className={`p-0.5 rounded transition-all hover:bg-slate-200 ${
+                                      visibleSketches.includes(f.id) ? 'text-primary' : 'text-slate-300'
+                                    }`}
+                                    title={visibleSketches.includes(f.id) ? "隱藏草圖" : "顯示草圖"}
+                                  >
+                                    {visibleSketches.includes(f.id) ? '👁️' : '👓'}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {/* Rollback Line after each feature */}
+                          <div 
+                            className={`h-1 w-full rounded-full transition-all cursor-row-resize ${rollbackIndex === fIdx ? 'bg-blue-600 h-1.5 shadow-md' : 'bg-transparent hover:bg-blue-200'}`}
+                            onClick={() => setRollbackIndex(rollbackIndex === fIdx ? null : fIdx)}
+                            title="退回到此特徵之後"
+                          />
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -2367,19 +2557,13 @@ export default function Home() {
               </div>
             </div>
           )}
-
-          {/* Sidebar Status Footer */}
-          <div className="h-[28px] w-full border-t border-[#D1D5DB] bg-[#F5F6F9] flex items-center justify-between px-3 text-[13px] text-slate-600 shrink-0 font-mono">
-            <span className={loading ? 'text-warning animate-pulse' : 'text-slate-600'}>
-              {loading ? '⚡ 幾何重構中 (BUSY)...' : '🟢 系統就緒 (READY)'}
-            </span>
-            <span>MMGS (公釐)</span>
-          </div>
         </aside>
 
         {/* Right Area: Viewport (Graphics Area) */}
-        <section className="flex-grow h-full relative">
-
+        <section className="flex-grow h-full relative" onContextMenu={(e) => e.preventDefault()}>
+          <HeadsUpToolbar />
+          <ShortcutBox />
+          <ContextMenu />
 
           {isSketchMode && hasConflict && (
             <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-500/90 border border-red-400 text-white px-5 py-3 rounded-full shadow-2xl flex items-center gap-2.5 z-[999] w-[85%] max-w-[500px] pointer-events-none backdrop-blur-md">
@@ -2421,60 +2605,6 @@ export default function Home() {
 
           {/* Floating Sketch Viewport HUD */}
           <SketchHUD onReset={resetSketchSession} onExit={handleExitAndExtrude} />
-
-          {/* Floating Camera View Orientation Toolbar (Right side) */}
-          <div className="absolute top-4 right-4 flex flex-col gap-2 z-10 select-none">
-            <div className="glass-effect p-1.5 rounded-2xl flex flex-col gap-1.5 shadow-2xl border border-white/30 text-[14px]">
-              <div className="text-[12px] text-slate-500 font-bold uppercase tracking-wider text-center border-b border-slate-200 pb-1 mb-1">視角 (View)</div>
-
-              <button
-                onClick={() => { setActivePlane('FRONT'); setSelectedId(null); }}
-                className={`w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all ${
-                  activePlane === 'FRONT' ? 'bg-primary/10 text-primary border border-primary/20 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                title="前視景 (FRONT)"
-              >
-                <span className="text-[13px] font-bold font-mono">前</span>
-                <span className="text-[12px] text-slate-600 leading-none">XY</span>
-              </button>
-
-              <button
-                onClick={() => { setActivePlane('TOP'); setSelectedId(null); }}
-                className={`w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all ${
-                  activePlane === 'TOP' ? 'bg-primary/10 text-primary border border-primary/20 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                title="俯視景 (TOP)"
-              >
-                <span className="text-[13px] font-bold font-mono">上</span>
-                <span className="text-[12px] text-slate-600 leading-none">XZ</span>
-              </button>
-
-              <button
-                onClick={() => { setActivePlane('RIGHT'); setSelectedId(null); }}
-                className={`w-9 h-9 flex flex-col items-center justify-center rounded-xl transition-all ${
-                  activePlane === 'RIGHT' ? 'bg-primary/10 text-primary border border-primary/20 font-bold' : 'hover:bg-slate-100 text-slate-700'
-                }`}
-                title="右視景 (RIGHT)"
-              >
-                <span className="text-[13px] font-bold font-mono">右</span>
-                <span className="text-[12px] text-slate-600 leading-none">YZ</span>
-              </button>
-
-              <div className="w-6 h-px bg-slate-200 self-center my-0.5" />
-
-              <button
-                onClick={() => {
-                  setSelectedId(null);
-                  resetSketchSession();
-                }}
-                className={`w-9 h-9 flex flex-col items-center justify-center rounded-xl hover:bg-slate-100 text-slate-700 transition-all`}
-                title="等角透視 (Perspective)"
-              >
-                <span className="text-[12px]">🌐</span>
-                <span className="text-[12px] text-slate-600 leading-none">立體</span>
-              </button>
-            </div>
-          </div>
 
           {/* Loading Overlay */}
           {loading && (
@@ -2646,6 +2776,7 @@ export default function Home() {
           )}
         </section>
       </div>
+      <StatusBar />
     </main>
   );
 }

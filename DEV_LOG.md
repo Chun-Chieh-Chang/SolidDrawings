@@ -47,6 +47,107 @@
 1. **不重複造輪子 (Don't Reinvent the Wheel)**: 凡是有現成、穩定、工業標準的開源工具（如 OpenCASCADE, SolveSpace, React Three Fiber），必須直接引進並封裝對接，嚴禁從零自行開發底層數學或圖形邏輯。
 
 ---
+## [2026-05-23] 貫徹 RCA/CAPA：型別強固化與自動化防禦體系實裝 ✅
+
+### 實裝成果
+- **建立自動化防禦 Hook (CAPA - Automation)**：
+  - 在 `.git/hooks/pre-commit` 中實作了強制的型別檢查邏輯。
+  - 現在任何 Git Commit 操作都會自動觸發 `npx tsc --noEmit`。若代碼中存在紅色波浪線（型別錯誤），提交將會被主動阻斷，從源頭杜絕異常進入代碼庫。
+- **更新專案記憶體與規範 (CAPA - Governance)**：
+  - 更新 [project_memory.md](file:///c:/Users/3kids/.trae/memory/projects/-c-Users-3kids-Downloads-3D-Builder/project_memory.md)，正式將「型別防禦」與「介面先行 (Interface First)」列入 Hard Constraints。
+  - 明確要求更新 Zustand Store 時必須先定義 `interface` 再寫實作，嚴禁使用 `any` 規避。
+- **完成深度根因診斷 (RCA)**：
+  - 詳見下方的 RCA 分析紀錄，定位了「局部實作優於全域介面」的思維慣性問題。
+
+### 確效結果 (Validation)
+- 嘗試手動刪除介面定義後執行 commit，成功觸發 pre-commit hook 阻斷，防禦體系運作正常。
+- 執行 `npx tsc --noEmit` 全域通過。
+
+### RCA & CAPA (Deep Analysis)
+- **Phase 1: Investigation (根因調查)**
+  - 錯誤重現：多次在 `page.tsx` 中出現變數未定義或型別不匹配的紅色波浪線，特別是在新增 `shortcutBox` 功能後。
+- **Phase 2: Pattern (模式分析)**
+  - 發現開發者傾向於在 `useCadStore.ts` 的 `create` 函式中直接新增實體狀態，但卻漏掉了 `CadState` 介面中的聲明。這種「實作快於介面」的模式是導致報錯的根本原因。
+- **Phase 3: Hypothesis (假設分析 RCA)**
+  - **根本原因**：缺乏「編譯即門禁」的自動化約束。開發者在 IDE 局部編輯時，若不主動執行全域編譯，極易忽略因介面不對稱導致的下游錯誤。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**
+  - **CAPA 1 (自動化防線)**：部署 Git `pre-commit` hook。將「人工自覺」轉換為「工具強迫」，確保只有編譯通過的代碼才能存檔。
+  - **CAPA 2 (規範化防線)**：在 `project_memory.md` 寫入硬性紀律，強化「介面先行」的開發意識。
+
+---
+## [2026-05-23] 修復 ShortcutBox 型別缺失導致的編譯錯誤 ✅
+
+### 實裝成果
+- **修復 Store 型別定義 (Store Interface Fix)**：
+  - 在 [useCadStore.ts](file:///c:/Users/3kids/Downloads/3D-Builder/src/store/useCadStore.ts) 中定義了 `CADShortcutBox` 介面。
+  - 將 `shortcutBox` 與 `setShortcutBox` 正式加入 `CadState` 介面定義中，解決了 `page.tsx` 無法識別該屬性的編譯錯誤。
+- **消除隱式 Any 型別 (Eliminate Implicit Any)**：
+  - 在 `useCadStore.ts` 的實作層為 `setShortcutBox` 參數顯式標註型別。
+  - 移除了 [ShortcutBox.tsx](file:///c:/Users/3kids/Downloads/3D-Builder/src/ui/ShortcutBox.tsx) 中不必要的 `as any` 強制轉型，達成全域強型別檢查。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 全域 100% 成功，無任何報錯。
+- IDE 中的紅色波浪線（page.tsx 與 useCadStore.ts）已完全消除。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 在前次實作 S-Key 快捷工具箱時，雖然在 Zustand Store 的實作中加入了 `shortcutBox` 狀態，但未同步更新 `CadState` 介面定義。這導致 TypeScript 編譯器與 IDE 檢查器因找不到對應屬性而產生錯誤標示。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **強型別同步機制**：要求在更新 Zustand Store 狀態時，必須遵循「介面先行」原則，先定義類型再實作邏輯。
+  - **編譯確效自動化**：在每次功能模組完成後，強制執行 `npx tsc --noEmit` 進行全域檢驗，而非僅依賴 IDE 的局部顯示。
+
+---
+## [2026-05-23] 強化開發續寫指南 (Handover Guide) 與環境智庫同步 ✅
+
+### 實裝成果
+- **全面升級續寫文檔 (Handover Guide Upgraded)**：
+  - 重構 [handover_resume_guide.md](file:///c:/Users/3kids/Downloads/3D-Builder/handover_resume_guide.md)，明確定義了當前 Phase 13+ 的技術成就與環境自動化流程。
+  - 導入了 **SkillsBuilder** 智庫整合說明，要求後續接手者執行 `INSTALL.ps1` 以同步全域專家技能與 Git Hooks。
+  - 強化了 **PDCA** 與 **Anti-Vibe Coding** 紀律宣告，將「根因分析 (RCA)」與「預防措施 (CAPA)」提升為專案核心開發準則。
+- **維護開發日誌 (Log Maintenance)**：
+  - 整理並歸檔了 Phase 5 至 Phase 13 的關鍵實裝紀錄，確保開發軌跡的連續性與可追溯性。
+  - 明確了「MECE 代碼清掃」的成果，確認專案已徹底移除所有 Demo 級別的冗餘代碼（如可樂瓶演示）。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 全域 100% 成功。
+- 文檔鏈路正確，Wiki 索引檔與各實體文件（如 [graph_model.md](file:///c:/Users/3kids/Downloads/3D-Builder/wiki/entities/graph_model.md)）均已同步。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 隨著專案複雜度提升與多次 Phase 迭代，原有的交接指南已無法完全覆蓋新引入的 SkillsBuilder 智庫、Nexus 協議以及強化的數據鏈路架構。缺乏即時更新的文檔會導致後續 AI Agent 在接手時產生上下文斷層，進而引發「猜測性開發」。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **文檔即代碼 (Doc-as-Code)**：建立文檔維護與 Phase 結束的強制掛鉤機制。在每個重大階段完成後，必須同步更新 `handover_resume_guide.md` 與 `DEV_LOG.md`。
+  - **自動化環境導引**：將 `INSTALL.ps1` 作為接手的第一步，透過腳本自動化完成複雜環境的初始化，降低技術轉移成本。
+
+---
+---
+## [2026-05-23] 成功實現 Phase 13 獨立性缺口優化與全參數化數據鏈 ✅
+
+### 實裝成果
+- **全參數化草圖儲存 (Full Parametric Storage)**：
+  - 修改 `page.tsx` 中的 `handleExitAndExtrude`。現在特徵不僅儲存坐標點，還會完整保存 `sketchNodes`、`sketchEdges` 與 `sketchConstraints` 到 `parameters` 中。
+  - 這解決了過去「退出草圖後約束丟失」的問題，確保再次編輯時所有智慧尺寸與幾何關係 100% 還原。
+- **草圖獨立顯示控制 (Independent Sketch Visibility)**：
+  - 在 `useCadStore.ts` 中新增 `visibleSketches` 狀態陣列。
+  - 在 `FeatureManager` (設計樹) 的巢狀草圖節點旁實作了「顯示/隱藏」按鈕（👁️ 圖示），支持持久化顯示非活動草圖。
+- **上下文感知渲染增強 (Context-Aware Rendering)**：
+  - 重構 `SketchPreview.tsx`。現在支持同時渲染多個「被動草圖」，並在選取草圖時自動浮現所有智慧尺寸標註。
+  - 優化了 3D 投影變換，確保不同基準面上的草圖能正確並行顯示。
+- **向下相容性防禦 (Legacy Fallback)**：
+  - 在 `handleEditFeatureSketch` 中加入防禦邏輯。若開啟舊版圖檔，系統會自動偵測並從舊有 points 數組中即時重建圖論拓撲，確保數據結構平滑升級。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 全域 100% 成功。
+- 驗證「建立帶約束草圖 ➔ 長出特徵 ➔ 隱藏實體 ➔ 獨立顯示草圖 ➔ 修改尺寸 ➔ 即時重構」完整閉環，運作流暢。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 過去的系統在「離開草圖模式」時會將圖論數據丟棄，僅保留用於生成實體的點陣數組。這導致「獨立性」受損：用戶無法在不進入編輯模式的情況下看到草圖尺寸，且再次編輯時必須重新標註約束，效率極低。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **數據鏈條固化**：將 Zustand 中的暫態草圖狀態在「結束草圖」的一刻，深度拷貝至特徵的持久化參數中。
+  - **渲染器多開化**：將 `SketchPreview` 從「單一 Active 模式」擴展為「Active + Passive List 模式」，利用 `useMemo` 高效過濾需要渲染的草圖集合，實現數據的可視化互動。
+
+---
 ---
 ## [2026-05-23] RCA & CAPA: 徹底掃除「示範建構」與「可樂瓶演示」代碼殘留（PDCA 循環確效） ✅
 
@@ -2378,7 +2479,8 @@ px tsc --noEmit returned Exit Code 0.
     - Registered globalShortcut for common CAD operations.
     - Implemented pp:notify using Electron's Notification module.
 - **Bridge Refactoring**:
-  - **CAPA**: Updated preload.ts and enderer.ts to expose new event-driven listeners (onFileOpen, onSaveRequest, etc.), allowing the React app to respond to OS-level events.
+  - **CAPA**: Updated preload.ts and 
+enderer.ts to expose new event-driven listeners (onFileOpen, onSaveRequest, etc.), allowing the React app to respond to OS-level events.
 
 ### Verification Results
 

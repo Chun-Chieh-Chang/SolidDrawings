@@ -291,8 +291,11 @@ export const DatumPlanes = () => {
       return;
     }
     setContextMenu({
-      plane: plane,
-      position: [event.point.x, event.point.y, event.point.z]
+      visible: true,
+      x: event.nativeEvent.clientX,
+      y: event.nativeEvent.clientY,
+      type: 'BACKGROUND',
+      data: { plane }
     });
   };
 

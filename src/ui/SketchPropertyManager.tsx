@@ -22,6 +22,10 @@ export const SketchPropertyManager: React.FC = () => {
     return selectedEntityIds.filter(id => sketchEdges[id]).map(id => sketchEdges[id]);
   }, [selectedEntityIds, sketchEdges]);
 
+  const selectedConstraints = useMemo(() => {
+    return selectedEntityIds.filter(id => sketchConstraints[id]).map(id => sketchConstraints[id]);
+  }, [selectedEntityIds, sketchConstraints]);
+
   // Unified constraint applicator
   const applyConstraint = (type: SketchConstraint['type']) => {
     const cid = uuidv4();
@@ -120,6 +124,45 @@ export const SketchPropertyManager: React.FC = () => {
           {selectedEdges.map(edge => (
             <div key={edge.id} className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-1.5 rounded text-[13px] text-emerald-800">
               <span className="font-bold">邊線 ({edge.type})</span>
+            </div>
+          ))}
+          {selectedConstraints.map(c => (
+            <div key={c.id} className="flex flex-col bg-indigo-50 border border-indigo-200 p-1.5 rounded text-[13px] text-indigo-800">
+              <div className="flex justify-between items-center">
+                <span className="font-bold">尺寸約束 ({c.type})</span>
+                <span className="font-mono text-[11px] text-indigo-600">ID: {c.id.slice(0, 4)}</span>
+              </div>
+              {c.value !== undefined && (
+                <div className="mt-1 flex items-center gap-2">
+                  <span className="text-[11px] text-indigo-400">數值:</span>
+                  <input 
+                    type="number"
+                    defaultValue={c.value}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const val = parseFloat((e.target as HTMLInputElement).value);
+                        if (!isNaN(val)) {
+                          const nextConstraints = { ...sketchConstraints, [c.id]: { ...c, value: val } };
+                          setSketchConstraints(nextConstraints);
+                          const nextNodes = solveConstraints(sketchNodes, sketchEdges, nextConstraints);
+                          setSketchNodes(nextNodes);
+                        }
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!isNaN(val)) {
+                        const nextConstraints = { ...sketchConstraints, [c.id]: { ...c, value: val } };
+                        setSketchConstraints(nextConstraints);
+                        const nextNodes = solveConstraints(sketchNodes, sketchEdges, nextConstraints);
+                        setSketchNodes(nextNodes);
+                      }
+                    }}
+                    className="w-16 bg-white border border-indigo-200 rounded px-1 text-[11px] font-mono focus:outline-none focus:border-indigo-500"
+                  />
+                  <span className="text-[10px] text-indigo-300 italic">mm</span>
+                </div>
+              )}
             </div>
           ))}
           {selectedEntityIds.length === 0 && (

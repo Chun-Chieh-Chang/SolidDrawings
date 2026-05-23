@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useEffect, useRef, useCallback, useState } from 'react';
+import React, { Suspense, useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, Grid, Stage, PerspectiveCamera, Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
@@ -296,24 +296,24 @@ const FeatureOutlines = () => {
         const isHovered = hoveredFeatureId === feat.id;
 
         let highlightColor = "#60A5FA"; // Default Reference Sky Blue
-        let lineWidth = 1.5;
+        let lineWidth = 1.0;
         let opacityVal = 0.4;
 
         if (isSelected && !suppressSolidHighlights) {
           highlightColor = "#60A5FA"; // SolidWorks Sky Blue/Cyan
-          lineWidth = 4.5;
+          lineWidth = 2.5;
           opacityVal = 0.9;
         } else if (isHovered) {
           highlightColor = "#f59e0b"; // Amber Gold
-          lineWidth = 3.5;
+          lineWidth = 2.0;
           opacityVal = 0.8;
         } else if (depType === 'PARENT') {
           highlightColor = "#10B981"; // Success Emerald Green
-          lineWidth = 3.0;
+          lineWidth = 1.5;
           opacityVal = 0.75;
         } else if (depType === 'CHILD') {
           highlightColor = "#3B82F6"; // Accent Royal Blue
-          lineWidth = 3.0;
+          lineWidth = 1.5;
           opacityVal = 0.75;
         }
 
@@ -664,6 +664,46 @@ interface ViewportProps {
   children?: React.ReactNode;
 }
 
+const MouseTracker = () => {
+  const { setMousePos, activePlane, isSketchMode, activeFaceOrigin, activeFaceNormal } = useCadStore();
+  
+  // Create a large invisible plane that matches the current active plane to catch mouse movement
+  const planeArgs = useMemo(() => {
+    let position = new THREE.Vector3(0, 0, 0);
+    let rotation = new THREE.Euler(0, 0, 0);
+
+    if (activePlane === 'FRONT') {
+      rotation.set(0, 0, 0);
+    } else if (activePlane === 'TOP') {
+      rotation.set(-Math.PI / 2, 0, 0);
+    } else if (activePlane === 'RIGHT') {
+      rotation.set(0, Math.PI / 2, 0);
+    } else if (activePlane === 'FACE' && activeFaceOrigin && activeFaceNormal) {
+      position.set(...activeFaceOrigin);
+      const normal = new THREE.Vector3(...activeFaceNormal).normalize();
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      rotation.setFromQuaternion(quaternion);
+    }
+
+    return { position, rotation };
+  }, [activePlane, activeFaceOrigin, activeFaceNormal]);
+
+  return (
+    <mesh
+      position={planeArgs.position}
+      rotation={planeArgs.rotation}
+      onPointerMove={(e) => {
+        // e.point is the 3D coordinate where the ray hits the mesh
+        setMousePos([e.point.x, e.point.y, e.point.z]);
+      }}
+      visible={false}
+    >
+      <planeGeometry args={[2000, 2000]} />
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+    </mesh>
+  );
+};
+
 export default function Viewport({ children }: ViewportProps) {
   const { isSketchMode, features, setControls, isCameraAnimating, activePropertyManager, setSelectedId, setSelectedSubNodeType } = useCadStore();
 
@@ -681,6 +721,7 @@ export default function Viewport({ children }: ViewportProps) {
         }}
       >
         <CameraHandler />
+        <MouseTracker />
         <SceneSelector />
         <PerspectiveCamera makeDefault position={[100, 100, 100]} fov={45} />
         <Suspense fallback={null}>
