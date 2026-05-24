@@ -21,7 +21,7 @@ export const MatePanel = () => {
 
   const assemblyService = new AssemblyService();
 
-  const handleApplyMate = () => {
+  const handleApplyMate = async () => {
     if (mateSelection.length < 2) return;
 
     const newMate: CADMate = {
@@ -44,7 +44,7 @@ export const MatePanel = () => {
     clearMateSelection();
     
     // Trigger solver
-    const updatedComponents = assemblyService.solve(components, [...mates, newMate]);
+    const updatedComponents = await assemblyService.solve(components, [...mates, newMate]);
     setComponents(updatedComponents);
   };
 

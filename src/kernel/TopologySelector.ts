@@ -3,11 +3,22 @@ import { useCadStore } from '../store/useCadStore';
 
 export type TopologyType = 'FACE' | 'EDGE' | 'VERTEX';
 
+export interface EdgeSignature {
+  length: number;
+}
+
+export interface FaceSignature {
+  area: number;
+  curvature?: string;
+  v_count: number;
+}
+
 export interface SelectedTopology {
   type: TopologyType;
   id: string;
   coordinates: [number, number, number];
   normal?: [number, number, number];
+  signature?: FaceSignature | EdgeSignature;
   edgeData?: {
     start: [number, number, number];
     end: [number, number, number];
@@ -160,15 +171,18 @@ export class TopologySelector {
             centerPoint = projCA;
           }
 
-          const topology: SelectedTopology = {
-            type: 'EDGE',
-            id: edgeId,
-            coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
-            edgeData: {
-              start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
-              end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
-            },
-          };
+                      const topology: SelectedTopology = {
+              type: 'EDGE',
+              id: edgeId,
+              coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
+              edgeData: {
+                start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
+                end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
+              },
+              signature: {
+                length: selectedEdge[0].distanceTo(selectedEdge[1])
+              }
+            };
           useCadStore.getState().setSelectedTopology(topology);
           return topology;
         }
@@ -179,11 +193,28 @@ export class TopologySelector {
         }
       }
 
-      // 3. FACE PICKING
+            // 3. FACE PICKING
       if (filterType === 'ALL' || filterType === 'FACE_ONLY' || filterType === 'FACE_EDGE') {
+        const metadata = mesh.userData.face_metadata as any[];
+        let signature: FaceSignature | undefined;
+        
+        if (metadata && hit.faceIndex !== undefined) {
+            // Map Three.js faceIndex to OCC face using index_range
+            // Three.js faceIndex is triangle index. Every 3 indices = 1 triangle.
+            // Vert index in geometry.index = faceIndex * 3
+            const triangleStartIdx = (hit.faceIndex as number) * 3;
+            const vertIdx = geometry.index ? geometry.index.getX(triangleStartIdx) : triangleStartIdx;
+            
+            const faceMatch = metadata.find(m => vertIdx >= m.index_range[0] && vertIdx < m.index_range[1]);
+            if (faceMatch) {
+                signature = { area: faceMatch.area, v_count: faceMatch.v_count, curvature: faceMatch.curvature };
+            }
+        }
+
         const topology: SelectedTopology = {
           type: 'FACE',
           id: `${mesh.uuid}_f_${hit.faceIndex}`,
+          signature,
           coordinates: [hitPoint.x, hitPoint.y, hitPoint.z],
           normal: hit.face.normal
             ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z]

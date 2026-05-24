@@ -2544,7 +2544,7 @@ export default function Home() {
                   <div className="bg-[#4F46E5]/10 p-2.5 rounded-xl border border-[#4F46E5]/20 shadow-sm flex flex-col items-center justify-center py-3">
                     <span className="text-[13px] text-[#4F46E5] uppercase font-bold tracking-widest mb-1">精確量測數值</span>
                     <div className="text-base font-black text-slate-900 font-mono leading-none flex items-baseline gap-1">
-                      <span>{measurementResults.value.toFixed(3)}</span>
+                      <span>{(measurementResults.value ?? 0).toFixed(3)}</span>
                       <span className="text-[14px] text-indigo-600 font-bold">{measurementResults.unit}</span>
                     </div>
                     {measurementResults.details && (

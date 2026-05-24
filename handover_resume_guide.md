@@ -34,9 +34,11 @@
 查閱 `wiki/index.md`。專案大腦已將「幾何約束數學」、「圖論模型」與「渲染管線」實體化。
 
 ### 步驟 3: 遵守 PDCA
-1. 讀取 `task_plan.md` 了解當前進度。
-2. 讀取 `DEV_LOG.md` 最後一筆記錄。
-3. 開始新的開發循環前，先更新 `task_plan.md`。
+1. 讀取 `docs/productization/PRODUCTIZATION_PLAN.md` 作為產品化 Plan of Record。
+2. 讀取 `task_plan.md` 了解當前 Do 的範圍與驗收條件。
+3. 讀取 `DEV_LOG.md` 最後一筆記錄。
+4. 完成每次開發或修訂後，執行 `npm run pdca:check`。
+5. 若 Check 不通過，依 `docs/governance/RCA_CAPA_TEMPLATE.md` 在 `DEV_LOG.md` 執行 RCA/CAPA，再修正並重跑 Check。
 
 ## 4. 下一步開發藍圖 (Roadmap)
 1. **進階組合件約束 (Advanced Assembly Mates)**:

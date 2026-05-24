@@ -18,7 +18,7 @@ export const DatumPlanes = () => {
     sketchNewChain, setSketchNewChain,
     activeFaceOrigin,
     activeFaceNormal,
-    activeFaceId,
+    activeFaceId, computedRefGeometry,
     referencePlanes,
     referenceAxes
   } = useCadStore();
@@ -433,10 +433,80 @@ export const DatumPlanes = () => {
               {cursorState.type || `${cursorState.u.toFixed(1)}, ${cursorState.v.toFixed(1)}`}
             </div>
           </Html>
-        </group>
+              {/* Render Computed Custom Reference Planes */}
+      {computedRefGeometry?.filter(g => g.type === 'PLANE').map((plane) => {
+        const { id, data } = plane;
+        const origin = new THREE.Vector3(...data.origin);
+        const normal = new THREE.Vector3(...data.normal);
+        const xDir = new THREE.Vector3(...data.xDir);
+        const yDir = new THREE.Vector3(...data.yDir);
+        
+        const isSelected = activePlane === id;
+        
+        return (
+          <group key={id} position={origin} quaternion={new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xDir, yDir, normal))}>
+            <Plane
+              args={[100, 100]}
+              onPointerDown={(e) => {
+                  e.stopPropagation();
+                  useCadStore.getState().setActivePlane(id);
+                  useCadStore.getState().setSelectedId(id);
+              }}
+            >
+              <meshStandardMaterial 
+                color={isSelected ? "#3B82F6" : "#94A3B8"} 
+                transparent 
+                opacity={isSelected ? 0.3 : 0.15} 
+                side={THREE.DoubleSide}
+              />
+            </Plane>
+            <Html position={[0, 0, 0]}>
+              <div className={`text-[9px] font-bold px-1 rounded border ${isSelected ? 'bg-primary text-white border-primary' : 'bg-white/80 text-slate-500 border-slate-300'}`}>
+                {id}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+    </group>
       )}
 
       {/* Reference Geometry Rendering is omitted for brevity but can be added back */}
+          {/* Render Computed Custom Reference Planes */}
+      {computedRefGeometry?.filter(g => g.type === 'PLANE').map((plane) => {
+        const { id, data } = plane;
+        const origin = new THREE.Vector3(...data.origin);
+        const normal = new THREE.Vector3(...data.normal);
+        const xDir = new THREE.Vector3(...data.xDir);
+        const yDir = new THREE.Vector3(...data.yDir);
+        
+        const isSelected = activePlane === id;
+        
+        return (
+          <group key={id} position={origin} quaternion={new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xDir, yDir, normal))}>
+            <Plane
+              args={[100, 100]}
+              onPointerDown={(e) => {
+                  e.stopPropagation();
+                  useCadStore.getState().setActivePlane(id);
+                  useCadStore.getState().setSelectedId(id);
+              }}
+            >
+              <meshStandardMaterial 
+                color={isSelected ? "#3B82F6" : "#94A3B8"} 
+                transparent 
+                opacity={isSelected ? 0.3 : 0.15} 
+                side={THREE.DoubleSide}
+              />
+            </Plane>
+            <Html position={[0, 0, 0]}>
+              <div className={`text-[9px] font-bold px-1 rounded border ${isSelected ? 'bg-primary text-white border-primary' : 'bg-white/80 text-slate-500 border-slate-300'}`}>
+                {id}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
     </group>
   );
 };

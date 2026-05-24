@@ -1,6 +1,6 @@
 {
   "name": "cad-app",
-  "version": "3.1.0-alpha",
+  "version": "1.0.0",
   "private": true,
   "main": "out/main.js",
   "skillsBuilder": {
@@ -15,7 +15,10 @@
     "electron:build": "npm run build && npx tsc --project electron/tsconfig.json",
     "electron:start": "electron .",
     "electron:pack": "electron-builder --dir",
-    "electron:dist": "electron-builder"
+    "electron:dist": "electron-builder",
+    "typecheck": "tsc --noEmit",
+    "pdca:check": "node tools/pdca-check.mjs",
+    "pdca:full": "npm run typecheck && npm run pdca:check"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.7",
@@ -44,12 +47,33 @@
     "ts-morph": "^28.0.0",
     "typescript": "^5"
   },
-  "build": {
+    "build": {
     "appId": "com.3dbuilder.cad",
     "productName": "3D-Builder",
+    "copyright": "Copyright © 2026 SkillsBuilder",
     "directories": {
-      "output": "dist"
+      "output": "release"
     },
+    "win": {
+      "target": "nsis",
+      "icon": "public/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.graphics-design"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "out/**/*",
+      "electron/main.js",
+      "electron/preload.js",
+      "node_modules/**/*",
+      "package.json"
+    ]
+  },
     "files": [
       "out/**/*",
       "node_modules/**/*",
@@ -93,11 +117,10 @@
       },
       {
         "ext": [
-          "sldprt"
+          "3dbpart"
         ],
-        "name": "SolidWorks Part",
+        "name": "3D-Builder Part",
         "role": "Editor"
       }
     ]
   }
-}

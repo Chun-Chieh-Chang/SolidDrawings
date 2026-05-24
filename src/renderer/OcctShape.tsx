@@ -5,10 +5,19 @@ import * as THREE from 'three';
 import { useCadStore } from '../store/useCadStore';
 import { topologySelector, getFeatureDistance } from './Viewport';
 
+export interface FaceMetadata {
+  id: string;
+  area: number;
+  v_count: number;
+  curvature?: string;
+  index_range: [number, number];
+}
+
 export interface MeshData {
   vertices: number[];
   normals: number[];
   indices: number[];
+  face_metadata?: FaceMetadata[];
 }
 
 interface OcctShapeProps {
@@ -45,6 +54,16 @@ export default function OcctShape({
     geo.setIndex(new THREE.BufferAttribute(indices, 1));
     return geo;
   }, [data]);
+
+  // P4-3 Performance Audit: Proper resource disposal to prevent memory leaks
+  React.useEffect(() => {
+    return () => {
+      if (geometry) {
+        console.log('[OcctShape] Disposing geometry for performance stabilization');
+        geometry.dispose();
+      }
+    };
+  }, [geometry]);
 
   const handleMeshClick = (e: any) => {
     e.stopPropagation();
@@ -101,7 +120,7 @@ export default function OcctShape({
       geometry={geometry} 
       position={position} 
       rotation={rotation} 
-      userData={{ type: 'B_REP_SHAPE' }}
+      userData={{ type: 'B_REP_SHAPE', face_metadata: data.face_metadata }}
       onClick={handleMeshClick}
     >
       <meshStandardMaterial 

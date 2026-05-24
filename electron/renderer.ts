@@ -4,6 +4,11 @@
 
 import { IpcRendererEvent } from 'electron';
 
+type SaveFileFormat = '3DBPART' | 'STEP' | 'IGES' | 'STL';
+interface SaveFileOptions {
+  format?: SaveFileFormat;
+}
+
 // File API
 export const fileAPI = {
   open: async (): Promise<{ path: string } | null> => {
@@ -13,9 +18,9 @@ export const fileAPI = {
     return null;
   },
 
-  save: async (data: string): Promise<{ success: boolean; path?: string; error?: string } | null> => {
+  save: async (data: string, options?: SaveFileOptions): Promise<{ success: boolean; path?: string; error?: string } | null> => {
     if (typeof window !== 'undefined' && window.electronAPI) {
-      return await window.electronAPI.file.save(data);
+      return await window.electronAPI.file.save(data, options);
     }
     return null;
   },

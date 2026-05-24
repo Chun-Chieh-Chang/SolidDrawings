@@ -32,7 +32,9 @@ escape_for_json() {
 
 using_superpowers_escaped=$(escape_for_json "$using_superpowers_content")
 warning_escaped=$(escape_for_json "$warning_message")
-session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Below is the full content of your 'superpowers:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n\n${warning_escaped}\n</EXTREMELY_IMPORTANT>"
+plan_guardrail="\n\n<PDCA_PRODUCTIZATION_GUARDRAIL>\nBefore making project changes, read docs/productization/PRODUCTIZATION_PLAN.md and task_plan.md. After each Do step, run npm run pdca:check. If output deviates from Plan, document RCA/CAPA in DEV_LOG.md using docs/governance/RCA_CAPA_TEMPLATE.md, correct the work, and repeat Check until aligned.\n</PDCA_PRODUCTIZATION_GUARDRAIL>"
+plan_guardrail_escaped=$(escape_for_json "$plan_guardrail")
+session_context="<EXTREMELY_IMPORTANT>\nYou have superpowers.\n\n**Below is the full content of your 'superpowers:using-superpowers' skill - your introduction to using skills. For all other skills, use the 'Skill' tool:**\n\n${using_superpowers_escaped}\n\n${plan_guardrail_escaped}\n\n${warning_escaped}\n</EXTREMELY_IMPORTANT>"
 
 # Output context injection as JSON.
 # Cursor hooks expect additional_context (snake_case).

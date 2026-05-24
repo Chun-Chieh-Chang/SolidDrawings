@@ -4,12 +4,17 @@
 
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
+type SaveFileFormat = '3DBPART' | 'STEP' | 'IGES' | 'STL';
+interface SaveFileOptions {
+  format?: SaveFileFormat;
+}
+
 // Expose API to Renderer Process
 contextBridge.exposeInMainWorld('electronAPI', {
   // File API
   file: {
     open: () => ipcRenderer.invoke('file:open'),
-    save: (data: string) => ipcRenderer.invoke('file:save', data),
+    save: (data: string, options?: SaveFileOptions) => ipcRenderer.invoke('file:save', data, options),
     read: (filePath: string) => ipcRenderer.invoke('file:read', filePath),
     printToPdf: (filePath?: string) => ipcRenderer.invoke('file:print-to-pdf', filePath),
   },
@@ -53,7 +58,7 @@ declare global {
     electronAPI: {
       file: {
         open: () => Promise<{ path: string } | null>;
-        save: (data: string) => Promise<{ success: boolean; path?: string; error?: string } | null>;
+        save: (data: string, options?: SaveFileOptions) => Promise<{ success: boolean; path?: string; error?: string } | null>;
         read: (filePath: string) => Promise<{ success: boolean; content?: string; error?: string }>;
         printToPdf: (filePath?: string) => Promise<{ success: boolean; path?: string; error?: string }>;
       };

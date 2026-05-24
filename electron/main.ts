@@ -143,9 +143,9 @@ ipcMain.handle('file:open', async (event: IpcMainInvokeEvent) => {
   const result = (await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
-      { name: 'CAD Files', extensions: ['step', 'stl', 'iges', 'igs', 'sldprt', 'sldasm'] },
-      { name: 'SolidWorks Part Files', extensions: ['sldprt'] },
-      { name: 'SolidWorks Assembly Files', extensions: ['sldasm'] },
+      { name: '3D-Builder Part Files', extensions: ['3dbpart'] },
+      { name: 'Standard CAD Exchange Files', extensions: ['step', 'stp', 'stl', 'iges', 'igs'] },
+      { name: 'SolidWorks Native Files (unsupported; convert to STEP first)', extensions: ['sldprt', 'sldasm'] },
       { name: 'All Files', extensions: ['*'] },
     ],
   })) as any;
@@ -156,14 +156,20 @@ ipcMain.handle('file:open', async (event: IpcMainInvokeEvent) => {
   return null;
 });
 
-ipcMain.handle('file:save', async (event: IpcMainInvokeEvent, data: string) => {
+ipcMain.handle('file:save', async (event: IpcMainInvokeEvent, data: string, options?: { format?: '3DBPART' | 'STEP' | 'IGES' | 'STL' }) => {
+  const format = options?.format ?? '3DBPART';
+  const saveFilters = {
+    '3DBPART': [{ name: '3D-Builder Part Files', extensions: ['3dbpart'] }],
+    'STEP': [{ name: 'STEP Files', extensions: ['step', 'stp'] }],
+    'IGES': [{ name: 'IGES Files', extensions: ['iges', 'igs'] }],
+    'STL': [{ name: 'STL Files', extensions: ['stl'] }],
+  }[format];
+
   const result = (await dialog.showSaveDialog(mainWindow!, {
+    defaultPath: format === '3DBPART' ? 'part.3dbpart' : `part.${format.toLowerCase()}`,
     filters: [
-      { name: 'STEP Files', extensions: ['step'] },
-      { name: 'STL Files', extensions: ['stl'] },
-      { name: 'IGES Files', extensions: ['iges', 'igs'] },
-      { name: 'SolidWorks Part Files', extensions: ['sldprt'] },
-      { name: 'SolidWorks Assembly Files', extensions: ['sldasm'] },
+      ...saveFilters,
+      { name: 'All Files', extensions: ['*'] },
     ],
   })) as any;
 

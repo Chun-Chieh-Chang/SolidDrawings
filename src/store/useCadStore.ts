@@ -16,8 +16,40 @@ export interface CADMate {
   type: MateType;
   entity1: MateEntity;
   entity2: MateEntity;
-  alignment: 'ALIGNED' | 'ANTI_ALIGNED';
+  parameters?: { offset?: number; alignmentFlip?: boolean };
+  alignment?: 'ALIGNED' | 'ANTI_ALIGNED';
   offset?: number;
+}
+
+export interface CADFeature {
+  id: string;
+  type: string;
+  name: string;
+  parameters: any;
+  isSuppressed?: boolean;
+  isBroken?: boolean;
+}
+
+export interface SketchNode {
+  id: string;
+  x: number;
+  y: number;
+  isFixed?: boolean;
+}
+
+export interface SketchEdge {
+  id: string;
+  type: 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE';
+  nodeIds: string[];
+  isConstruction?: boolean;
+}
+
+export interface SketchConstraint {
+  id: string;
+  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE';
+  nodeIds?: string[];
+  edgeIds?: string[];
+  value?: number;
 }
 
 export interface CADComponent {
@@ -29,6 +61,13 @@ export interface CADComponent {
     rotation: [number, number, number];
   };
   visible: boolean;
+  isFixed?: boolean;
+}
+
+export interface CADShortcutBox {
+  visible: boolean;
+  x: number;
+  y: number;
 }
 
 export interface CADContextMenu {
@@ -39,61 +78,35 @@ export interface CADContextMenu {
   data?: any;
 }
 
-export interface CADShortcutBox {
-  visible: boolean;
-  x: number;
-  y: number;
-}
-
 export interface MeasurementResult {
-  mode: MeasurementMode;
-  value: number;
-  unit: string;
-  details?: string;
-}
-
-export interface CADFeature {
-  id: string;
-  type: 'SKETCH_RECT' | 'EXTRUDE' | 'BOX' | 'CYLINDER' | 'SPHERE' | 'REVOLVE' | 'FILLET' | 'CHAMFER' | 'PATTERN' | 'REFERENCE_PLANE' | 'REFERENCE_AXIS';
-  name: string;
-  parameters: any;
-}
-
-export interface SketchNode {
-  id: string;
-  x: number;
-  y: number;
-  isFixed?: boolean;
-}
-
-export type SketchEdgeType = 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE';
-
-export interface SketchEdge {
-  id: string;
-  type: SketchEdgeType;
-  nodeIds: string[]; 
-  isConstruction?: boolean;
-}
-
-export type ConstraintType = 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE';
-
-export interface SketchConstraint {
-  id: string;
-  type: ConstraintType;
-  nodeIds?: string[];
-  edgeIds?: string[];
-  value?: number;
+    mode?: string;
+    value?: number;
+    unit?: string;
+    details?: any;
+    distance?: number;
+    angle?: number;
+    area?: number;
+    volume?: number;
+    center_of_mass?: [number, number, number];
+    inertia_matrix?: number[][];
 }
 
 interface CadState {
+  projectName: string;
+  setProjectName: (name: string) => void;
+  drawingScale: string;
+  setDrawingScale: (scale: string) => void;
+  drawnBy: string;
+  setDrawnBy: (name: string) => void;
+  approvedBy: string;
+  setApprovedBy: (name: string) => void;
+
   mode: CadMode;
   setMode: (mode: CadMode) => void;
-
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
   activePlane: string | null;
   setActivePlane: (plane: string | null) => void;
-
   activeFaceOrigin: [number, number, number] | null;
   setActiveFaceOrigin: (origin: [number, number, number] | null) => void;
   activeFaceNormal: [number, number, number] | null;
@@ -101,59 +114,57 @@ interface CadState {
   activeFaceId: string | null;
   setActiveFaceId: (id: string | null) => void;
 
+  sketchTool: string;
+  setSketchTool: (tool: string) => void;
+  gridSnap: boolean;
+  setGridSnap: (active: boolean) => void;
+  sketchNewChain: boolean;
+  setSketchNewChain: (active: boolean) => void;
+  selectedEntityIds: string[];
+  setSelectedEntityIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+
   sketchNodes: Record<string, SketchNode>;
   setSketchNodes: (nodes: Record<string, SketchNode> | ((prev: Record<string, SketchNode>) => Record<string, SketchNode>)) => void;
   sketchEdges: Record<string, SketchEdge>;
   setSketchEdges: (edges: Record<string, SketchEdge> | ((prev: Record<string, SketchEdge>) => Record<string, SketchEdge>)) => void;
   sketchConstraints: Record<string, SketchConstraint>;
   setSketchConstraints: (constraints: Record<string, SketchConstraint> | ((prev: Record<string, SketchConstraint>) => Record<string, SketchConstraint>)) => void;
+  setSketchRelations: (rels: any) => void;
 
-
-  sketchTool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC' | 'MIDPOINT_LINE';
-  /** Circle creation mode */
-  activeCircleMode: 'CENTER_RADIUS' | 'DIAMETER' | 'THREE_POINTS' | 'TANGENT' | 'COINCIDENT';
-  setActiveCircleMode: (mode: CadState['activeCircleMode']) => void;
-  setSketchTool: (tool: 'LINE' | 'CENTER_LINE' | 'CIRCLE' | 'RECTANGLE' | 'ARC' | 'MIDPOINT_LINE') => void;
-  gridSnap: boolean;
-  setGridSnap: (snap: boolean) => void;
-  sketchRelations: string[];
-  setSketchRelations: (relations: string[]) => void;
-  selectedEntityIds: string[];
-  setSelectedEntityIds: (ids: string[]) => void;
-  sketchNewChain: boolean;
-  setSketchNewChain: (val: boolean) => void;
-
-  projectName: string;
-  setProjectName: (name: string) => void;
-  drawingScale: string;
-  setDrawingScale: (scale: string) => void;
-  drawnBy: string;
-  setDrawnBy: (by: string) => void;
-  approvedBy: string;
-  setApprovedBy: (by: string) => void;
-
-  // Feature Tree Logic
   features: CADFeature[];
+  setFeatures: (features: CADFeature[]) => void;
   addFeature: (feature: CADFeature) => void;
   removeFeature: (id: string) => void;
   updateFeatureParams: (id: string, params: any) => void;
   editingFeatureId: string | null;
   setEditingFeatureId: (id: string | null) => void;
-  rollbackIndex: number | null; // Index in features array to rollback to
+  rollbackIndex: number | null;
   setRollbackIndex: (index: number | null) => void;
 
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
   selectedSubNodeType: 'SKETCH' | 'FEATURE' | null;
   setSelectedSubNodeType: (type: 'SKETCH' | 'FEATURE' | null) => void;
-  visibleSketches: string[]; // Set of feature IDs whose sketches should be visible in 3D
+  visibleSketches: string[];
   toggleSketchVisibility: (featureId: string) => void;
 
-  // Topology Selection State
-  selectedTopology: any; // SelectedTopology from TopologySelector
+  // History
+  setSuppressed: (id: string, suppressed: boolean) => void;
+  reorderFeatures: (startIndex: number, endIndex: number) => void;
+  checkDependencies: () => void;
+  
+  // Undo/Redo System
+  history: {
+    past: any[];
+    future: any[];
+  };
+  undo: () => void;
+  redo: () => void;
+  saveSnapshot: () => void;
+
+  selectedTopology: any;
   setSelectedTopology: (topology: any) => void;
 
-  // Measurement State
   measurementMode: MeasurementMode;
   setMeasurementMode: (mode: MeasurementMode) => void;
   measurementPoints: any[];
@@ -161,7 +172,6 @@ interface CadState {
   measurementResults: MeasurementResult | null;
   setMeasurementResults: (results: MeasurementResult | null) => void;
 
-  // Assembly & Mate State
   components: CADComponent[];
   setComponents: (components: CADComponent[]) => void;
   addComponent: (component: CADComponent) => void;
@@ -169,62 +179,64 @@ interface CadState {
   setMates: (mates: CADMate[]) => void;
   addMate: (mate: CADMate) => void;
 
-  // Assembly Selection State
   mateSelection: any[];
   setMateSelection: (selection: any[]) => void;
   addMateSelection: (entity: any) => void;
   clearMateSelection: () => void;
 
-  // Render State
-  meshData: any[]; // Array of { id, data: { vertices, indices, normals } }
+  meshData: any[];
   setMeshData: (data: any[]) => void;
+  solverReport: { dof: number; residual: number } | null;
+  setSolverReport: (report: { dof: number; residual: number } | null) => void;
+  computedRefGeometry: any[];
+  setComputedRefGeometry: (refGeom: any[]) => void;
 
-  // Camera Alignment Trigger
+  contextMenu: CADContextMenu | null;
+  setContextMenu: (menu: CADContextMenu | null) => void;
+  shortcutBox: CADShortcutBox | null;
+  setShortcutBox: (box: CADShortcutBox | null) => void;
+  mousePos: [number, number, number] | null;
+  setMousePos: (pos: [number, number, number] | null) => void;
+
+  hint: string;
+  setHint: (hint: string) => void;
+  
+  referencePlanes: any[];
+  setReferencePlanes: (planes: any[]) => void;
+  referenceAxes: any[];
+  setReferenceAxes: (axes: any[]) => void;
+  
+  activePropertyManager: any;
+  setActivePropertyManager: (mgr: any) => void;
+
   cameraNormalTrigger: number;
   cameraNormalFlip: boolean;
   cameraNormalLastPlane: string | null;
   triggerCameraNormal: () => void;
-
-  // Transient Context Menu HUD
-  contextMenu: CADContextMenu | null;
-  setContextMenu: (menu: CADContextMenu | null) => void;
-  shortcutBox: CADShortcutBox | null;
-  setShortcutBox: (menu: CADShortcutBox | null) => void;
-
-  // Transient OrbitControls Reference & Animation Lock
-  controls: any | null;
-  setControls: (controls: any | null) => void;
+  controls: any;
+  setControls: (controls: any) => void;
   isCameraAnimating: boolean;
-  setIsCameraAnimating: (isAnimating: boolean) => void;
-
-  // Status Bar Info
-  mousePos: [number, number, number] | null;
-  setMousePos: (pos: [number, number, number] | null) => void;
-  hint: string;
-  setHint: (hint: string) => void;
-
-  // Reference Geometry & PropertyManager
-  referencePlanes: any[];
-  setReferencePlanes: (planes: any[]) => void;
-  addReferencePlane: (plane: any) => void;
-  referenceAxes: any[];
-  setReferenceAxes: (axes: any[]) => void;
-  addReferenceAxis: (axis: any) => void;
-  activePropertyManager: any | null;
-  setActivePropertyManager: (mgr: any | null) => void;
+  setIsCameraAnimating: (active: boolean) => void;
 }
 
 export const useCadStore = create<CadState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
+      projectName: 'Professional CAD Project',
+      setProjectName: (projectName) => set({ projectName }),
+      drawingScale: '1:1',
+      setDrawingScale: (drawingScale) => set({ drawingScale }),
+      drawnBy: 'SkillsBuilder',
+      setDrawnBy: (drawnBy) => set({ drawnBy }),
+      approvedBy: 'Admin',
+      setApprovedBy: (approvedBy) => set({ approvedBy }),
+
       mode: 'PART',
       setMode: (mode) => set({ mode }),
-
       isSketchMode: false,
-      setSketchMode: (active) => set({ isSketchMode: active }),
+      setSketchMode: (isSketchMode) => set({ isSketchMode }),
       activePlane: null,
-      setActivePlane: (plane) => set({ activePlane: plane }),
-
+      setActivePlane: (activePlane) => set({ activePlane }),
       activeFaceOrigin: null,
       setActiveFaceOrigin: (activeFaceOrigin) => set({ activeFaceOrigin }),
       activeFaceNormal: null,
@@ -232,86 +244,130 @@ export const useCadStore = create<CadState>()(
       activeFaceId: null,
       setActiveFaceId: (activeFaceId) => set({ activeFaceId }),
 
+      sketchTool: 'SELECT',
+      setSketchTool: (sketchTool) => set({ sketchTool }),
+      gridSnap: true,
+      setGridSnap: (gridSnap) => set({ gridSnap }),
+      sketchNewChain: false,
+      setSketchNewChain: (sketchNewChain) => set({ sketchNewChain }),
+      selectedEntityIds: [],
+      setSelectedEntityIds: (ids) => set((state) => ({ 
+        selectedEntityIds: typeof ids === 'function' ? ids(state.selectedEntityIds) : ids 
+      })),
+
       sketchNodes: {},
-      setSketchNodes: (updater) => set((state) => ({ 
-        sketchNodes: typeof updater === 'function' ? updater(state.sketchNodes) : updater 
+      setSketchNodes: (nodes) => set((state) => ({ 
+        sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes 
       })),
       sketchEdges: {},
-      setSketchEdges: (updater) => set((state) => ({ 
-        sketchEdges: typeof updater === 'function' ? updater(state.sketchEdges) : updater 
+      setSketchEdges: (edges) => set((state) => ({ 
+        sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges 
       })),
       sketchConstraints: {},
-      setSketchConstraints: (updater) => set((state) => ({ 
-        sketchConstraints: typeof updater === 'function' ? updater(state.sketchConstraints) : updater 
+      setSketchConstraints: (constraints) => set((state) => ({ 
+        sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints 
       })),
+      setSketchRelations: (rels) => {},
 
-
-      sketchTool: 'LINE',
-      setSketchTool: (tool) => set({ sketchTool: tool }),
-      // Circle mode defaults to center‑radius
-      activeCircleMode: 'CENTER_RADIUS',
-      setActiveCircleMode: (mode) => set({ activeCircleMode: mode }),
-      gridSnap: true,
-      setGridSnap: (snap) => set({ gridSnap: snap }),
-      sketchRelations: [],
-      setSketchRelations: (relations) => set({ sketchRelations: relations }),
-      selectedEntityIds: [],
-      setSelectedEntityIds: (selectedEntityIds) => set({ selectedEntityIds }),
-      sketchNewChain: true,
-      setSketchNewChain: (sketchNewChain) => set({ sketchNewChain }),
-
-      projectName: 'Professional CAD Project',
-      drawingScale: '1:1',
-      drawnBy: 'CAD Engineer',
-      approvedBy: 'Lead Architect',
-      setProjectName: (name) => set({ projectName: name }),
-      setDrawingScale: (scale) => set({ drawingScale: scale }),
-      setDrawnBy: (by) => set({ drawnBy: by }),
-      setApprovedBy: (by) => set({ approvedBy: by }),
-
-      // Start with a clean slate: no default features, exactly like a new SolidWorks Part document
       features: [],
-
-
-
-      addFeature: (feature) => set((state) => ({
-        features: [...state.features, feature]
-      })),
-
-      removeFeature: (id) => set((state) => ({
-        features: state.features.filter(f => f.id !== id),
-        selectedId: state.selectedId === id ? null : state.selectedId,
-        editingFeatureId: state.editingFeatureId === id ? null : state.editingFeatureId,
-        referencePlanes: state.referencePlanes.filter(p => p.id !== id),
-        referenceAxes: state.referenceAxes.filter(a => a.id !== id)
-      })),
-
-      updateFeatureParams: (id, params) => set((state) => {
-        const newFeatures = state.features.map(f =>
-          f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f
-        );
-        return { features: [...newFeatures] };
-      }),
-
+      setFeatures: (features) => { get().saveSnapshot(); set({ features }); },
+      addFeature: (feature) => { get().saveSnapshot(); set((state) => ({ features: [...state.features, feature] })); },
+      removeFeature: (id) => { get().saveSnapshot(); set((state) => ({ features: state.features.filter(f => f.id !== id) })); },
+      updateFeatureParams: (id, params) => { get().saveSnapshot(); set((state) => ({
+        features: state.features.map(f => f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f)
+      })); },
+      
       editingFeatureId: null,
-      setEditingFeatureId: (id) => set({ editingFeatureId: id }),
+      setEditingFeatureId: (editingFeatureId) => set({ editingFeatureId }),
       rollbackIndex: null,
-      setRollbackIndex: (index) => set({ rollbackIndex: index }),
+      setRollbackIndex: (rollbackIndex) => set({ rollbackIndex }),
 
       selectedId: null,
-      setSelectedId: (id) => set({ selectedId: id }),
+      setSelectedId: (selectedId) => set({ selectedId }),
       selectedSubNodeType: null,
       setSelectedSubNodeType: (selectedSubNodeType) => set({ selectedSubNodeType }),
       visibleSketches: [],
       toggleSketchVisibility: (featureId) => set((state) => ({
-        visibleSketches: state.visibleSketches.includes(featureId)
-          ? state.visibleSketches.filter(id => id !== featureId)
-          : [...state.visibleSketches, featureId]
+        visibleSketches: state.visibleSketches.includes(featureId) ? state.visibleSketches.filter(id => id !== featureId) : [...state.visibleSketches, featureId]
       })),
 
-      selectedTopology: null,
-      setSelectedTopology: (topology) => set({ selectedTopology: topology }),
+      setSuppressed: (id, suppressed) => { get().saveSnapshot(); set((state) => ({
+        features: state.features.map(f => f.id === id ? { ...f, isSuppressed: suppressed } : f)
+      })); },
+      reorderFeatures: (startIndex, endIndex) => { get().saveSnapshot(); set((state) => {
+        const nextFeatures = [...state.features];
+        const [removed] = nextFeatures.splice(startIndex, 1);
+        nextFeatures.splice(endIndex, 0, removed);
+        return { features: nextFeatures };
+      }); },
+      checkDependencies: () => set((state) => {
+        const features = [...state.features];
+        return { features: features.map((f, idx) => {
+           if (f.type === 'FILLET' || f.type === 'CHAMFER') {
+              const targetId = f.parameters?.target_feature_id;
+              if (targetId) {
+                const parentIdx = features.findIndex(p => p.id === targetId);
+                if (parentIdx === -1 || parentIdx >= idx) return { ...f, isBroken: true };
+              }
+           }
+           return { ...f, isBroken: false };
+        })};
+      }),
 
+      history: { past: [], future: [] },
+      saveSnapshot: () => set((state) => {
+        const snapshot = {
+          features: state.features,
+          sketchNodes: state.sketchNodes,
+          sketchEdges: state.sketchEdges,
+          sketchConstraints: state.sketchConstraints,
+          mates: state.mates,
+          components: state.components
+        };
+        return {
+          history: {
+            past: [...state.history.past.slice(-50), snapshot],
+            future: []
+          }
+        };
+      }),
+      undo: () => set((state) => {
+        if (state.history.past.length === 0) return state;
+        const previous = state.history.past[state.history.past.length - 1];
+        const newPast = state.history.past.slice(0, state.history.past.length - 1);
+        const current = {
+          features: state.features,
+          sketchNodes: state.sketchNodes,
+          sketchEdges: state.sketchEdges,
+          sketchConstraints: state.sketchConstraints,
+          mates: state.mates,
+          components: state.components
+        };
+        return {
+          ...previous,
+          history: { past: newPast, future: [current, ...state.history.future] }
+        };
+      }),
+      redo: () => set((state) => {
+        if (state.history.future.length === 0) return state;
+        const next = state.history.future[0];
+        const newFuture = state.history.future.slice(1);
+        const current = {
+          features: state.features,
+          sketchNodes: state.sketchNodes,
+          sketchEdges: state.sketchEdges,
+          sketchConstraints: state.sketchConstraints,
+          mates: state.mates,
+          components: state.components
+        };
+        return {
+          ...next,
+          history: { past: [...state.history.past, current], future: newFuture }
+        };
+      }),
+
+      selectedTopology: null,
+      setSelectedTopology: (selectedTopology) => set({ selectedTopology }),
       measurementMode: 'NONE',
       setMeasurementMode: (measurementMode) => set({ measurementMode }),
       measurementPoints: [],
@@ -321,10 +377,10 @@ export const useCadStore = create<CadState>()(
 
       components: [],
       setComponents: (components) => set({ components }),
-      addComponent: (component) => set((state) => ({ components: [...state.components, component] })),
+      addComponent: (component) => { get().saveSnapshot(); set((state) => ({ components: [...state.components, component] })); },
       mates: [],
-      setMates: (mates) => set({ mates }),
-      addMate: (mate) => set((state) => ({ mates: [...state.mates, mate] })),
+      setMates: (mates) => { get().saveSnapshot(); set({ mates }); },
+      addMate: (mate) => { get().saveSnapshot(); set((state) => ({ mates: [...state.mates, mate] })); },
 
       mateSelection: [],
       setMateSelection: (mateSelection) => set({ mateSelection }),
@@ -333,58 +389,51 @@ export const useCadStore = create<CadState>()(
 
       meshData: [],
       setMeshData: (meshData) => set({ meshData }),
+      solverReport: null,
+      setSolverReport: (solverReport) => set({ solverReport }),
+      computedRefGeometry: [],
+      setComputedRefGeometry: (computedRefGeometry) => set({ computedRefGeometry }),
+
+      contextMenu: null,
+      setContextMenu: (contextMenu) => set({ contextMenu }),
+      shortcutBox: null,
+      setShortcutBox: (shortcutBox) => set({ shortcutBox }),
+      mousePos: null,
+      setMousePos: (mousePos) => set({ mousePos }),
+      hint: 'Ready',
+      setHint: (hint) => set({ hint }),
+      referencePlanes: [],
+      setReferencePlanes: (referencePlanes) => set({ referencePlanes }),
+      referenceAxes: [],
+      setReferenceAxes: (referenceAxes) => set({ referenceAxes }),
+      activePropertyManager: null,
+      setActivePropertyManager: (activePropertyManager) => set({ activePropertyManager }),
 
       cameraNormalTrigger: 0,
       cameraNormalFlip: false,
       cameraNormalLastPlane: null,
       triggerCameraNormal: () => set((state) => {
-        // If clicking normal to the same plane again, flip the view 180 degrees!
         const isSamePlane = state.cameraNormalLastPlane === state.activePlane;
-        return { 
+        return {
           cameraNormalTrigger: state.cameraNormalTrigger + 1,
           cameraNormalLastPlane: state.activePlane,
           cameraNormalFlip: isSamePlane ? !state.cameraNormalFlip : false
         };
       }),
-
-      contextMenu: null,
-      setContextMenu: (contextMenu) => set({ contextMenu }),
-      shortcutBox: null as CADShortcutBox | null,
-      setShortcutBox: (shortcutBox: CADShortcutBox | null) => set({ shortcutBox }),
-
       controls: null,
       setControls: (controls) => set({ controls }),
       isCameraAnimating: false,
       setIsCameraAnimating: (isCameraAnimating) => set({ isCameraAnimating }),
-
-      mousePos: null,
-      setMousePos: (mousePos) => set({ mousePos }),
-      hint: 'Ready',
-      setHint: (hint) => set({ hint }),
-
-      referencePlanes: [],
-      setReferencePlanes: (planes) => set({ referencePlanes: planes }),
-      addReferencePlane: (plane) => set((state) => ({ referencePlanes: [...state.referencePlanes, plane] })),
-      referenceAxes: [],
-      setReferenceAxes: (axes) => set({ referenceAxes: axes }),
-      addReferenceAxis: (axis) => set((state) => ({ referenceAxes: [...state.referenceAxes, axis] })),
-      activePropertyManager: null,
-      setActivePropertyManager: (activePropertyManager) => set({ activePropertyManager }),
     }),
     {
       name: 'cad-storage',
       storage: createJSONStorage(() => localStorage),
       partialize: (state) => ({
         mode: state.mode,
-        projectName: state.projectName,
-        drawingScale: state.drawingScale,
-        drawnBy: state.drawnBy,
-        approvedBy: state.approvedBy,
         features: state.features,
-        selectedId: state.selectedId,
-        selectedSubNodeType: state.selectedSubNodeType,
-        selectedTopology: state.selectedTopology,
-        selectedEntityIds: state.selectedEntityIds,
+        sketchNodes: state.sketchNodes,
+        sketchEdges: state.sketchEdges,
+        sketchConstraints: state.sketchConstraints,
         components: state.components,
         mates: state.mates,
         activePlane: state.activePlane,
@@ -393,7 +442,11 @@ export const useCadStore = create<CadState>()(
         activeFaceId: state.activeFaceId,
         referencePlanes: state.referencePlanes,
         referenceAxes: state.referenceAxes,
-      }), // Don't persist meshData and transient measurement state as they can be large or dynamic
+        projectName: state.projectName,
+        drawingScale: state.drawingScale,
+        drawnBy: state.drawnBy,
+        approvedBy: state.approvedBy,
+      }),
     }
   )
 );

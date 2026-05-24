@@ -23,7 +23,7 @@ try {
     Write-Host "[SUCCESS] Graphify CLI is already installed!" -ForegroundColor Green
 } catch {
     Write-Host "[INFO] Graphify CLI not found. Attempting to install graphifyy..." -ForegroundColor Yellow
-    
+
     # Try using 'uv' tool first
     try {
         $null = Get-Command uv -ErrorAction Stop
@@ -50,7 +50,7 @@ if ($graphifyInstalled) {
     try {
         Write-Host "[INFO] Registering global Graphify plugins..." -ForegroundColor Cyan
         $null = Start-Process graphify -ArgumentList "install" -NoNewWindow -Wait -ErrorAction Stop
-        
+
         Write-Host "[INFO] Registering local workspace Git hooks for Graphify..." -ForegroundColor Cyan
         $null = Start-Process graphify -ArgumentList "hook", "install" -NoNewWindow -Wait -ErrorAction Stop
         Write-Host "[SUCCESS] Graphify registered successfully!" -ForegroundColor Green
@@ -64,7 +64,7 @@ $currentDir = Get-Location
 
 foreach ($antigravityPath in $pathsToSync) {
     Write-Host "[INFO] Processing Antigravity directory: $antigravityPath" -ForegroundColor Cyan
-    
+
     $skillsDir = Join-Path $antigravityPath "skills"
     $knowledgeDir = Join-Path $antigravityPath "knowledge"
 
@@ -81,10 +81,10 @@ foreach ($antigravityPath in $pathsToSync) {
         foreach ($skill in $skillsInCat) {
             $skillSource = $skill.FullName
             $skillDest = Join-Path $skillsDir $skill.Name
-            
+
             Write-Host "[LINK] Processing skill: $($category.Name)/$($skill.Name)" -ForegroundColor Gray
             if (Test-Path $skillDest) { Remove-Item $skillDest -Recurse -Force }
-            
+
             try {
                 # Try to create symbolic link first
                 $null = New-Item -ItemType SymbolicLink -Path $skillDest -Target $skillSource -Force -ErrorAction Stop
@@ -127,5 +127,32 @@ foreach ($antigravityPath in $pathsToSync) {
         $rulesContent | Out-File -FilePath (Join-Path $kiArtifacts "global_rules.md") -Encoding UTF8
     }
 }
+
+# --- Install PDCA Git pre-commit hook ---
+Write-Host "[INFO] Installing PDCA pre-commit hook..." -ForegroundColor Cyan
+$gitHooksDir = Join-Path $currentDir ".git\hooks"
+$pdcaHookSource = Join-Path $currentDir "hooks\pre-commit-pdca"
+$preCommitPath = Join-Path $gitHooksDir "pre-commit"
+
+if (Test-Path $gitHooksDir) {
+    $preCommitContent = @'
+#!/bin/sh
+# 3D-Builder PDCA/CAPA pre-commit gate.
+# Installed by INSTALL.ps1. Do not edit generated file directly; edit hooks/pre-commit-pdca.
+
+if command -v bash >/dev/null 2>&1; then
+    bash hooks/pre-commit-pdca
+else
+    echo "[PDCA] bash not found; running fallback checks."
+    npx tsc --noEmit || exit 1
+    npm run pdca:check || exit 1
+fi
+'@
+    $preCommitContent | Out-File -FilePath $preCommitPath -Encoding UTF8 -NoNewline
+    Write-Host "[SUCCESS] Installed .git/hooks/pre-commit PDCA gate." -ForegroundColor Green
+} else {
+    Write-Host "[WARNING] .git/hooks not found. Skipping Git hook install." -ForegroundColor Yellow
+}
+# ----------------------------------------
 
 Write-Host "[SUCCESS] SkillsBuilder global sync complete!" -ForegroundColor Green

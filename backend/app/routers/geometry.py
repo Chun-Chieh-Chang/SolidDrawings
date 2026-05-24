@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+﻿from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from app.services import geometry_service
@@ -27,6 +27,8 @@ class FeatureDefinition(BaseModel):
 
 class AssemblyRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
+    deflection: Optional[float] = 0.01
 
 @router.post("/box")
 async def create_box(params: BoxParams):
@@ -57,7 +59,7 @@ async def rebuild_assembly(request: AssemblyRequest):
     try:
         print("[DEBUG] Rebuild Request Features:", [f.dict() for f in request.features])
         # We now process the entire feature tree as a single B-Rep solid (SolidWorks Part style)
-        result = geometry_service.process_features(request.features)
+        result = geometry_service.process_features(request.features, deflection=request.deflection)
         if result:
             # Return as a single mesh item for the renderer to display as one part
             return [result] 
@@ -69,11 +71,12 @@ async def rebuild_assembly(request: AssemblyRequest):
 
 class MassPropertiesRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
 
 @router.post("/mass_properties")
 async def get_mass_properties(request: MassPropertiesRequest):
     try:
-        props = geometry_service.calculate_mass_properties(request.features)
+        props = geometry_service.calculate_mass_properties(request.features, material_id=request.materialId)
         if props is None:
             raise HTTPException(status_code=500, detail="Failed to calculate physical properties for shape.")
         return props
@@ -84,6 +87,7 @@ async def get_mass_properties(request: MassPropertiesRequest):
 
 class ExportRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
     format: str  # 'STEP', 'IGES', 'STL'
     filepath: str
 
@@ -105,6 +109,7 @@ async def export_cad(request: ExportRequest):
 
 class ExportStepRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
     filename: Optional[str] = "part.step"
 
 @router.post("/export/step")
@@ -134,12 +139,14 @@ async def export_step(request: ExportStepRequest):
 
 class ProjectRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
     plane: str = 'FRONT'
+    sectionPlane: Optional[dict] = None
 
 @router.post("/project")
 async def project_2d(request: ProjectRequest):
     try:
-        return geometry_service.project_2d(request.features, request.plane)
+        return geometry_service.project_2d(request.features, request.plane, section_plane=request.sectionPlane)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -155,6 +162,7 @@ class SelectedTopologyDefinition(BaseModel):
 
 class ConvertEntitiesRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
     selectedTopology: SelectedTopologyDefinition
     activePlane: str
     activeFaceOrigin: Optional[List[float]] = None
@@ -169,6 +177,7 @@ class OffsetEntitiesRequest(BaseModel):
 
 class IntersectionCurveRequest(BaseModel):
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
     activePlane: str
     activeFaceOrigin: Optional[List[float]] = None
     activeFaceNormal: Optional[List[float]] = None
@@ -224,11 +233,13 @@ class RefPlaneRequest(BaseModel):
     refs: List[dict]
     offset: Optional[float] = 0.0
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
 
 class RefAxisRequest(BaseModel):
     axisType: str
     refs: List[dict]
     features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
 
 
 @router.post("/ref_plane")
@@ -253,6 +264,66 @@ async def create_ref_axis(request: RefAxisRequest):
             request.refs,
             request.features
         )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+from app.services import solver_service
+
+class SolverRequest(BaseModel):
+    nodes: dict
+    edges: dict
+    constraints: dict
+
+@router.post("/solve_sketch")
+async def solve_sketch(request: SolverRequest):
+    try:
+        solved_nodes, report = solver_service.solve_sketch_constraints(
+            request.nodes,
+            request.edges,
+            request.constraints
+        )
+        return {"nodes": solved_nodes, "report": report}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AssemblySolverRequest(BaseModel):
+    components: dict
+    mates: List[dict]
+
+@router.post("/solve_assembly")
+async def solve_assembly(request: AssemblySolverRequest):
+    try:
+        from app.services import assembly_solver
+        solved_components, report = assembly_solver.solve_assembly_mates(
+            request.components,
+            request.mates
+        )
+        return {"components": solved_components, "report": report}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class InterferenceRequest(BaseModel):
+    components: List[dict] # [{id, features}]
+
+@router.post("/detect_interference")
+async def detect_interference(request: InterferenceRequest):
+    try:
+        component_shapes = {}
+        for c in request.components:
+            cid = c.get('id')
+            features = c.get('features', [])
+            shape = geometry_service.build_shape_only(features)
+            if shape:
+                component_shapes[cid] = shape
+        
+        return geometry_service.detect_interference(component_shapes)
     except Exception as e:
         import traceback
         traceback.print_exc()

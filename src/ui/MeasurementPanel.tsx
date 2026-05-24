@@ -149,7 +149,7 @@ export const MeasurementPanel = () => {
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-slate-600 font-bold">數值:</span>
             <span className="text-[16px] text-[#059669] font-bold font-mono">
-              {measurementResults.value.toFixed(3)} {measurementResults.unit}
+              {(measurementResults.value ?? 0).toFixed(3)} {measurementResults.unit}
             </span>
           </div>
 
