@@ -3255,3 +3255,15 @@ px tsc --noEmit -> **PASS**??
 ### RCA & CAPA
 - **RCA (Root Cause Analysis)**?  - 先前的「在地化」腳本雖然恢復了英文，但因編碼混亂導致 Emoji 突變為無意義的亂碼字元，且標籤過於簡略（如僅顯示 "Feature"），導致使用者無法區分功能。
 - **CAPA (Corrective and Preventive Actions)**?  - **Unicode Shielding**垢隤 在進行含有非 ASCII 字元的代碼操作時，強制使用 Unicode Escape 編碼，從根本上屏蔽作業系統 shell 層級的編碼干擾。
+
+---
+## [2026-05-24] PDCA FAILURE CORRECTION: UI Visual Restoration ??
+### 正??
+- **?? Visual Fix**城?修復了 Ribbon 功能區將 Unicode 轉義序列（如 \uD83C）渲染為純文字的錯誤。現在已恢復為真正的圖標（Emoji）。
+- **?? Encoding Finalization**垮??強制執行 UTF-8 with BOM 寫入，確保 Windows 環境下的 Emoji 顯示穩定。
+### 捂?荒? (Validation/Check)
+- ?? **Check Phase**垢隤 執行了 
+ode -e 指令對原始位元組進行二進制校驗，確認代碼中不再含有字串層級的反斜線轉義符。
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**?  - 在之前的修復中，我誤以為 React/JSX 會自動解析模板字串中的 \uXXXX 轉義序列。實際上，直接寫入 TSX 檔案的字串會被視為字面量文本渲染，導致介面顯示原始代碼。
+- **CAPA (Corrective and Preventive Actions)**?  - **Mandatory Visual Parity Check**垢隤 嚴格執行 PDCA 的 C (Check) 階段。在聲明修復前，必須透過讀取檔案原始內容的方式，從二進制層面驗證視覺符號的正確性，而不僅僅是檢查編譯是否通過。

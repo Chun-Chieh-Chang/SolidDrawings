@@ -2670,7 +2670,7 @@ export default function Home() {
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Extrude Boss"
               >
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83C\uDFD7</span>
+                <span className="text-lg group-hover:scale-110 transition-all">🏗️</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Extrude</span>
               </button>
               <button
@@ -2687,7 +2687,7 @@ export default function Home() {
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Extrude Cut"
               >
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDD28</span>
+                <span className="text-lg group-hover:scale-110 transition-all">🔨</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Cut</span>
               </button>
               <button
@@ -2706,18 +2706,18 @@ export default function Home() {
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Revolve"
               >
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDD04</span>
+                <span className="text-lg group-hover:scale-110 transition-all">🔄</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Revolve</span>
               </button>
 
               <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
 
               <button onClick={() => addNewFeature('BOX')} className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Box">
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDCE6</span>
+                <span className="text-lg group-hover:scale-110 transition-all">📦</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Box</span>
               </button>
               <button onClick={() => addNewFeature('CYLINDER')} className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Cylinder">
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDEE2</span>
+                <span className="text-lg group-hover:scale-110 transition-all">🛢️</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Cylinder</span>
               </button>
               <button
@@ -2734,31 +2734,31 @@ export default function Home() {
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Pattern"
               >
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDD22</span>
+                <span className="text-lg group-hover:scale-110 transition-all">🔢</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Pattern</span>
               </button>
             </div>
           ) : activeTab === 'SKETCH' ? (
             <div className="flex items-center gap-1.5 h-full overflow-x-auto no-scrollbar py-1">
               <button onClick={resetSketchSession} className="h-[52px] px-3 rounded bg-slate-100 hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-1 group border border-slate-300" title="Exit Sketch">
-                <span className="text-lg group-hover:scale-110 transition-all">\u2705</span>
+                <span className="text-lg group-hover:scale-110 transition-all">✅</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Exit</span>
               </button>
               <button onClick={() => setSmartDimensionActive(!smartDimensionActive)} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${smartDimensionActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Dimension">
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDCCF</span>
+                <span className="text-lg group-hover:scale-110 transition-all">📏</span>
                 <span className="text-[13px] leading-none">Dimension</span>
               </button>
               <div className="w-[1px] h-[40px] bg-slate-300 mx-1 shrink-0" />
               <button onClick={() => setSketchTool('LINE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'LINE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Line">
-                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDCCF</span>
+                <span className="text-lg group-hover:scale-110 transition-all">📏</span>
                 <span className="text-[13px] leading-none">Line</span>
               </button>
               <button onClick={() => setSketchTool('CIRCLE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'CIRCLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Circle">
-                <span className="text-lg group-hover:scale-110 transition-all">\u2B55</span>
+                <span className="text-lg group-hover:scale-110 transition-all">⭕</span>
                 <span className="text-[13px] leading-none">Circle</span>
               </button>
               <button onClick={() => setSketchTool('RECTANGLE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'RECTANGLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Rectangle">
-                <span className="text-lg group-hover:scale-110 transition-all">\u2B1C</span>
+                <span className="text-lg group-hover:scale-110 transition-all">⬜</span>
                 <span className="text-[13px] leading-none">Rect</span>
               </button>
             </div>
