@@ -3193,3 +3193,14 @@ px tsc --noEmit -> **PASS**??
 pm run pdca:check -> **PASS**??
 ### RCA & CAPA
 - **RCA (Root Cause Analysis)**?  - 長時間的高強度開發會遺留大量中繼檔案與技術債，若不進行發布前的 MECE 清理，會造成程式碼倉庫臃腫，影響後續協作與打包體積???? Repository Bloat Risk??- **CAPA (Corrective and Preventive Actions)**?  - **Pre-flight Audit**垢隤 在推播至遠端前強制執行環境清理與狀態凍結，這是專業軟體工程 (Software Engineering) 的標準收尾流程??
+
+---
+## [2026-05-24] Bug Fix: Sketch Cancellation State Leak ??
+### 正??
+- **?? Graph State Cleanup**城?更新 src/app/page.tsx 中的 esetSketchSession 邏輯。現在當使用者點擊「取消草圖」或完成特徵重建後，系統不僅會清空舊的 sketchPoints，還會同步清空全域的圖論模型數據 (sketchNodes, sketchEdges, sketchConstraints)。
+### 捂?荒? (Validation)
+- ?? 
+px tsc --noEmit -> **PASS**??
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**?  - 在從簡單陣列 (sketchPoints) 升級至圖論模型架構 (Graph-based Model) 的過程中，狀態重置邏輯未被完整覆蓋。導致取消草圖時，useCadStore 中的節點與邊數據殘留（Memory Leak），當再次進入草圖模式時，這些「幽靈線條」就會重新被渲染出來。
+- **CAPA (Corrective and Preventive Actions)**?  - **Comprehensive State Reset**垢隤 將所有圖論狀態的 Setter (setSketchNodes, setSketchEdges, setSketchConstraints) 加入草圖重置生命週期中，徹底杜絕狀態殘留。

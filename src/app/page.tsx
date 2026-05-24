@@ -107,7 +107,7 @@ export default function Home() {
     activeFaceNormal, setActiveFaceNormal,
     activeFaceId, setActiveFaceId,
     triggerCameraNormal,
-    sketchNodes, sketchEdges, sketchConstraints,
+    sketchNodes, setSketchNodes, sketchEdges, setSketchEdges, sketchConstraints, setSketchConstraints,
     hint, setHint
   } = useCadStore();
 
@@ -792,6 +792,9 @@ export default function Home() {
   };
 
   const resetSketchSession = useCallback(() => {
+    setSketchNodes({});
+    setSketchEdges({});
+    setSketchConstraints({});
     setSketchPoints([]);
     setSketchRelations([]);
     setSketchMode(false);
@@ -802,7 +805,7 @@ export default function Home() {
     setActiveFaceOrigin(null);
     setActiveFaceNormal(null);
     setActiveFaceId(null);
-  }, [setSketchPoints, setSketchRelations, setSketchMode, setActivePlane, setEditingFeatureId, setSelectedEntityIds, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
+  }, [setSketchNodes, setSketchEdges, setSketchConstraints, setSketchPoints, setSketchRelations, setSketchMode, setActivePlane, setEditingFeatureId, setSelectedEntityIds, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId]);
 
   const handleEditFeatureSketch = useCallback((feature: CADFeature) => {
     const rawPoints = feature.parameters?.points;
