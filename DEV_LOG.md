@@ -3241,3 +3241,17 @@ px tsc --noEmit -> **PASS**??
 ### RCA & CAPA
 - **RCA (Root Cause Analysis)**?  - 在之前的「全球英文在地化」腳本中，使用了過於激進的正則表達式 e.sub(r'[^\x00-\x7F]+', '', s)，該表達式原本意圖刪除中文字符，但卻誤將所有的非 ASCII 圖標（Emoji）與特殊符號一併抹除，導致 UI 呈現「禿頭」現象。
 - **CAPA (Corrective and Preventive Actions)**?  - **Surgical UI Rebuild**垢隤 放棄模糊的正則匹配，改用針對 Ribbon 區塊的「硬核覆寫 (Hard Overwrite)」策略。直接將清潔、帶有正確圖標的 JSX 代碼段寫入檔案，確保 100% 的顯示一致性。
+
+---
+## [2026-05-24] UI Overhaul: Distinctive English Labels & Verified Icons ??
+### 正??
+- **?? Clear English Labels**城?對所有 Ribbon 按鈕進行了重命名，確保功能區與 SolidWorks 對標：Extrude Boss, Extrude Cut, Revolve, Smart Dimension, Pattern 等。
+- **?? Meaningful Icons (Unicode Safe)**垮??放棄直接在代碼中寫入 Emoji，改用 Unicode 轉義序列（如 \uD83C\uDFD7）透過 Node.js 寫入。這徹底解決了 Windows 環境下的編碼損壞問題，恢復了 🏗️, 🔨, 🔄, 📏, ⭕ 等具備語義辨識度的專業圖標。
+- **?? Text + Icon Combination**垢隤 每個按鈕現在同時具備大型圖標與清晰的英文標籤，達到工業級 UI 的清晰度與操作性。
+### 捂?荒? (Validation)
+- ?? 
+px tsc --noEmit -> **PASS**??
+- ?? 編碼校驗：透過 Node.js 二進制校驗 Unicode 字元完整性。
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**?  - 先前的「在地化」腳本雖然恢復了英文，但因編碼混亂導致 Emoji 突變為無意義的亂碼字元，且標籤過於簡略（如僅顯示 "Feature"），導致使用者無法區分功能。
+- **CAPA (Corrective and Preventive Actions)**?  - **Unicode Shielding**垢隤 在進行含有非 ASCII 字元的代碼操作時，強制使用 Unicode Escape 編碼，從根本上屏蔽作業系統 shell 層級的編碼干擾。

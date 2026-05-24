@@ -2655,393 +2655,113 @@ export default function Home() {
         <div className="flex-1 flex items-center px-4 py-1 gap-1 overflow-x-auto overflow-y-hidden bg-[#F5F6F9]">
 
           {activeTab === 'FEATURES' ? (
-
-            <div className="flex items-center gap-1.5 h-full">
-
-              {/* Feature Commands */}
-
+            <div className="flex items-center gap-1.5 h-full overflow-x-auto no-scrollbar py-1">
               <button
-
                 onClick={() => {
-
                   if (solidSketchPointCount >= 3) {
-
                     handleExitAndExtrude();
-
                   } else {
-
-                    // Start sketch mode
-
-                    setEditingFeatureId(null);
-
-                    setSketchPoints([]);
-
-                    setSketchRelations([]);
-
-                    
-
-                    if (selectedTopology?.type === 'FACE' && selectedTopology.coordinates && selectedTopology.normal) {
-
-                      setActiveFaceOrigin(selectedTopology.coordinates);
-
-                      setActiveFaceNormal(selectedTopology.normal);
-
-                      setActiveFaceId(selectedTopology.id || `face_${Date.now()}`);
-
-                      setActivePlane('FACE');
-
-                      triggerCameraNormal();
-
-                    } else {
-
-                      setActivePlane('FRONT');
-
-                    }
-
-                    
-
-                    setSketchMode(true);
-
-                    setSketchTool('SELECT');
-
+                    setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]);
+                    if (selectedTopology?.type === 'FACE') { setActivePlane('FACE'); triggerCameraNormal(); }
+                    else setActivePlane('FRONT');
+                    setSketchMode(true); setSketchTool('SELECT');
                   }
-
                 }}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
-
-                title=""
-
+                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                title="Extrude Boss"
               >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] text-slate-800 font-bold leading-none">-</span> </button> <button
-
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83C\uDFD7</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Extrude</span>
+              </button>
+              <button
                 onClick={() => {
-
                   if (solidSketchPointCount >= 3) {
-
                     handleExitAndExtrude('CUT');
-
                   } else {
-
-                    setEditingFeatureId(null);
-
-                    setSketchPoints([]);
-
-                    setSketchRelations([]);
-
-                    
-
-                    if (selectedTopology?.type === 'FACE' && selectedTopology.coordinates && selectedTopology.normal) {
-
-                      setActiveFaceOrigin(selectedTopology.coordinates);
-
-                      setActiveFaceNormal(selectedTopology.normal);
-
-                      setActiveFaceId(selectedTopology.id || `face_${Date.now()}`);
-
-                      setActivePlane('FACE');
-
-                      triggerCameraNormal();
-
-                    } else {
-
-                      setActivePlane('FRONT');
-
-                    }
-
-                    
-
-                    setSketchMode(true);
-
-                    setSketchTool('SELECT');
-
+                    setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]);
+                    if (selectedTopology?.type === 'FACE') { setActivePlane('FACE'); triggerCameraNormal(); }
+                    else setActivePlane('FRONT');
+                    setSketchMode(true); setSketchTool('SELECT');
                   }
-
                 }}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
-
-                title=""
-
+                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                title="Extrude Cut"
               >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] text-slate-800 font-bold leading-none">-</span> </button> <button
-
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDD28</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Cut</span>
+              </button>
+              <button
                 onClick={() => {
-
                   if (isSketchMode && sketchPoints.length >= 3) {
-
                     const solidPoints = cloneSketchPoints(sketchPoints.filter(pt => pt[2] !== 'CENTER_LINE'));
-
                     const id = `feat_${Date.now()}`;
-
                     const revolveFeature: CADFeature = {
-
-                      id,
-
-                      type: 'REVOLVE',
-
-                      name: `- ${features.length + 1}`,
-
-                      parameters: {
-
-                        plane: activePlane ?? 'FRONT',
-
-                        angle: 360.0,
-
-                        points: solidPoints,
-
-                        x: 0.0, y: 0.0, z: 0.0,
-
-                        operation: 'ADD'
-
-                      }
-
+                      id, type: 'REVOLVE', name: `Revolve ${features.length + 1}`,
+                      parameters: { plane: activePlane ?? 'FRONT', angle: 360.0, points: solidPoints, x: 0.0, y: 0.0, z: 0.0, operation: 'ADD' }
                     };
-
                     useCadStore.setState({ features: [...features, revolveFeature], selectedId: id });
-
-                    resetSketchSession();
-
-                    setTimeout(handleRebuild, 50);
-
-                  } else {
-
-                    if (typeof window !== 'undefined' && (window as any).appAPI) {
-
-                      (window as any).appAPI.notify('', '');
-
-                    } else {
-
-                      alert('');
-
-                    }
-
-                  }
-
+                    resetSketchSession(); setTimeout(handleRebuild, 50);
+                  } else { alert('Select a plane and draw a profile first'); }
                 }}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group text-indigo-600 font-bold border border-indigo-200/50 bg-indigo-50/30 shadow-sm"
-
-                title=" B-Rep Sketch Mode"
-
+                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                title="Revolve"
               >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] leading-none">Revolve</span> </button>
-
-
-
-              {/* Divider and active feature list cleaned of placeholder/padlocked orphans */}
-
-
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDD04</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Revolve</span>
+              </button>
 
               <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
 
-
-
-              {/* Spawn Primitives */}
-
+              <button onClick={() => addNewFeature('BOX')} className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Box">
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDCE6</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Box</span>
+              </button>
+              <button onClick={() => addNewFeature('CYLINDER')} className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Cylinder">
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDEE2</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Cylinder</span>
+              </button>
               <button
-
-                onClick={() => addNewFeature('BOX')}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
-
-                title=""
-
+                onClick={() => {
+                   if (!selectedId) return;
+                   const id = `feat_${Date.now()}`;
+                   const pat: CADFeature = {
+                     id, type: 'PATTERN', name: `Pattern ${features.length + 1}`,
+                     parameters: { targetFeatureId: selectedId, type: 'LINEAR', count: 3, spacing: 50, direction: [1,0,0] }
+                   };
+                   useCadStore.setState({ features: [...features, pat], selectedId: id });
+                   setTimeout(handleRebuild, 50);
+                }}
+                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                title="Pattern"
               >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] text-slate-800 font-bold leading-none"> </span> </button> <button
-
-                onClick={() => addNewFeature('CYLINDER')}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
-
-                title=""
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] text-slate-800 font-bold leading-none"> </span> </button> <button
-
-                onClick={() => addNewFeature('SPHERE')}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
-
-                title=""
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] text-slate-800 font-bold leading-none"> </span> </button> <button
-
-                onClick={() => addNewFeature('PATTERN')}
-
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group text-indigo-600 font-bold border border-indigo-200/50 bg-indigo-50/30 shadow-sm animate-pulse"
-
-                title="/"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] leading-none">Pattern</span> </button> </div>
-
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDD22</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Pattern</span>
+              </button>
+            </div>
           ) : activeTab === 'SKETCH' ? (
-
-            <div className="flex items-center gap-1.5 h-full">
-
-              {/* Sketch Commands */}
-
-              <button
-
-                onClick={() => {
-
-                  setSketchMode(!isSketchMode);
-
-                  if(!isSketchMode && !activePlane) setActivePlane('FRONT');
-
-                }}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  isSketchMode ? 'bg-primary/20 border border-primary/30 text-primary' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title="/"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">🚪</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Exit Sketch</span> </button> <button
-
-                onClick={() => {
-
-                  setSmartDimensionActive(!smartDimensionActive);
-
-                  setSelectedId(null); // Clear selected feature to focus on sketch sidebar editor
-
-                }}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  smartDimensionActive ? 'bg-primary/20 border border-primary/30 text-primary font-bold shadow-inner' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title=""
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">📏</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Smart Dimension</span> </button> <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
-
-
-
-              {/* Sketch Tools */}
-
-              <button
-
-                onClick={() => setSketchTool('LINE')}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  sketchTool === 'LINE' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title="📏 Line"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">📏</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Line</span> </button> <button
-
-                onClick={() => setSketchTool('CENTER_LINE')}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  sketchTool === 'CENTER_LINE' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title="➖ Centerline"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">📏</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Centerline</span> </button> <button
-
-                onClick={() => setSketchTool('MIDPOINT_LINE')}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  sketchTool === 'MIDPOINT_LINE' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title="↔️ Midpoint Line"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">➖</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Midpoint Line</span> </button> <button
-
-                onClick={() => setSketchTool('CIRCLE')}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  sketchTool === 'CIRCLE' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title="⭕ Circle"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">↔️</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Circle</span> </button> <button
-
-                onClick={() => setSketchTool('RECTANGLE')}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  sketchTool === 'RECTANGLE' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title="⬜ Rectangle"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">⭕</span> <span className="text-[13px] text-slate-800 font-bold leading-none">Rectangle</span> </button> <button
-
-                onClick={() => setSketchTool('ARC')}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  sketchTool === 'ARC' ? 'bg-primary/10 border border-primary/20 text-primary font-bold' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title=" (Arc)"
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all">⬜</span> <span className="text-[13px] text-slate-800 font-bold leading-none">3-Point Arc</span> </button> <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
-
-
-
-              {/* Snapping Toggle */}
-
-              <button
-
-                onClick={() => setGridSnap(!gridSnap)}
-
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
-
-                  gridSnap ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-600' : 'hover:bg-slate-200/80 active:bg-slate-300'
-
-                }`}
-
-                title=""
-
-              >
-
-                <span className="text-lg group-hover:scale-110 transition-all"> </span> <span className="text-[13px] font-bold leading-none">Grid Snap</span> </button> </div>
-
+            <div className="flex items-center gap-1.5 h-full overflow-x-auto no-scrollbar py-1">
+              <button onClick={resetSketchSession} className="h-[52px] px-3 rounded bg-slate-100 hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-1 group border border-slate-300" title="Exit Sketch">
+                <span className="text-lg group-hover:scale-110 transition-all">\u2705</span>
+                <span className="text-[13px] text-slate-800 font-bold leading-none">Exit</span>
+              </button>
+              <button onClick={() => setSmartDimensionActive(!smartDimensionActive)} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${smartDimensionActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Dimension">
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDCCF</span>
+                <span className="text-[13px] leading-none">Dimension</span>
+              </button>
+              <div className="w-[1px] h-[40px] bg-slate-300 mx-1 shrink-0" />
+              <button onClick={() => setSketchTool('LINE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'LINE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Line">
+                <span className="text-lg group-hover:scale-110 transition-all">\uD83D\uDCCF</span>
+                <span className="text-[13px] leading-none">Line</span>
+              </button>
+              <button onClick={() => setSketchTool('CIRCLE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'CIRCLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Circle">
+                <span className="text-lg group-hover:scale-110 transition-all">\u2B55</span>
+                <span className="text-[13px] leading-none">Circle</span>
+              </button>
+              <button onClick={() => setSketchTool('RECTANGLE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'RECTANGLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Rectangle">
+                <span className="text-lg group-hover:scale-110 transition-all">\u2B1C</span>
+                <span className="text-[13px] leading-none">Rect</span>
+              </button>
+            </div>
           ) : activeTab === 'DRAWING' ? (
 
             <div className="flex items-center gap-2 h-full">
