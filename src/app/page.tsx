@@ -2466,7 +2466,7 @@ export default function Home() {
 
       {/* 2. SolidWorks CommandManager (Ribbon Bar) */}
 
-      <div className="h-[95px] w-full bg-[#F5F6F9] border-b border-[#D1D5DB] flex flex-col z-20 shrink-0 select-none">
+      <div className="h-[110px] w-full bg-[#F5F6F9] border-b border-[#D1D5DB] flex flex-col z-20 shrink-0 select-none">
 
         {/* Ribbon Tabs */}
 
@@ -2494,11 +2494,7 @@ export default function Home() {
 
             }`}
 
-          >
-
-             (Features)
-
-          </button> <button
+          >FEATURES</button> <button
 
             onClick={() => {
 
@@ -2562,11 +2558,7 @@ export default function Home() {
 
             }`}
 
-          >
-
-             (Sketch)
-
-          </button> <button
+          >SKETCH</button> <button
 
             onClick={() => {
 
@@ -2588,11 +2580,7 @@ export default function Home() {
 
             }`}
 
-          >
-
-             (Drawing)
-
-          </button> <button
+          >DRAWING</button> <button
 
             onClick={() => {
 
@@ -2614,11 +2602,7 @@ export default function Home() {
 
             }`}
 
-          >
-
-             (Assembly)
-
-          </button> <button
+          >ASSEMBLY</button> <button
 
             onClick={() => {
 
@@ -2642,17 +2626,13 @@ export default function Home() {
 
             }`}
 
-          >
-
-             (Evaluate)
-
-          </button> </div>
+          >EVALUATE</button> </div>
 
 
 
         {/* Ribbon Content Panels */}
 
-        <div className="flex-1 flex items-center px-4 py-1 gap-1 overflow-x-auto overflow-y-hidden bg-[#F5F6F9]">
+        <div className="flex-1 flex items-center px-4 py-1.5 gap-1.5 overflow-x-auto overflow-y-hidden bg-[#F5F6F9]">
 
           {activeTab === 'FEATURES' ? (
             <div className="flex items-center gap-1.5 h-full overflow-x-auto no-scrollbar py-1">
@@ -2667,7 +2647,7 @@ export default function Home() {
                     setSketchMode(true); setSketchTool('SELECT');
                   }
                 }}
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Extrude Boss"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🏗️</span>
@@ -2684,7 +2664,7 @@ export default function Home() {
                     setSketchMode(true); setSketchTool('SELECT');
                   }
                 }}
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Extrude Cut"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🔨</span>
@@ -2703,7 +2683,7 @@ export default function Home() {
                     resetSketchSession(); setTimeout(handleRebuild, 50);
                   } else { alert('Select a plane and draw a profile first'); }
                 }}
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Revolve"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🔄</span>
@@ -2712,11 +2692,11 @@ export default function Home() {
 
               <div className="w-[1px] h-[40px] bg-slate-300 mx-2 shrink-0" />
 
-              <button onClick={() => addNewFeature('BOX')} className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Box">
+              <button onClick={() => addNewFeature('BOX')} className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Box">
                 <span className="text-lg group-hover:scale-110 transition-all">📦</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Box</span>
               </button>
-              <button onClick={() => addNewFeature('CYLINDER')} className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Cylinder">
+              <button onClick={() => addNewFeature('CYLINDER')} className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group" title="Cylinder">
                 <span className="text-lg group-hover:scale-110 transition-all">🛢️</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Cylinder</span>
               </button>
@@ -2731,7 +2711,7 @@ export default function Home() {
                    useCadStore.setState({ features: [...features, pat], selectedId: id });
                    setTimeout(handleRebuild, 50);
                 }}
-                className="h-[52px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
                 title="Pattern"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🔢</span>
@@ -2740,24 +2720,24 @@ export default function Home() {
             </div>
           ) : activeTab === 'SKETCH' ? (
             <div className="flex items-center gap-1.5 h-full overflow-x-auto no-scrollbar py-1">
-              <button onClick={resetSketchSession} className="h-[52px] px-3 rounded bg-slate-100 hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-1 group border border-slate-300" title="Exit Sketch">
+              <button onClick={resetSketchSession} className="h-[60px] px-3 rounded bg-slate-100 hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-1 group border border-slate-300" title="Exit Sketch">
                 <span className="text-lg group-hover:scale-110 transition-all">✅</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Exit</span>
               </button>
-              <button onClick={() => setSmartDimensionActive(!smartDimensionActive)} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${smartDimensionActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Dimension">
+              <button onClick={() => setSmartDimensionActive(!smartDimensionActive)} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${smartDimensionActive ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Dimension">
                 <span className="text-lg group-hover:scale-110 transition-all">📏</span>
                 <span className="text-[13px] leading-none">Dimension</span>
               </button>
               <div className="w-[1px] h-[40px] bg-slate-300 mx-1 shrink-0" />
-              <button onClick={() => setSketchTool('LINE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'LINE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Line">
+              <button onClick={() => setSketchTool('LINE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'LINE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Line">
                 <span className="text-lg group-hover:scale-110 transition-all">📏</span>
                 <span className="text-[13px] leading-none">Line</span>
               </button>
-              <button onClick={() => setSketchTool('CIRCLE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'CIRCLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Circle">
+              <button onClick={() => setSketchTool('CIRCLE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'CIRCLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Circle">
                 <span className="text-lg group-hover:scale-110 transition-all">⭕</span>
                 <span className="text-[13px] leading-none">Circle</span>
               </button>
-              <button onClick={() => setSketchTool('RECTANGLE')} className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'RECTANGLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Rectangle">
+              <button onClick={() => setSketchTool('RECTANGLE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'RECTANGLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Rectangle">
                 <span className="text-lg group-hover:scale-110 transition-all">⬜</span>
                 <span className="text-[13px] leading-none">Rect</span>
               </button>
@@ -2772,7 +2752,7 @@ export default function Home() {
 
                 onClick={handlePrintToPDF}
 
-                className="h-[52px] px-3.5 rounded transition-all flex flex-col items-center justify-center gap-1 group text-indigo-600 font-bold border border-indigo-200/50 bg-indigo-50/30 hover:bg-indigo-100/80 shadow-sm"
+                className="h-[60px] px-3.5 rounded transition-all flex flex-col items-center justify-center gap-1 group text-indigo-600 font-bold border border-indigo-200/50 bg-indigo-50/30 hover:bg-indigo-100/80 shadow-sm"
 
                 title="一鍵匯出無失真 A4 橫向向量 PDF 工程圖"
 
@@ -2866,7 +2846,7 @@ export default function Home() {
 
                 }}
 
-                className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
+                className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${
 
                   measurementMode !== 'NONE'
 
@@ -2902,7 +2882,7 @@ export default function Home() {
 
                     }}
 
-                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                    className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
 
                       measurementMode === 'DISTANCE' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
 
@@ -2922,7 +2902,7 @@ export default function Home() {
 
                     }}
 
-                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                    className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
 
                       measurementMode === 'ANGLE' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
 
@@ -2942,7 +2922,7 @@ export default function Home() {
 
                     }}
 
-                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                    className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
 
                       measurementMode === 'AREA' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
 
@@ -2962,7 +2942,7 @@ export default function Home() {
 
                     }}
 
-                    className={`h-[52px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
+                    className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 ${
 
                       measurementMode === 'VOLUME' ? 'bg-indigo-100 border border-indigo-300 text-indigo-700 font-bold' : 'hover:bg-slate-200'
 
@@ -2986,7 +2966,7 @@ export default function Home() {
 
                 onClick={handleCalculateMassProperties}
 
-                className="h-[52px] px-3 rounded hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 text-slate-700 hover:text-amber-700 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-amber-500/10 border border-transparent hover:border-amber-500/20 text-slate-700 hover:text-amber-700 transition-all flex flex-col items-center justify-center gap-1 group"
 
                 title="計算Part質量、重心與轉動慣量"
 
@@ -3000,7 +2980,7 @@ export default function Home() {
 
                 onClick={() => handleExportCad('STEP')}
 
-                className="h-[52px] px-3 rounded hover:bg-blue-500/10 border border-transparent hover:border-blue-500/20 text-slate-700 hover:text-blue-700 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-blue-500/10 border border-transparent hover:border-blue-500/20 text-slate-700 hover:text-blue-700 transition-all flex flex-col items-center justify-center gap-1 group"
 
                 title=" B-Rep STEP  SolidWorks "
 
@@ -3010,7 +2990,7 @@ export default function Home() {
 
                 onClick={() => handleExportCad('IGES')}
 
-                className="h-[52px] px-3 rounded hover:bg-orange-500/10 border border-transparent hover:border-orange-500/20 text-slate-700 hover:text-orange-700 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-orange-500/10 border border-transparent hover:border-orange-500/20 text-slate-700 hover:text-orange-700 transition-all flex flex-col items-center justify-center gap-1 group"
 
                 title=" IGES "
 
@@ -3020,7 +3000,7 @@ export default function Home() {
 
                 onClick={() => handleExportCad('STL')}
 
-                className="h-[52px] px-3 rounded hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 text-slate-700 hover:text-emerald-700 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-emerald-500/10 border border-transparent hover:border-emerald-500/20 text-slate-700 hover:text-emerald-700 transition-all flex flex-col items-center justify-center gap-1 group"
 
                 title=" STL  3D "
 
@@ -3030,7 +3010,7 @@ export default function Home() {
 
                 onClick={handleSaveSldprt}
 
-                className="h-[52px] px-3 rounded hover:bg-pink-500/10 border border-transparent hover:border-pink-500/20 text-slate-700 hover:text-pink-700 transition-all flex flex-col items-center justify-center gap-1 group"
+                className="h-[60px] px-3 rounded hover:bg-pink-500/10 border border-transparent hover:border-pink-500/20 text-slate-700 hover:text-pink-700 transition-all flex flex-col items-center justify-center gap-1 group"
 
                 title="保存為 3D-Builder 參數化特徵Part檔"
 
