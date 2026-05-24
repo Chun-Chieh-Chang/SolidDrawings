@@ -321,7 +321,7 @@ export default function Home() {
 
       const key = e.key.toLowerCase();
       if (key === 'l') {
-        setSketchTool('LINE');
+        setSketchTool('SELECT');
       } else if (key === 'a') {
         setSketchTool('ARC');
       } else if (e.key === 'Escape') {
@@ -886,7 +886,7 @@ export default function Home() {
       setActiveFaceNormal(null);
       setActiveFaceId(null);
     }
-    setSketchTool('LINE');
+    setSketchTool('SELECT');
     setSketchMode(true);
     setActiveTab('SKETCH');
     setSmartDimensionActive(false);
@@ -1304,7 +1304,7 @@ export default function Home() {
                 }
                 
                 setSketchMode(true);
-                setSketchTool('LINE');
+                setSketchTool('SELECT');
               }
             }}
             className={`px-4 py-1 text-[14px] font-bold tracking-wider transition-all border-b-2 uppercase ${
@@ -1386,7 +1386,7 @@ export default function Home() {
                     }
                     
                     setSketchMode(true);
-                    setSketchTool('LINE');
+                    setSketchTool('SELECT');
                   }
                 }}
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
@@ -1416,7 +1416,7 @@ export default function Home() {
                     }
                     
                     setSketchMode(true);
-                    setSketchTool('LINE');
+                    setSketchTool('SELECT');
                   }
                 }}
                 className="h-[52px] px-3 rounded hover:bg-slate-200/80 active:bg-slate-300 transition-all flex flex-col items-center justify-center gap-1 group"
@@ -1909,7 +1909,7 @@ export default function Home() {
                                 data: { plane: 'FRONT' }
                               });
                             }}
-                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('FRONT'); setSketchMode(true); setSketchTool('LINE'); setContextMenu(null); }}
+                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('FRONT'); setSketchMode(true); setSketchTool('SELECT'); setContextMenu(null); }}
                             onMouseEnter={() => setHoveredTreeId('FRONT')}
                             onMouseLeave={() => setHoveredTreeId(null)}
                             className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border ${
@@ -1946,7 +1946,7 @@ export default function Home() {
                                 data: { plane: 'TOP' }
                               });
                             }}
-                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('TOP'); setSketchMode(true); setSketchTool('LINE'); setContextMenu(null); }}
+                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('TOP'); setSketchMode(true); setSketchTool('SELECT'); setContextMenu(null); }}
                             onMouseEnter={() => setHoveredTreeId('TOP')}
                             onMouseLeave={() => setHoveredTreeId(null)}
                             className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border ${
@@ -1983,7 +1983,7 @@ export default function Home() {
                                 data: { plane: 'RIGHT' }
                               });
                             }}
-                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('RIGHT'); setSketchMode(true); setSketchTool('LINE'); setContextMenu(null); }}
+                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('RIGHT'); setSketchMode(true); setSketchTool('SELECT'); setContextMenu(null); }}
                             onMouseEnter={() => setHoveredTreeId('RIGHT')}
                             onMouseLeave={() => setHoveredTreeId(null)}
                             className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border ${
@@ -2204,7 +2204,7 @@ export default function Home() {
                     setSketchPoints([]);
                     setSketchRelations([]);
                     setSketchMode(true);
-                    setSketchTool('LINE');
+                    setSketchTool('SELECT');
                     setEditingFeatureId(null);
                     triggerCameraNormal();
                   }}

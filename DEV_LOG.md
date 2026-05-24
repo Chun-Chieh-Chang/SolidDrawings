@@ -3204,3 +3204,15 @@ px tsc --noEmit -> **PASS**??
 ### RCA & CAPA
 - **RCA (Root Cause Analysis)**?  - 在從簡單陣列 (sketchPoints) 升級至圖論模型架構 (Graph-based Model) 的過程中，狀態重置邏輯未被完整覆蓋。導致取消草圖時，useCadStore 中的節點與邊數據殘留（Memory Leak），當再次進入草圖模式時，這些「幽靈線條」就會重新被渲染出來。
 - **CAPA (Corrective and Preventive Actions)**?  - **Comprehensive State Reset**垢隤 將所有圖論狀態的 Setter (setSketchNodes, setSketchEdges, setSketchConstraints) 加入草圖重置生命週期中，徹底杜絕狀態殘留。
+
+---
+## [2026-05-24] Bug Fix: Default Sketch Tool & Accidental Drawing ??
+### 正??
+- **?? Default Tool Normalization**城?更新 src/app/page.tsx。當使用者雙擊基準面或透過按鈕進入草圖模式時，預設的 sketchTool 狀態將切換為 SELECT（選取模式），而非強制綁定為 LINE（直線）。
+- **?? Click Guardrail**垮??更新 src/renderer/DatumPlanes.tsx。在 handlePlaneClick 實作了工具狀態守門員。當工具為 SELECT 時，點擊畫布只會清空選取狀態，而**絕對不會**實體化任何草圖節點或線段。
+### 捂?荒? (Validation)
+- ?? 
+px tsc --noEmit -> **PASS**??
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**?  - 違反了標準 CAD 的「無狀態優先 (Stateless-First)」原則。進入草圖即強制啟動繪圖工具，導致使用者在只想點選既有特徵時，意外觸發了寫入操作。
+- **CAPA (Corrective and Preventive Actions)**?  - **State Guarding**垢隤 在 React Three Fiber 的渲染層引入嚴格的工具狀態判斷，徹底切斷了「選取模式」與「繪圖行為」的耦合。
