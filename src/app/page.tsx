@@ -2644,7 +2644,7 @@ export default function Home() {
                   }
                 }}
                 className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
-                title="Extrude Boss"
+                title="🏗️ Extrude Boss (Boss/Base)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🏗️</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Extrude</span>
@@ -2661,7 +2661,7 @@ export default function Home() {
                   }
                 }}
                 className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
-                title="Extrude Cut"
+                title="🔨 Extrude Cut (Remove Material)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🔨</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Cut</span>
@@ -2680,7 +2680,7 @@ export default function Home() {
                   } else { alert('Select a plane and draw a profile first'); }
                 }}
                 className="h-[60px] px-3 rounded hover:bg-slate-200/80 transition-all flex flex-col items-center justify-center gap-1 group"
-                title="Revolve"
+                title="🔄 Revolve (Circular Feature)"
               >
                 <span className="text-lg group-hover:scale-110 transition-all">🔄</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Revolve</span>
@@ -2716,7 +2716,7 @@ export default function Home() {
             </div>
           ) : activeTab === 'SKETCH' ? (
             <div className="flex items-center gap-1.5 h-full overflow-x-auto no-scrollbar py-1">
-              <button onClick={resetSketchSession} className="h-[60px] px-3 rounded bg-slate-100 hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-1 group border border-slate-300" title="Exit Sketch">
+              <button onClick={resetSketchSession} className="h-[60px] px-3 rounded bg-slate-100 hover:bg-slate-200 transition-all flex flex-col items-center justify-center gap-1 group border border-slate-300" title="✅ Exit Sketch (Apply Changes)">
                 <span className="text-lg group-hover:scale-110 transition-all">✅</span>
                 <span className="text-[13px] text-slate-800 font-bold leading-none">Exit</span>
               </button>
@@ -2725,15 +2725,15 @@ export default function Home() {
                 <span className="text-[13px] leading-none">Dimension</span>
               </button>
               <div className="w-[1px] h-[40px] bg-slate-300 mx-1 shrink-0" />
-              <button onClick={() => setSketchTool('LINE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'LINE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Line">
+              <button onClick={() => setSketchTool('LINE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'LINE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="📏 Line (Continuous Segments)">
                 <span className="text-lg group-hover:scale-110 transition-all">📏</span>
                 <span className="text-[13px] leading-none">Line</span>
               </button>
-              <button onClick={() => setSketchTool('CIRCLE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'CIRCLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Circle">
+              <button onClick={() => setSketchTool('CIRCLE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'CIRCLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="⭕ Circle (Center-Radius)">
                 <span className="text-lg group-hover:scale-110 transition-all">⭕</span>
                 <span className="text-[13px] leading-none">Circle</span>
               </button>
-              <button onClick={() => setSketchTool('RECTANGLE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'RECTANGLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="Rectangle">
+              <button onClick={() => setSketchTool('RECTANGLE')} className={`h-[60px] px-3 rounded transition-all flex flex-col items-center justify-center gap-1 group ${sketchTool === 'RECTANGLE' ? 'bg-primary/10 text-primary font-bold' : 'hover:bg-slate-200'}`} title="⬜ Rectangle (Corner-Corner)">
                 <span className="text-lg group-hover:scale-110 transition-all">⬜</span>
                 <span className="text-[13px] leading-none">Rect</span>
               </button>

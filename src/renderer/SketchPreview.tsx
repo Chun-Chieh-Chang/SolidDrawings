@@ -161,18 +161,48 @@ export const SketchPreview = () => {
     return null;
   };
 
-  const handleEntityClick = (entId: string) => {
+    const handleEntityClick = (entId: string) => {
     if (!isSketchMode) return;
+    
+    console.log('[Sketch Interaction] Entity Clicked:', entId, 'SmartDim:', smartDimensionActive);
 
-        if (smartDimensionActive) {
-      // SMART DIMENSION LOGIC
-      
-      // A. Edge Click (Line/Circle)
+    if (smartDimensionActive) {
+      // 1. Try to find as Edge (Line/Circle)
       const edge = sketchEdges[entId];
-      if (edge && (edge.type === 'LINE' || edge.type === 'CENTER_LINE' || edge.type === 'CIRCLE')) {
-        const n1 = sketchNodes[edge.nodeIds[0]];
-        const n2 = sketchNodes[edge.nodeIds[1]];
-        if (n1 && n2) {
+      if (edge) {
+        if (edge.type === 'LINE' || edge.type === 'CENTER_LINE' || edge.type === 'CIRCLE') {
+          const n1 = sketchNodes[edge.nodeIds[0]];
+          const n2 = sketchNodes[edge.nodeIds[1]];
+          if (n1 && n2) {
+            const distance = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+            const cId = uuidv4();
+            const newConstraint = {
+              id: cId,
+              type: 'DISTANCE' as const,
+              nodeIds: [n1.id, n2.id],
+              value: distance
+            };
+            setSketchConstraints((prev: any) => {
+               const next = { ...prev, [cId]: newConstraint };
+               // Trigger solve immediately
+               const solvedNodes = solveConstraints(sketchNodes, sketchEdges, next);
+               setSketchNodes(solvedNodes);
+               return next;
+            });
+            setSelectedEntityIds([]);
+            return;
+          }
+        }
+      }
+
+      // 2. Try to find as Node
+      const node = sketchNodes[entId];
+      if (node) {
+        // If one node already selected, create dimension
+        const alreadySelectedNodeId = selectedEntityIds.find(id => sketchNodes[id]);
+        if (alreadySelectedNodeId && alreadySelectedNodeId !== entId) {
+          const n1 = sketchNodes[alreadySelectedNodeId];
+          const n2 = node;
           const distance = Math.hypot(n2.x - n1.x, n2.y - n1.y);
           const cId = uuidv4();
           const newConstraint = {
@@ -181,39 +211,23 @@ export const SketchPreview = () => {
             nodeIds: [n1.id, n2.id],
             value: distance
           };
-          setSketchConstraints(prev => ({ ...prev, [cId]: newConstraint }));
+          setSketchConstraints((prev: any) => {
+             const next = { ...prev, [cId]: newConstraint };
+             const solvedNodes = solveConstraints(sketchNodes, sketchEdges, next);
+             setSketchNodes(solvedNodes);
+             return next;
+          });
           setSelectedEntityIds([]);
           return;
-        }
-      }
-
-      // B. Node Click (Store first node, wait for second)
-      const node = sketchNodes[entId];
-      if (node) {
-        if (selectedEntityIds.length === 1 && sketchNodes[selectedEntityIds[0]]) {
-           // Second node clicked
-           const n1Id = selectedEntityIds[0];
-           const n2Id = entId;
-           if (n1Id !== n2Id) {
-             const n1 = sketchNodes[n1Id];
-             const n2 = sketchNodes[n2Id];
-             const distance = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-             const cId = uuidv4();
-             setSketchConstraints(prev => ({ 
-               ...prev, 
-               [cId]: { id: cId, type: 'DISTANCE' as const, nodeIds: [n1Id, n2Id], value: distance } 
-             }));
-             setSelectedEntityIds([]);
-             return;
-           }
         } else {
-           // First node clicked
-           setSelectedEntityIds([entId]);
-           return;
+          // First node selection in dim mode
+          setSelectedEntityIds([entId]);
+          return;
         }
       }
     }
 
+    // Standard Selection Logic (if not in dim mode or nothing handled)
     const isSelected = selectedEntityIds.includes(entId);
     if (isSelected) {
       setSelectedEntityIds(selectedEntityIds.filter(id => id !== entId));
