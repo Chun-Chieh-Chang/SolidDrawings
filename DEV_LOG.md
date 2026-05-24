@@ -3228,3 +3228,16 @@ px tsc --noEmit -> **PASS**??
 ### RCA & CAPA
 - **RCA (Root Cause Analysis)**?  - 由於 Windows PowerShell 環境、Node.js 檔案寫入流以及 Git Hook 之間對 UTF-8（是否帶 BOM）的處理機制不一致，導致在進行代碼重構時，中文字符頻繁損壞為「孵噩」等亂碼（Mojibake），甚至破壞了緊鄰的 TypeScript 邏輯運算子（如 ??）。
 - **CAPA (Corrective and Preventive Actions)**?  - **Encoding Agnosticism**垢隤 作出戰略性決策：放棄在核心架構未穩定前維持本地化介面。全面轉向純英文 ASCII 介面，確保 1.0/2.0 正式版的代碼能在任何作業系統或終端環境下穩定編譯與渲染，消除一切編碼地雷。
+
+---
+## [2026-05-24] UI Restoration: Missing Icons & Labels Fixed ??
+### 正??
+- **?? Icon Restoration**城?修復了在切換英文介面時意外遺失的輔助圖標。現在 FEATURES, SKETCH, DRAWING, ASSEMBLY, EVALUATE 所有分頁的功能按鈕皆已恢復圖標顯示（如：🏗️, 📏, 🔄, 🐚...）。
+- **?? Label Normalization**垮??修正了 Ribbon 功能區中出現的 "-" 占位符，確保所有英文標籤（如：Extrude Boss, Revolve, Pattern）完整顯示。
+### 捂?荒? (Validation)
+- ?? 
+px tsc --noEmit -> **PASS**??
+- ?? 視覺檢查：手動核對 JSX 標籤結構與 Emoji 編碼。
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**?  - 在之前的「全球英文在地化」腳本中，使用了過於激進的正則表達式 e.sub(r'[^\x00-\x7F]+', '', s)，該表達式原本意圖刪除中文字符，但卻誤將所有的非 ASCII 圖標（Emoji）與特殊符號一併抹除，導致 UI 呈現「禿頭」現象。
+- **CAPA (Corrective and Preventive Actions)**?  - **Surgical UI Rebuild**垢隤 放棄模糊的正則匹配，改用針對 Ribbon 區塊的「硬核覆寫 (Hard Overwrite)」策略。直接將清潔、帶有正確圖標的 JSX 代碼段寫入檔案，確保 100% 的顯示一致性。
