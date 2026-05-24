@@ -1,16 +1,19 @@
-'use client';
+﻿'use client';
 
 import React, { useMemo, useState } from 'react';
 import * as THREE from 'three';
 import { useCadStore } from '../store/useCadStore';
+import { v4 as uuidv4 } from 'uuid';
 import { Line, Html } from '@react-three/drei';
-import { analyzeSketchDefinitions } from '../utils/geometry/ConstraintSolver';
+import { analyzeSketchDefinitions, solveConstraints } from '../utils/geometry/ConstraintSolver';
 
 export const SketchPreview = () => {
   const { 
-    sketchNodes, sketchEdges, sketchConstraints,
+    sketchNodes, setSketchNodes, sketchEdges, setSketchEdges, sketchConstraints,
     activePlane, 
     isSketchMode,
+    smartDimensionActive, setSmartDimensionActive,
+    setSketchConstraints,
     selectedEntityIds,
     setSelectedEntityIds,
     activeFaceOrigin,
@@ -160,6 +163,57 @@ export const SketchPreview = () => {
 
   const handleEntityClick = (entId: string) => {
     if (!isSketchMode) return;
+
+        if (smartDimensionActive) {
+      // SMART DIMENSION LOGIC
+      
+      // A. Edge Click (Line/Circle)
+      const edge = sketchEdges[entId];
+      if (edge && (edge.type === 'LINE' || edge.type === 'CENTER_LINE' || edge.type === 'CIRCLE')) {
+        const n1 = sketchNodes[edge.nodeIds[0]];
+        const n2 = sketchNodes[edge.nodeIds[1]];
+        if (n1 && n2) {
+          const distance = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+          const cId = uuidv4();
+          const newConstraint = {
+            id: cId,
+            type: 'DISTANCE' as const,
+            nodeIds: [n1.id, n2.id],
+            value: distance
+          };
+          setSketchConstraints(prev => ({ ...prev, [cId]: newConstraint }));
+          setSelectedEntityIds([]);
+          return;
+        }
+      }
+
+      // B. Node Click (Store first node, wait for second)
+      const node = sketchNodes[entId];
+      if (node) {
+        if (selectedEntityIds.length === 1 && sketchNodes[selectedEntityIds[0]]) {
+           // Second node clicked
+           const n1Id = selectedEntityIds[0];
+           const n2Id = entId;
+           if (n1Id !== n2Id) {
+             const n1 = sketchNodes[n1Id];
+             const n2 = sketchNodes[n2Id];
+             const distance = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+             const cId = uuidv4();
+             setSketchConstraints(prev => ({ 
+               ...prev, 
+               [cId]: { id: cId, type: 'DISTANCE' as const, nodeIds: [n1Id, n2Id], value: distance } 
+             }));
+             setSelectedEntityIds([]);
+             return;
+           }
+        } else {
+           // First node clicked
+           setSelectedEntityIds([entId]);
+           return;
+        }
+      }
+    }
+
     const isSelected = selectedEntityIds.includes(entId);
     if (isSelected) {
       setSelectedEntityIds(selectedEntityIds.filter(id => id !== entId));
@@ -193,7 +247,11 @@ export const SketchPreview = () => {
           ...currentConstraints[constraintId],
           value: val
         };
-        useCadStore.setState({ sketchConstraints: currentConstraints });
+        setSketchConstraints(currentConstraints);
+        
+        // Auto-solve
+        const solvedNodes = solveConstraints(sketchNodes, sketchEdges, currentConstraints);
+        setSketchNodes(solvedNodes);
       }
     }
     setEditingConstraintId(null);

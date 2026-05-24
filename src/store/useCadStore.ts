@@ -1,4 +1,4 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING';
@@ -105,6 +105,8 @@ interface CadState {
   setMode: (mode: CadMode) => void;
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
+  smartDimensionActive: boolean;
+  setSmartDimensionActive: (active: boolean) => void;
   activePlane: string | null;
   setActivePlane: (plane: string | null) => void;
   activeFaceOrigin: [number, number, number] | null;
@@ -235,6 +237,8 @@ export const useCadStore = create<CadState>()(
       setMode: (mode) => set({ mode }),
       isSketchMode: false,
       setSketchMode: (isSketchMode) => set({ isSketchMode }),
+      smartDimensionActive: false,
+      setSmartDimensionActive: (smartDimensionActive) => set({ smartDimensionActive }),
       activePlane: null,
       setActivePlane: (activePlane) => set({ activePlane }),
       activeFaceOrigin: null,

@@ -3282,3 +3282,19 @@ pm run pdca:check -> **PASS**??
 ### RCA & CAPA
 - **RCA (Root Cause Analysis)**?  - 之前的 Ribbon Bar 高度設定過於緊湊（Hard-coded Height），且未考慮到瀏覽器在不同作業系統下「橫向滾動條」會佔用垂直像素的特性。這導致當功能項目較多觸發滾動時，下方標籤會被擠壓。
 - **CAPA (Corrective and Preventive Actions)**?  - **Dynamic Clearance Standard**垢隤 在 UI 佈局中，針對關鍵交互區（如 Ribbon）保留至少 15-20% 的垂直緩衝空間（Clearance），並透過自動化腳本確保標籤字串的純淨度，避免隱形成員（Invisible Whitespace）干擾佈局。
+
+---
+## [2026-05-24] Feature: Smart Dimension Logic Restored ??
+### 正??
+- **?? Store Integration**城?將 smartDimensionActive 狀態從組件局部 state 提升至全域 useCadStore。這解決了 3D 渲染層無法得知當前是否處於標註模式的問題。
+- **?? Entity Interaction**垮??更新 src/renderer/SketchPreview.tsx。現在當「智慧尺寸 (Smart Dimension)」啟用時：
+    - 點擊 **線段 (Line)** 或 **圓 (Circle)**：自動建立對應的 DISTANCE 約束（標註長度或半徑）。
+    - 點擊 **兩個端點 (Nodes)**：建立兩點間距離約束。
+- **?? Auto-Solver Trigger**垢隤 修改標註數值時，系統現在會自動觸發 solveConstraints，即時更新草圖幾何形狀。
+### 捂?荒? (Validation)
+- ?? 
+px tsc --noEmit -> **PASS**??
+- ?? **PDCA Check**垢隤 驗證了狀態提升後的組件依賴關係。
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**?  - 之前的「Dimension」按鈕僅僅是一個 UI 切換，背後缺乏與 3D 交互層 (React Three Fiber) 的邏輯綁定。渲染層根本不知道使用者切換到了標註模式，因此點擊圖元時僅觸發了選取邏輯而非標註邏輯。
+- **CAPA (Corrective and Preventive Actions)**?  - **State-Driven Tooling**垢隤 確立規範：所有影響視圖交互的工具狀態必須存放於全域 Store。並在渲染層 onClick 處理器中優先判斷工具模式，確保「模式 -> 行為」的正確映射。

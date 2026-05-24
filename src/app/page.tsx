@@ -142,9 +142,7 @@ export default function Home() {
 
   }, []);
 
-  const {
-
-    mode, setMode,
+  const { mode, setMode,
 
     projectName, setProjectName,
 
@@ -180,7 +178,7 @@ export default function Home() {
 
     meshData, setMeshData,
 
-    isSketchMode, setSketchMode,
+    isSketchMode, smartDimensionActive, setSmartDimensionActive, setSketchMode,
 
     activePlane, setActivePlane,
 
@@ -218,9 +216,7 @@ export default function Home() {
 
     sketchNodes, setSketchNodes, sketchEdges, setSketchEdges, sketchConstraints, setSketchConstraints,
 
-    hint, setHint
-
-  } = useCadStore();
+    hint, setHint } = useCadStore();
 
 
 
@@ -600,7 +596,7 @@ export default function Home() {
 
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
 
-  const [smartDimensionActive, setSmartDimensionActive] = useState(false);
+  
 
 
 
