@@ -26,6 +26,46 @@ export const SketchPropertyManager: React.FC = () => {
     return selectedEntityIds.filter(id => sketchConstraints[id]).map(id => sketchConstraints[id]);
   }, [selectedEntityIds, sketchConstraints]);
 
+
+  const handleDeleteEntities = () => {
+    if (selectedEntityIds.length === 0) return;
+
+    const nextNodes = { ...sketchNodes };
+    const nextEdges = { ...sketchEdges };
+    const nextConstraints = { ...sketchConstraints };
+    
+    // Determine which IDs to delete
+    const nodesToDelete = new Set<string>();
+    const edgesToDelete = new Set<string>();
+    const constraintsToDelete = new Set<string>();
+
+    selectedEntityIds.forEach(id => {
+      if (sketchNodes[id]) nodesToDelete.add(id);
+      if (sketchEdges[id]) edgesToDelete.add(id);
+      if (sketchConstraints[id]) constraintsToDelete.add(id);
+    });
+
+    Object.values(sketchEdges).forEach(edge => {
+      if (edge.nodeIds.some(nid => nodesToDelete.has(nid))) {
+        edgesToDelete.add(edge.id);
+      }
+    });
+
+    Object.values(sketchConstraints).forEach(c => {
+      if (c.nodeIds?.some(nid => nodesToDelete.has(nid))) constraintsToDelete.add(c.id);
+      if (c.edgeIds?.some(eid => edgesToDelete.has(eid))) constraintsToDelete.add(c.id);
+    });
+
+    nodesToDelete.forEach(id => delete nextNodes[id]);
+    edgesToDelete.forEach(id => delete nextEdges[id]);
+    constraintsToDelete.forEach(id => delete nextConstraints[id]);
+
+    useCadStore.getState().setSketchNodes(nextNodes);
+    useCadStore.getState().setSketchEdges(nextEdges);
+    useCadStore.getState().setSketchConstraints(nextConstraints);
+    useCadStore.getState().setSelectedEntityIds([]);
+  };
+
   // Unified constraint applicator
   const applyConstraint = (type: SketchConstraint['type']) => {
     const cid = uuidv4();
