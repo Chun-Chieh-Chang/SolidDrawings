@@ -259,7 +259,7 @@ export const DatumPlanes = () => {
       return { sketchNodes: nextNodes, sketchEdges: nextEdges, sketchConstraints: nextConstraints };
     });
 
-    if (isClosing || sketchTool === 'CIRCLE' || sketchTool === 'RECTANGLE') {
+    if (isClosing || ((sketchTool === 'CIRCLE' || sketchTool === 'RECTANGLE') && !sketchNewChain)) {
       setSketchNewChain(true);
       setLastClickedNodeId(null);
       setFirstChainNodeId(null);
