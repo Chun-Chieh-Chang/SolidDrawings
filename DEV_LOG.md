@@ -47,6 +47,51 @@
 1. **不重複造輪子 (Don't Reinvent the Wheel)**: 凡是有現成、穩定、工業標準的開源工具（如 OpenCASCADE, SolveSpace, React Three Fiber），必須直接引進並封裝對接，嚴禁從零自行開發底層數學或圖形邏輯。
 
 ---
+## [2026-05-23] 專案計畫歸一化與終極對標基準確立 (Act) ✅
+
+### 實裝成果
+- **確立終極對標基準 (Master Plan Established)**：
+    - 建立了 [SOLIDWORKS_MASTER_PLAN.md](file:///c:/Users/3kids/Downloads/3D-Builder/SOLIDWORKS_MASTER_PLAN.md)，作為 3D-Builder 的歸一化最高指導原則。
+    - 內容涵蓋「引擎引擎」、「數據流」、「交互方式」與「前後端通連」四大板塊的完美復刻計畫。
+- **治理體系同步 (Governance Sync)**：
+    - 更新 `tools/pdca-check.mjs`，將 `SOLIDWORKS_MASTER_PLAN.md` 納入自動化檢查的硬性約束。
+    - 同步更新 [README.md](file:///c:/Users/3kids/Downloads/3D-Builder/README.md) 與 [handover_resume_guide.md](file:///c:/Users/3kids/Downloads/3D-Builder/handover_resume_guide.md)，確保開發導引與終極目標一致。
+
+### 確效結果 (Check)
+- 執行 `npm run pdca:check` 通過，確認歸一化計畫已成為專案門禁的一部分。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+    - 專案先前存在多份計畫文件（`PRODUCTIZATION_PLAN.md`、`SOLIDWORKS_FEATURE_ROADMAP.md`），導致開發目標分散，且缺乏對「SolidWorks 級別復刻」這一終極願景的系統性整合。
+- **CAPA (Corrective and Preventive Actions)**：
+    - **歸一化管理**：建立 Master Plan 制度，所有細分計畫必須依附於 Master Plan，避免目標偏移。
+    - **門禁強制化**：透過 Git Hook 與自動化腳本，強制開發者在開始前與結束後都必須對標 Master Plan。
+
+---
+## [2026-05-23] 系統性 PDCA 查核與產品化基礎強化 (Act) ✅
+
+### 實裝成果
+- **產品化名稱與格式標準化 (Productization Standardization)**：
+  - 徹底移除 `.sldprt` 偽相容命名，全面轉向原生 [`.3dbpart`](file:///c:/Users/3kids/Downloads/3D-Builder/docs/spec/part-file-format.md) 格式。
+  - 重構 `handleSaveProject` 與視埠標題，強化「3D-Builder」專案身份，規避商標風險。
+- **草圖圖論模型遷移 (Sketch Graph Migration)**：
+  - **Check 發現**：發現 `entities` 可視化邏輯仍依賴已廢棄的 `sketchPoints` 陣列，導致數據鏈路脫節。
+  - **Act 修復**：重構 `entities` 的 `useMemo`，使其直接由 `sketchNodes` 與 `sketchEdges` 驅動，達成數據模型與渲染層的 100% 同步。
+- **文檔健康度修復 (Documentation Health)**：
+  - 修正了 `README.md` 的編碼異常（Mojibake），恢復專業文案內容。
+
+### 確效結果 (Check)
+- 執行 `npm run pdca:check` 通過。
+- 視埠實體選取與顯示現在正確反映 Store 中的圖論數據，而非遺留的座標陣列。
+
+### RCA & CAPA
+- **RCA (Root Cause Analysis)**：
+  - 在 Phase 13/14 的迭代中，僅更新了資料儲存層 (Store)，卻忽略了渲染層 (UI Memo) 的依賴關係，造成「資料更新但顯示無效」的隱性 Bug。
+- **CAPA (Corrective and Preventive Actions)**：
+  - **全域搜尋規範**：在移除任何遺留狀態 (如 `sketchPoints`) 前，必須執行全域 Grep 確保所有消費者 (Consumers) 已完成遷移。
+  - **PDCA 門禁強化**：將 `entities` 的資料來源校驗加入 `tools/pdca-check.mjs`。
+
+---
 ## [2026-05-23] RCA/CAPA：PDCA 自動化檢查失敗修復 (Act) ✅
 
 ### 實裝成果

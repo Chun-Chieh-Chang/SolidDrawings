@@ -1,11 +1,12 @@
 # Task Plan - Phase 14 Closure & Baseline
 
-## [P] Plan: 建立 Phase 14 穩定基準點
-- **目標**：完成基準面交互優化，實裝自動化型別防禦，並清理專案環境。
+## [P] Plan: 建立 Phase 14 穩定基準點與系統性 PDCA 查核
+- **目標**：完成基準面交互優化，實裝自動化型別防禦，並對全專案計畫執行 PDCA 閉環查核。
 - **驗收標準**：
     1. `npx tsc --noEmit` 通過。
     2. `npm run pdca:check` 通過。
-    3. Git Tag `v3.2.0-Phase14-Baseline` 已推送。
+    3. 遺留的 `.sldprt` 命名與 `sketchPoints` 渲染邏輯已清理/遷移。
+    4. Git Tag `v3.2.0-Phase14-Baseline` 已推送。
 
 ## [D] Do: 執行任務
 - [x] 基準面點擊選取與高亮邏輯。

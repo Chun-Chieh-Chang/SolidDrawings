@@ -1,41 +1,62 @@
-﻿﻿# 3D Builder (Powered by SkillsBuilder)
+# 3D-Builder (Powered by SkillsBuilder)
 
-3D Builder ?臭????Web ?銝誨???3D CAD 撱箸芋撌亙嚗?冽?靘極璆剔?????????銝雁撟曆?瑽遣?賢?嚗蒂?? Electron 撠???啁垢?蝔???
-?砍?獢?撅斗?其? **Graph-driven Development (??撽?)** ?嗆?嚗蒂?瑕??單??踵???**Position-Based Dynamics (PBD)** 蝝?瘙圾?具??潮?蝔蝔???[SkillsBuilder](https://github.com/Chun-Chieh-Chang) ?箸?蝟餌絞?風?迎??萄儐?湔??PDCA 敺芰?餈湔飛蝣箸?蝝敺?
+3D-Builder 是一個基於 Web 的新世代參數化 3D CAD 建模工具，旨在提供工業級的草圖約束引擎與三維幾何構建能力，並透過 Electron 封裝成本地端應用程式。
+
+本專案底層採用了 **Graph-driven Development (圖論驅動)** 架構，並具備即時響應的 **Position-Based Dynamics (PBD)** 約束求解器。開發過程全程受到 [SkillsBuilder](https://github.com/Chun-Chieh-Chang) 智慧開發系統的護航，遵循嚴格的 PDCA 循環與防迴歸確效紀律。
+
 ---
 
-## ? ?詨?? (Core Features)
+## 🎯 核心功能 (Core Features)
 
-### 1. Graph-based 2D ??撘? (Sketcher)
-- ???喟絞??鞈湧???寧????隢?瑽?(`SketchNode` ??`SketchEdge`)??- ?批遣 **PBD (Position-Based Dynamics) 蝝?瘙圾??*嚗?游??瘞游像???氬暺??瑯??敹?摨衣?蝝?璇辣閫??嚗?ａ撱園????- **?????閬箏?**嚗????蝢拍?摨西???莎?摰摰儔=暺嚗?摰儔=?嚗?蝒?蝝嚗?
-### 2. 撌交平蝝?蝬剔敺萄遣璅?(3D Modeling)
-- **?Ｖ?韏瑁? (Sketch on Face)**嚗?游隞餅?撖阡?銵券撱箇?撅?典?璅頂 (LCS) 銝阡脰?鈭活?孵噩蝜芾ˊ??- **??敺菟?**嚗??典?璅?SolidWorks ?敺菜邦?摩嚗???**???嗆? (Rollback Bar)** ?風?脣?皞舐楊頛胯?- **???汗 (Live Rebuild)**嚗??訾耨?孵??150ms ?脫??????閬賢??賬?- **?孵噩???**嚗?渡??扯??啣耦?孵噩???銴ˊ??
-### 3. 璆菔?蝙?刻???(SolidWorks-aligned UI/UX)
-- **?閬?撌亙甈?(Heads-up Toolbar)**嚗?靘虜?函?憿舐內璅????閫???- **S-Key 敹急撌亙蝞?*嚗芋撘??亦?敹恍?殷?憭批???撱箸芋????- **瘥????(Glassmorphism)**嚗隞???雲???賊?輯?撅祆抒恣???
-### 4. IPC ??蝡臬嗾雿??(Electron + PythonOCC)
-- **Backend**: ?箸 OpenCASCADE (pythonOCC) ??撌交平蝝? 3D 撣????釭?惇?批???擃???敹?抒嚗?- **撌交平?澆?撠**嚗??STEP, IGES, STL 隞亙? A4 ??撌亦???PDF 頛詨??
+### 1. Graph-based 2D 草圖引擎 (Sketcher)
+- 拋棄傳統的依賴陣列，改用原生的圖論結構 (`SketchNode` 與 `SketchEdge`)。
+- 內建 **PBD (Position-Based Dynamics) 約束求解器**，支援即時的水平、垂直、共點、等長、相切、同心、角度等約束條件解算，畫面零延遲回饋。
+- **草圖狀態視覺化**：根據約束定義程度自動變色（完全定義=黑色，欠定義=藍色，衝突=紅色）。
+
+### 2. 工業級三維特徵建模 (3D Modeling)
+- **面上起草 (Sketch on Face)**：支援在任意實體表面建立局部坐標系 (LCS) 並進行二次特徵繪製。
+- **參數化特徵鏈**：完全對標 SolidWorks 的特徵樹邏輯，包含 **退回控制棒 (Rollback Bar)** 與歷史回溯編輯。
+- **動態預覽 (Live Rebuild)**：參數修改具備 150ms 防抖的動態即時預覽功能。
+- **特徵陣列**：支援線性與環形特徵陣列複製。
+
+### 3. 極致的使用者介面 (SolidWorks-aligned UI/UX)
+- **前景視圖工具欄 (Heads-up Toolbar)**：提供常用的顯示樣式與視角切換。
+- **S-Key 快捷工具箱**：模式感知的快速選單，大幅提升建模效率。
+- **毛玻璃效果 (Glassmorphism)**：現代感十足的參數面板與屬性管理器。
+
+### 4. IPC 與後端幾何內核 (Electron + PythonOCC)
+- **Backend**: 基於 OpenCASCADE (pythonOCC) 提供工業級的 3D 布林運算、質量屬性分析（體積、重心、慣性矩）。
+- **工業格式導出**：支援 STEP, IGES, STL 以及 A4 向量工程圖 PDF 輸出。
+
 ---
 
-## ?? 敹恍?憪?(Quick Start)
+## 🚀 快速開始 (Quick Start)
 
-### ?啣??????砍?獢???芸????潛憓?隢擐活?瑁??銵?
+### 環境初始化
+本專案整合了自動化開發環境，請在首次執行前執行：
 ```powershell
 powershell .\INSTALL.ps1
 ```
-???芸??郊??賢澈??蝵?Git Hooks 銝行炎??Python ?啣???
-### ??誘
+這將自動同步技能庫、配置 Git Hooks 並檢查 Python 環境。
+
+### 開發指令
 ```bash
 npm install
 npm run dev
 ```
 
-### ?瑼Ｘ?蝳?撠?撌脣???Git pre-commit hook嚗??誨蝣澆???隞乩?瑼Ｘ??漱嚗?```bash
+### 型別檢查與防禦
+專案已啟用 Git pre-commit hook，所有代碼必須通過以下檢查才能提交：
+```bash
 npx tsc --noEmit
 ```
 
 ---
 
-## ?? ?辣蝝Ｗ? (Documentation)
-- [?Ｗ????潸???(PRODUCTIZATION_PLAN.md)](docs/productization/PRODUCTIZATION_PLAN.md) - 敺??Ｗ??? Plan of Record??- [?Ｗ????潸???HTML](docs/productization/PRODUCTIZATION_PLAN.html) - ?舐汗/????- [PDCA 瘝餌?閬?](docs/governance/PDCA_GOVERNANCE.md) - Plan/Do/Check/Act ???hook 蝑??- [RCA/CAPA 璅⊥](docs/governance/RCA_CAPA_TEMPLATE.md) - Check 銝泵?? Act 閮?璅⊥??- [`.3dbpart` ???嗡辣?澆?閬](docs/spec/part-file-format.md) - 3D-Builder native part file schema??- [?孵噩璅寞撘??奭(docs/spec/feature-schema.md) - `.3dbpart` 銝?`features[]` ??feature schema??- [??亥? (DEV_LOG.md)](DEV_LOG.md) - 閰喟敦閮? RCA/CAPA 閮箸??Phase ?脣漲??- [蝥神?漱?交???(handover_resume_guide.md)](handover_resume_guide.md) - 銝?雿??潸?AI ??霈撠???- [??? (SOLIDWORKS_FEATURE_ROADMAP.md)](docs/architecture/SOLIDWORKS_FEATURE_ROADMAP.md) - ?瑟???頝舐???
-
-
+## 📜 文件索引 (Documentation)
+- [終極對標計畫 (SOLIDWORKS_MASTER_PLAN.md)](SOLIDWORKS_MASTER_PLAN.md) - 本專案的唯一歸一化開發藍圖。
+- [產品化開發細節 (PRODUCTIZATION_PLAN.md)](docs/productization/PRODUCTIZATION_PLAN.md) - 執行層面的階段性規劃。
+- [PDCA 治理規範 (PDCA_GOVERNANCE.md)](docs/governance/PDCA_GOVERNANCE.md) - Plan/Do/Check/Act 工作流與 Hook 註冊規範。
+- [開發日誌 (DEV_LOG.md)](DEV_LOG.md) - 詳細記錄 RCA/CAPA 診斷與進度。
+- [續寫與交接指南 (handover_resume_guide.md)](handover_resume_guide.md) - 下一位開發者/AI 的必讀導引。
+- [功能藍圖 (SOLIDWORKS_FEATURE_ROADMAP.md)](docs/architecture/SOLIDWORKS_FEATURE_ROADMAP.md) - 長期功能開發路線圖。

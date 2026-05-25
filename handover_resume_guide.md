@@ -35,7 +35,7 @@
 查閱 `wiki/index.md`。專案大腦已將「幾何約束數學」、「圖論模型」與「渲染管線」實體化。
 
 ### 步驟 3: 遵守 PDCA
-1. 讀取 `docs/productization/PRODUCTIZATION_PLAN.md` 作為產品化 Plan of Record。
+1. 讀取 [SOLIDWORKS_MASTER_PLAN.md](file:///c:/Users/3kids/Downloads/3D-Builder/SOLIDWORKS_MASTER_PLAN.md) 作為終極對標基準。
 2. 讀取 `DEV_LOG.md` 最後一筆記錄，確認上一個 Phase 的閉環狀態。
 3. 開始新的開發循環前，先列出待解決的「缺口 (Gaps)」，並遵循「介面先行」原則進行型別定義。
 4. 完成每次開發或修訂後，執行 `npx tsc --noEmit` 或嘗試 `git commit`（會自動觸發檢查）。

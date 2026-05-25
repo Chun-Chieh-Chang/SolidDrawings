@@ -1,4 +1,4 @@
-﻿﻿'use client';
+﻿﻿﻿﻿﻿﻿﻿'use client';
 
 
 
@@ -105,7 +105,7 @@ export default function Home() {
 
       onSaveRequest(async () => {
 
-        handleSaveSldprt();
+        handleSaveProject();
 
       }),
 
@@ -891,201 +891,61 @@ export default function Home() {
 
     const list: SketchEntity[] = [];
 
-    let i = 0;
-
     
 
-    while (i < sketchPoints.length) {
+    // Convert sketchEdges to SketchEntity list
 
-      // 1. Check if it's a Circle (37 points closed loop)
+    Object.values(sketchEdges).forEach((edge) => {
 
-      if (i + 36 < sketchPoints.length) {
+      const nodeA = sketchNodes[edge.nodeIds[0]];
 
-        const pStart = sketchPoints[i];
+      const nodeB = sketchNodes[edge.nodeIds[1]];
 
-        const pEnd = sketchPoints[i + 36];
+      if (!nodeA || !nodeB) return;
 
-        if (Math.hypot(pStart[0] - pEnd[0], pStart[1] - pEnd[1]) < 0.1) {
 
-          const pts = sketchPoints.slice(i, i + 37);
 
-          const us = pts.map(p => p[0]);
+      if (edge.type === 'CIRCLE') {
 
-          const vs = pts.map(p => p[1]);
+        list.push({
 
-          const minU = Math.min(...us);
+          id: edge.id,
 
-          const maxU = Math.max(...us);
+          type: 'CIRCLE',
 
-          const minV = Math.min(...vs);
+          name: ` C${list.filter(e => e.type === 'CIRCLE').length + 1}`,
 
-          const maxV = Math.max(...vs);
+          pointIndices: [], // Indices are legacy
 
-          const cU = (minU + maxU) / 2;
+          center: [nodeA.x, nodeA.y],
 
-          const cV = (minV + maxV) / 2;
+          radius: Math.hypot(nodeA.x - nodeB.x, nodeA.y - nodeB.y)
 
-          const radius = (maxU - minU) / 2;
-
-          
-
-          list.push({
-
-            id: `circle_${i}`,
-
-            type: 'CIRCLE',
-
-            name: ` C${list.filter(e => e.type === 'CIRCLE').length + 1}`,
-
-            pointIndices: Array.from({ length: 37 }, (_, k) => i + k),
-
-            center: [cU, cV],
-
-            radius: radius
-
-          });
-
-          i += 37;
-
-          continue;
-
-        }
-
-      }
-
-      
-
-      // 2. Check if it's a Rectangle (5 points closed loop)
-
-      if (i + 4 < sketchPoints.length) {
-
-        const pStart = sketchPoints[i];
-
-        const pEnd = sketchPoints[i + 4];
-
-        if (Math.hypot(pStart[0] - pEnd[0], pStart[1] - pEnd[1]) < 0.1) {
-
-          list.push({
-
-            id: `rect_${i}`,
-
-            type: 'RECTANGLE',
-
-            name: `矩形 R${list.filter(e => e.type === 'RECTANGLE').length + 1}`,
-
-            pointIndices: Array.from({ length: 5 }, (_, k) => i + k)
-
-          });
-
-          i += 5;
-
-          continue;
-
-        }
-
-      }
-
-      
-
-      // 3. Otherwise, check segments
-
-      const pCurr = sketchPoints[i];
-
-      const pNext = sketchPoints[i + 1];
-
-      if (pNext) {
-
-        if (pNext[2] && pNext[2].includes('START')) {
-
-          // This is a new chain boundary. Do NOT connect them!
-
-          i += 1;
-
-        } else if (pCurr[2] && pCurr[2].includes('CENTER_LINE')) {
-
-          list.push({
-
-            id: `cline_${i}`,
-
-            type: 'CENTER_LINE',
-
-            name: ` CL${list.filter(e => e.type === 'CENTER_LINE').length + 1}`,
-
-            pointIndices: [i, i + 1]
-
-          });
-
-          i += 1;
-
-        } else if (pNext[2] === 'ARC_CONTROL') {
-
-          const pEnd = sketchPoints[i + 2];
-
-          if (pEnd) {
-
-            list.push({
-
-              id: `arc_${i}`,
-
-              type: 'LINE',
-
-              name: ` A${list.filter(e => e.type === 'LINE' && e.name.includes('')).length + 1}`,
-
-              pointIndices: [i, i + 1, i + 2]
-
-            });
-
-            i += 2;
-
-          } else {
-
-            list.push({
-
-              id: `line_${i}`,
-
-              type: 'LINE',
-
-              name: ` L${list.filter(e => e.type === 'LINE' && !e.name.includes('')).length + 1}`,
-
-              pointIndices: [i, i + 1]
-
-            });
-
-            i += 1;
-
-          }
-
-        } else {
-
-          list.push({
-
-            id: `line_${i}`,
-
-            type: 'LINE',
-
-            name: ` L${list.filter(e => e.type === 'LINE' && !e.name.includes('')).length + 1}`,
-
-            pointIndices: [i, i + 1]
-
-          });
-
-          i += 1;
-
-        }
+        });
 
       } else {
 
-        i += 1;
+        list.push({
+
+          id: edge.id,
+
+          type: edge.type === 'CENTER_LINE' ? 'CENTER_LINE' : 'LINE',
+
+          name: `${edge.type === 'CENTER_LINE' ? 'CL' : 'L'}${list.filter(e => e.type === (edge.type === 'CENTER_LINE' ? 'CENTER_LINE' : 'LINE')).length + 1}`,
+
+          pointIndices: [] // Legacy
+
+        });
 
       }
 
-    }
+    });
 
-    
+
 
     return list;
 
-  }, [sketchPoints]);
+  }, [sketchNodes, sketchEdges]);
 
 
 
@@ -1181,7 +1041,7 @@ export default function Home() {
 
   const handleSave = async () => {
 
-    handleSaveSldprt();
+    handleSaveProject();
 
   };
 
@@ -1524,7 +1384,7 @@ export default function Home() {
 
 
 
-  const handleSaveSldprt = async () => {
+  const handleSaveProject = async () => {
 
     if (typeof window === 'undefined' || !window.electronAPI) {
 
@@ -1542,7 +1402,7 @@ export default function Home() {
 
       schema: "3D-BUILDER-PARAMETRIC-SCHEMA",
 
-      version: "3.1.0",
+      version: "3.2.0",
 
       features: features,
 
@@ -1560,7 +1420,7 @@ export default function Home() {
 
     if (result && result.success && result.path) {
 
-      appAPI.notify('', `SolidWorks Part: ${result.path}`);
+      appAPI.notify('', `3D-Builder Project: ${result.path}`);
 
     }
 
@@ -2344,7 +2204,7 @@ ${result.path}`);
         </div>
         <div className="flex items-center gap-4">
           <div className="text-[11px] text-[#404040] font-medium bg-[#FFFFFF] px-4 py-1 rounded-sm border border-[#A0A0A0] shadow-inner">
-            Part 1.SLDPRT * <span className="text-[#005B9A] font-bold">[{activePlane || "No Active Plane"}]</span>
+            Part 1.3DBPART * <span className="text-[#005B9A] font-bold">[{activePlane || "No Active Plane"}]</span>
           </div>
           <div className="flex items-center gap-3 text-[12px]">
             <div className="flex items-center gap-1.5">
