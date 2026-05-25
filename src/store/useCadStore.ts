@@ -199,8 +199,8 @@ interface CadState {
   setContextMenu: (menu: CADContextMenu | null) => void;
   shortcutBox: CADShortcutBox | null;
   setShortcutBox: (box: CADShortcutBox | null) => void;
-  mousePos: [number, number, number] | null;
-  setMousePos: (pos: [number, number, number] | null) => void;
+  mousePos: [number, number, number];
+  setMousePos: (pos: [number, number, number]) => void;
 
   hint: string;
   setHint: (hint: string) => void;
@@ -404,7 +404,7 @@ export const useCadStore = create<CadState>()(
       setContextMenu: (contextMenu) => set({ contextMenu }),
       shortcutBox: null,
       setShortcutBox: (shortcutBox) => set({ shortcutBox }),
-      mousePos: null,
+      mousePos: [0, 0, 0],
       setMousePos: (mousePos) => set({ mousePos }),
       hint: 'Ready',
       setHint: (hint) => set({ hint }),

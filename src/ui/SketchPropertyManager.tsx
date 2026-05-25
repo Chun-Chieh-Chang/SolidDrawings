@@ -1,514 +1,229 @@
 'use client';
 
-
-
 import React, { useMemo } from 'react';
-
-import { useCadStore, SketchConstraint } from '../store/useCadStore';
-
+import { useCadStore } from '../store/useCadStore';
 import { solveConstraints } from '../utils/geometry/ConstraintSolver';
 
-import { v4 as uuidv4 } from 'uuid';
-
-
-
 export const SketchPropertyManager: React.FC = () => {
-
-  const { 
-
-    sketchNodes, setSketchNodes, 
-
-    sketchEdges, 
-
-    sketchConstraints, setSketchConstraints,
-
-    selectedEntityIds 
-
+  const {
+    selectedEntityIds,
+    setSelectedEntityIds,
+    sketchNodes,
+    setSketchNodes,
+    sketchEdges,
+    setSketchEdges,
+    sketchConstraints,
+    setSketchConstraints
   } = useCadStore();
 
-
-
-  // Parse selection
-
   const selectedNodes = useMemo(() => {
-
-    return selectedEntityIds.filter(id => sketchNodes[id]).map(id => sketchNodes[id]);
-
+    return selectedEntityIds
+      .filter(id => sketchNodes[id])
+      .map(id => sketchNodes[id]);
   }, [selectedEntityIds, sketchNodes]);
 
-
-
   const selectedEdges = useMemo(() => {
-
-    return selectedEntityIds.filter(id => sketchEdges[id]).map(id => sketchEdges[id]);
-
+    return selectedEntityIds
+      .filter(id => sketchEdges[id])
+      .map(id => sketchEdges[id]);
   }, [selectedEntityIds, sketchEdges]);
 
-
-
   const selectedConstraints = useMemo(() => {
-
-    return selectedEntityIds.filter(id => sketchConstraints[id]).map(id => sketchConstraints[id]);
-
+    return Object.values(sketchConstraints).filter(c => {
+      const nodeMatch = c.nodeIds?.some(id => selectedEntityIds.includes(id));
+      const edgeMatch = c.edgeIds?.some(id => selectedEntityIds.includes(id));
+      return nodeMatch || edgeMatch;
+    });
   }, [selectedEntityIds, sketchConstraints]);
 
-
-
-
-
   const handleDeleteEntities = () => {
-
-    if (selectedEntityIds.length === 0) return;
-
-
-
     const nextNodes = { ...sketchNodes };
-
     const nextEdges = { ...sketchEdges };
-
     const nextConstraints = { ...sketchConstraints };
-
-    
-
-    // Determine which IDs to delete
 
     const nodesToDelete = new Set<string>();
-
     const edgesToDelete = new Set<string>();
 
-    const constraintsToDelete = new Set<string>();
-
-
-
     selectedEntityIds.forEach(id => {
-
-      if (sketchNodes[id]) nodesToDelete.add(id);
-
-      if (sketchEdges[id]) edgesToDelete.add(id);
-
-      if (sketchConstraints[id]) constraintsToDelete.add(id);
-
+      if (nextNodes[id]) nodesToDelete.add(id);
+      if (nextEdges[id]) edgesToDelete.add(id);
     });
 
-
-
-    Object.values(sketchEdges).forEach(edge => {
-
+    // Also delete dependent edges and constraints
+    Object.values(nextEdges).forEach(edge => {
       if (edge.nodeIds.some(nid => nodesToDelete.has(nid))) {
-
         edgesToDelete.add(edge.id);
-
       }
-
     });
 
-
-
-    Object.values(sketchConstraints).forEach(c => {
-
-      if (c.nodeIds?.some(nid => nodesToDelete.has(nid))) constraintsToDelete.add(c.id);
-
-      if (c.edgeIds?.some(eid => edgesToDelete.has(eid))) constraintsToDelete.add(c.id);
-
+    Object.values(nextConstraints).forEach(c => {
+      if (c.nodeIds?.some(nid => nodesToDelete.has(nid))) delete nextConstraints[c.id];
+      if (c.edgeIds?.some(eid => edgesToDelete.has(eid))) delete nextConstraints[c.id];
     });
-
-
 
     nodesToDelete.forEach(id => delete nextNodes[id]);
-
     edgesToDelete.forEach(id => delete nextEdges[id]);
 
-    constraintsToDelete.forEach(id => delete nextConstraints[id]);
-
-
-
-    useCadStore.getState().setSketchNodes(nextNodes);
-
-    useCadStore.getState().setSketchEdges(nextEdges);
-
-    useCadStore.getState().setSketchConstraints(nextConstraints);
-
-    useCadStore.getState().setSelectedEntityIds([]);
-
+    setSketchNodes(nextNodes);
+    setSketchEdges(nextEdges);
+    setSketchConstraints(nextConstraints);
+    setSelectedEntityIds([]);
   };
 
-
-
-  // Unified constraint applicator
-
-  const applyConstraint = (type: SketchConstraint['type']) => {
-
-    const cid = uuidv4();
-
-    const newConstraint: SketchConstraint = { id: cid, type };
-
-
+  const applyConstraint = (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE') => {
+    const cid = `c_${Date.now()}`;
+    let newConstraint: any = { id: cid, type };
 
     if (type === 'HORIZONTAL' || type === 'VERTICAL') {
-
-      if (selectedEdges.length !== 1) return;
-
-      newConstraint.edgeIds = [selectedEdges[0].id];
-
-    } else if (type === 'COINCIDENT' || type === 'DISTANCE') {
-
-      if (selectedNodes.length !== 2) return;
-
-      newConstraint.nodeIds = [selectedNodes[0].id, selectedNodes[1].id];
-
-      if (type === 'DISTANCE') {
-
-        const n1 = selectedNodes[0];
-
-        const n2 = selectedNodes[1];
-
-        newConstraint.value = Math.hypot(n2.x - n1.x, n2.y - n1.y);
-
+      if (selectedEdges.length === 1) {
+        newConstraint.edgeIds = [selectedEdges[0].id];
+      } else {
+        return;
       }
-
+    } else if (type === 'COINCIDENT') {
+      if (selectedNodes.length === 2) {
+        newConstraint.nodeIds = [selectedNodes[0].id, selectedNodes[1].id];
+      } else {
+        return;
+      }
+    } else if (type === 'DISTANCE') {
+      if (selectedNodes.length === 2) {
+        newConstraint.nodeIds = [selectedNodes[0].id, selectedNodes[1].id];
+        newConstraint.value = Math.hypot(selectedNodes[0].x - selectedNodes[1].x, selectedNodes[0].y - selectedNodes[1].y);
+      } else {
+        return;
+      }
     } else if (type === 'EQUAL') {
-
-      if (selectedEdges.length !== 2) return;
-
-      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
-
-    } else if (type === 'CONCENTRIC') {
-
-      if (selectedEdges.length !== 2) return;
-
-      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
-
-    } else if (type === 'TANGENT') {
-
-      if (selectedEdges.length !== 2) return;
-
-      const hasLine = selectedEdges.some(e => e.type === 'LINE');
-
-      const hasCircle = selectedEdges.some(e => e.type === 'CIRCLE');
-
-      if (!hasLine || !hasCircle) return;
-
-      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
-
-    } else if (type === 'ANGLE') {
-
-      if (selectedEdges.length !== 2) return;
-
-      if (selectedEdges[0].type !== 'LINE' || selectedEdges[1].type !== 'LINE') return;
-
-      newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
-
-      
-
-      const e1 = selectedEdges[0];
-
-      const e2 = selectedEdges[1];
-
-      const p1a = sketchNodes[e1.nodeIds[0]];
-
-      const p1b = sketchNodes[e1.nodeIds[1]];
-
-      const p2a = sketchNodes[e2.nodeIds[0]];
-
-      const p2b = sketchNodes[e2.nodeIds[1]];
-
-      if (p1a && p1b && p2a && p2b) {
-
-        const dx1 = p1b.x - p1a.x;
-
-        const dy1 = p1b.y - p1a.y;
-
-        const dx2 = p2b.x - p2a.x;
-
-        const dy2 = p2b.y - p2a.y;
-
-        const len1 = Math.hypot(dx1, dy1);
-
-        const len2 = Math.hypot(dx2, dy2);
-
-        if (len1 > 1e-4 && len2 > 1e-4) {
-
-          const angle1 = Math.atan2(dy1, dx1);
-
-          const angle2 = Math.atan2(dy2, dx2);
-
-          let currentAngleDeg = Math.abs((angle2 - angle1) * 180.0 / Math.PI);
-
-          if (currentAngleDeg > 180.0) currentAngleDeg = 360.0 - currentAngleDeg;
-
-          
-
-          const valStr = prompt(` ( ${currentAngleDeg.toFixed(1)}):`, currentAngleDeg.toFixed(1));
-
-          if (valStr !== null) {
-
-            const val = parseFloat(valStr);
-
-            newConstraint.value = isNaN(val) ? currentAngleDeg : val;
-
-          } else {
-
-            return;
-
-          }
-
-        }
-
+      if (selectedEdges.length === 2) {
+        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+      } else {
+        return;
       }
-
+    } else if (type === 'CONCENTRIC') {
+      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'CIRCLE')) {
+        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+      } else {
+        return;
+      }
+    } else if (type === 'TANGENT') {
+      if (selectedEdges.length === 2) {
+        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+      } else {
+        return;
+      }
+    } else if (type === 'ANGLE') {
+      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'LINE')) {
+        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+        newConstraint.value = 90;
+      } else {
+        return;
+      }
     }
 
-
-
     const nextConstraints = { ...sketchConstraints, [cid]: newConstraint };
-
     setSketchConstraints(nextConstraints);
-
-
-
-    // Run solver immediately to close the loop!
 
     const nextNodes = solveConstraints(sketchNodes, sketchEdges, nextConstraints);
-
     setSketchNodes(nextNodes);
-
   };
-
-
 
   const deleteConstraint = (cid: string) => {
-
     const nextConstraints = { ...sketchConstraints };
-
     delete nextConstraints[cid];
-
     setSketchConstraints(nextConstraints);
-
-    // Might need to re-solve from scratch or let physics relax, but PBD is order independent mostly
-
   };
 
-
-
   return (
-
-    <div className="flex flex-col gap-3">
-
-      {/* Selection Info Card */}
-
-      <div className="p-2.5 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-2 relative overflow-hidden backdrop-blur-md bg-white/70"> <div className="absolute inset-0 pointer-events-none border border-white/40 rounded-xl" /> <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center relative z-10"> <span className="flex items-center gap-1"> Selection</span> <span className="text-[13px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono">{selectedEntityIds.length} ITEMS</span> </div> <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-0.5 relative z-10">
-
-          {selectedNodes.map(node => (
-
-            <div key={node.id} className="flex justify-between items-center bg-blue-50 border border-blue-200 p-1.5 rounded text-[13px] text-blue-800"> <span className="font-bold"> (Node)</span> <span className="font-mono text-[11px] text-blue-600">[{node.x.toFixed(1)}, {node.y.toFixed(1)}]</span> </div>
-
-          ))}
-
-          {selectedEdges.map(edge => (
-
-            <div key={edge.id} className="flex justify-between items-center bg-emerald-50 border border-emerald-200 p-1.5 rounded text-[13px] text-emerald-800"> <span className="font-bold"> ({edge.type})</span> </div>
-
-          ))}
-
-          {selectedConstraints.map(c => (
-
-            <div key={c.id} className="flex flex-col bg-indigo-50 border border-indigo-200 p-1.5 rounded text-[13px] text-indigo-800"> <div className="flex justify-between items-center"> <span className="font-bold"> ({c.type})</span> <span className="font-mono text-[11px] text-indigo-600">ID: {c.id.slice(0, 4)}</span> </div>
-
-              {c.value !== undefined && (
-
-                <div className="mt-1 flex items-center gap-2"> <span className="text-[11px] text-indigo-400">:</span> <input 
-
-                    type="number"
-
-                    defaultValue={c.value}
-
-                    onKeyDown={(e) => {
-
-                      if (e.key === 'Enter') {
-
-                        const val = parseFloat((e.target as HTMLInputElement).value);
-
-                        if (!isNaN(val)) {
-
-                          const nextConstraints = { ...sketchConstraints, [c.id]: { ...c, value: val } };
-
-                          setSketchConstraints(nextConstraints);
-
-                          const nextNodes = solveConstraints(sketchNodes, sketchEdges, nextConstraints);
-
-                          setSketchNodes(nextNodes);
-
-                        }
-
-                      }
-
-                    }}
-
-                    onBlur={(e) => {
-
-                      const val = parseFloat(e.target.value);
-
-                      if (!isNaN(val)) {
-
-                        const nextConstraints = { ...sketchConstraints, [c.id]: { ...c, value: val } };
-
-                        setSketchConstraints(nextConstraints);
-
-                        const nextNodes = solveConstraints(sketchNodes, sketchEdges, nextConstraints);
-
-                        setSketchNodes(nextNodes);
-
-                      }
-
-                    }}
-
-                    className="w-16 bg-white border border-indigo-200 rounded px-1 text-[11px] font-mono focus:outline-none focus:border-indigo-500"
-
-                  />
-
-                  <span className="text-[10px] text-indigo-300 italic">mm</span> </div>
-
-              )}
-
-            </div>
-
-          ))}
-
-          {selectedEntityIds.length === 0 && (
-
-            <div className="text-[13px] text-slate-400 text-center py-2"> </div>
-
-          )}
-
-        </div> </div>
-
-
-
-      {/* Constraints Tool Card */}
-
-      <div className="p-2.5 bg-[#F0F7FB] rounded-xl border border-[#B4D8E7] shadow-sm space-y-2 relative overflow-hidden backdrop-blur-xl"> <div className="absolute inset-0 pointer-events-none border border-white/60 rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]" /> <div className="text-[14px] text-[#1A3A5F] font-bold uppercase border-b border-[#B4D8E7] pb-1 flex justify-between items-center relative z-10"> <span> Constraints</span> </div> <div className="grid grid-cols-2 gap-1.5 text-[13px] relative z-10"> <button
-
-            onClick={() => applyConstraint('HORIZONTAL')}
-
-            disabled={selectedEdges.length !== 1}
-
-            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span> </button> <button
-
-            onClick={() => applyConstraint('VERTICAL')}
-
-            disabled={selectedEdges.length !== 1}
-
-            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span> Perpendicular
-
-          </button> <button
-
-            onClick={() => applyConstraint('COINCIDENT')}
-
-            disabled={selectedNodes.length !== 2}
-
-            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span> </button> <button
-
-            onClick={() => applyConstraint('EQUAL')}
-
-            disabled={selectedEdges.length !== 2}
-
-            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span> </button> <button
-
-            onClick={() => applyConstraint('DISTANCE')}
-
-            disabled={selectedNodes.length !== 2}
-
-            className="col-span-2 flex items-center justify-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span>📏</span> Distance ()
-
-          </button> <button
-
-            onClick={() => applyConstraint('CONCENTRIC')}
-
-            disabled={!(selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'CIRCLE'))}
-
-            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span> Concentric
-
-          </button> <button
-
-            onClick={() => applyConstraint('TANGENT')}
-
-            disabled={!(selectedEdges.length === 2 && selectedEdges.some(e => e.type === 'LINE') && selectedEdges.some(e => e.type === 'CIRCLE'))}
-
-            className="flex items-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span> Tangent
-
-          </button> <button
-
-            onClick={() => applyConstraint('ANGLE')}
-
-            disabled={!(selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'LINE'))}
-
-            className="col-span-2 flex items-center justify-center gap-1.5 p-1.5 bg-white hover:bg-[#3A7CA8] hover:text-white rounded border border-[#B4D8E7] active:scale-95 transition-all text-[#1A3A5F] font-bold disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#1A3A5F]"
-
-          >
-
-            <span> </span>  ()
-
-          </button> </div> </div>
-
-
-
-      {/* Active Constraints List */}
-
-      {Object.keys(sketchConstraints).length > 0 && (
-
-        <div className="p-2.5 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-2"> <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1"> <span>Active Constraints</span> </div> <div className="space-y-1 max-h-[150px] overflow-y-auto">
-
-            {Object.values(sketchConstraints).map(c => (
-
-              <div key={c.id} className="flex justify-between items-center text-[12px] bg-slate-50 border border-slate-200 p-1 rounded group"> <span className="font-bold text-slate-600">{c.type}</span> <button 
-
-                  onClick={() => deleteConstraint(c.id)}
-
-                  className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity font-bold px-1"
-
-                >
-
-                  
-
-                </button> </div>
-
+    <div className="flex flex-col h-full bg-[#F5F6F9] select-none font-sans">
+      {/* PropertyManager Header */}
+      <div className="p-3 bg-white border-b border-slate-300 shadow-sm">
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-[13px] font-black text-slate-800 uppercase tracking-tight">PropertyManager</h2>
+          <div className="flex gap-1">
+            <button className="w-5 h-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-400 border-none bg-transparent">?</button>
+            <button className="w-5 h-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-400 border-none bg-transparent">×</button>
+          </div>
+        </div>
+        <div className="text-[11px] text-slate-500 font-medium">
+          {selectedEntityIds.length > 0 ? `Selected: ${selectedEntityIds.length} Entities` : 'Select entities to add relations'}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-2 space-y-3">
+        {/* Selection Rollout */}
+        <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+          <div className="px-2 py-1 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
+            <span className="text-[11px] font-bold text-slate-700">Selected Entities</span>
+            <button onClick={handleDeleteEntities} className="text-[10px] text-red-600 hover:underline border-none bg-transparent cursor-pointer">Delete All</button>
+          </div>
+          <div className="p-2 max-h-[120px] overflow-y-auto space-y-1">
+            {selectedNodes.map(node => (
+              <div key={node.id} className="flex items-center gap-2 px-2 py-1 bg-blue-50 text-blue-800 text-[11px] rounded border border-blue-100 font-mono">
+                <span className="opacity-50">●</span> Point: ({node.x.toFixed(1)}, {node.y.toFixed(1)})
+              </div>
             ))}
+            {selectedEdges.map(edge => (
+              <div key={edge.id} className="flex items-center gap-2 px-2 py-1 bg-sky-50 text-sky-800 text-[11px] rounded border border-sky-100 font-mono">
+                <span className="opacity-50">/</span> {edge.type} ({edge.id.slice(0, 4)})
+              </div>
+            ))}
+            {selectedEntityIds.length === 0 && (
+              <div className="text-[11px] text-slate-400 italic text-center py-2">No selection</div>
+            )}
+          </div>
+        </div>
 
-          </div> </div>
+        {/* Relations Rollout */}
+        <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+          <div className="px-2 py-1 bg-slate-100 border-b border-slate-300">
+            <span className="text-[11px] font-bold text-slate-700">Add Relations</span>
+          </div>
+          <div className="p-2 grid grid-cols-2 gap-1.5">
+            {[
+              { type: 'HORIZONTAL', label: 'Horizontal', icon: '—' },
+              { type: 'VERTICAL', label: 'Vertical', icon: '|' },
+              { type: 'COINCIDENT', label: 'Coincident', icon: '•' },
+              { type: 'DISTANCE', label: 'Distance', icon: '↔' },
+              { type: 'EQUAL', label: 'Equal', icon: '=' },
+              { type: 'CONCENTRIC', label: 'Concentric', icon: '◎' },
+              { type: 'TANGENT', label: 'Tangent', icon: '○' },
+              { type: 'ANGLE', label: 'Angle', icon: '∠' }
+            ].map(c => (
+              <button
+                key={c.type}
+                onClick={() => applyConstraint(c.type as any)}
+                className="flex flex-col items-center justify-center p-2 rounded border border-slate-200 hover:bg-blue-50 hover:border-blue-300 text-slate-600 hover:text-blue-700 transition-all bg-white cursor-pointer group"
+              >
+                <span className="text-lg font-bold group-hover:scale-110 transition-transform">{c.icon}</span>
+                <span className="text-[9px] font-bold uppercase mt-1 tracking-tighter">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
 
-      )}
-
+        {/* Existing Constraints Rollout */}
+        {selectedConstraints.length > 0 && (
+          <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
+            <div className="px-2 py-1 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-700">Existing Relations</span>
+            </div>
+            <div className="p-2 space-y-1">
+              {selectedConstraints.map(c => (
+                <div key={c.id} className="flex items-center justify-between p-1.5 bg-slate-50 border border-slate-200 rounded text-[11px]">
+                  <div className="flex flex-col">
+                    <span className="font-bold text-slate-700 uppercase text-[9px]">{c.type}</span>
+                    <span className="text-slate-400 font-mono text-[9px]">{c.id.slice(0, 8)}</span>
+                  </div>
+                  <button 
+                    onClick={() => deleteConstraint(c.id)}
+                    className="w-5 h-5 rounded hover:bg-red-50 text-red-400 hover:text-red-600 flex items-center justify-center border-none bg-transparent cursor-pointer"
+                  >×</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-
   );
-
 };
-

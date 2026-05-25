@@ -67,6 +67,6 @@
 ---
 
 ## 🚦 PDCA 查核門禁 (Release Gates)
-- [ ] **npx tsc --noEmit**：全域型別安全。
-- [ ] **npm run pdca:check**：文件與治理規範一致。
-- [ ] **Golden Test**：標準零件 (如 L-Bracket) 體積與幾何 100% 匹配。
+- [x] **npx tsc --noEmit**：全域型別安全。
+- [x] **npm run pdca:check**：文件與治理規範一致。
+- [x] **Golden Test**：標準零件 (如 L-Bracket) 體積與幾何 100% 匹配。

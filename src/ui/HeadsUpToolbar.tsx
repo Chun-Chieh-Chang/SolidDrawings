@@ -36,7 +36,7 @@ const SectionIcon = () => (
 );
 
 export const HeadsUpToolbar: React.FC = () => {
-  const { triggerCameraNormal, setActivePlane, controls } = useCadStore();
+  const { triggerCameraNormal, setActivePlane, controls, isSketchMode, setSketchMode } = useCadStore();
   const [showOrientation, setShowOrientation] = useState(false);
   const [displayStyle, setDisplayStyle] = useState<'SHADED' | 'WIREFRAME'>('SHADED');
 
@@ -52,11 +52,6 @@ export const HeadsUpToolbar: React.FC = () => {
     } else if (view === 'NORMAL_TO') {
       triggerCameraNormal();
     } else {
-      // Just trigger camera alignment without changing the activePlane of the model
-      // We'll use a temporary plane override for the trigger if needed, or just let triggerCameraNormal handle it.
-      // For now, let's keep the activePlane logic but maybe it should be renamed to activeView if it's just for orientation.
-      // However, in this app activePlane is used for sketching.
-      // So let's make it so that if we are NOT in sketch mode, we can change activePlane to align view.
       setActivePlane(view);
       triggerCameraNormal();
     }
@@ -64,18 +59,18 @@ export const HeadsUpToolbar: React.FC = () => {
   };
 
   return (
-    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-2 bg-surface border border-white/30 rounded-sm shadow-sm z-40 select-none transition-all hover:bg-white/60 font-sans">
-      <button onClick={handleZoomToFit} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-background text-slate-800 transition-all " title="Zoom to Fit (F)">
+    <div className="absolute top-6 left-1/2 -translate-x-1/2 flex items-center gap-1 p-1 bg-[#F5F6F9]/80 backdrop-blur-xl border border-slate-300/50 rounded-lg shadow-2xl z-40 select-none transition-all hover:bg-white/90 font-sans">
+      <button onClick={handleZoomToFit} className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all border-none bg-transparent cursor-pointer" title="Zoom to Fit (F)">
         <ZoomIcon />
       </button>
 
       <div className="relative">
-        <button onClick={() => setShowOrientation(!showOrientation)} className={`w-10 h-10 flex items-center justify-center rounded-xl transition-all  ${showOrientation ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'hover:bg-background text-slate-800'}`} title="View Orientation">
+        <button onClick={() => setShowOrientation(!showOrientation)} className={`w-9 h-9 flex items-center justify-center rounded-md transition-all border-none bg-transparent cursor-pointer ${showOrientation ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'hover:bg-slate-200/50 text-slate-700'}`} title="View Orientation">
           <ViewIcon />
         </button>
 
         {showOrientation && (
-          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-48 bg-white/90 backdrop-blur-2xl border border-white/50 rounded-sm shadow-sm py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-48 bg-white/95 backdrop-blur-2xl border border-slate-200 rounded-md shadow-2xl py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
             {[
               { id: 'NORMAL_TO', label: 'Normal To', key: 'N', color: 'bg-slate-700' },
               { id: 'FRONT', label: 'Front View', key: 'F', color: 'bg-blue-500' },
@@ -92,15 +87,29 @@ export const HeadsUpToolbar: React.FC = () => {
         )}
       </div>
 
-      <div className="w-[1px] h-6 bg-slate-300/30 mx-1" />
+      <div className="w-[1px] h-6 bg-slate-300/50 mx-1" />
 
-      <button onClick={() => setDisplayStyle(displayStyle === 'SHADED' ? 'WIREFRAME' : 'SHADED')} className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-background text-slate-800 transition-all " title="Display Style">
+      <button onClick={() => setDisplayStyle(displayStyle === 'SHADED' ? 'WIREFRAME' : 'SHADED')} className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all border-none bg-transparent cursor-pointer" title="Display Style">
         <StyleIcon wireframe={displayStyle === 'WIREFRAME'} />
       </button>
 
-      <button className="w-10 h-10 flex items-center justify-center rounded-xl hover:bg-background text-slate-800 transition-all opacity-40 cursor-not-allowed" title="Section View (Under Dev)">
+      <button className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all opacity-40 cursor-not-allowed border-none bg-transparent" title="Section View (Under Dev)">
         <SectionIcon />
       </button>
+
+      {isSketchMode && (
+        <>
+          <div className="w-[1px] h-6 bg-slate-300/50 mx-1" />
+          <button 
+            onClick={() => setSketchMode(false)}
+            className="px-3 h-9 flex items-center gap-2 rounded-md bg-emerald-50 hover:bg-emerald-100 text-emerald-700 transition-all border border-emerald-200/50 cursor-pointer font-bold text-[11px] uppercase tracking-wider"
+            title="Exit Sketch"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+            Exit
+          </button>
+        </>
+      )}
     </div>
   );
 };

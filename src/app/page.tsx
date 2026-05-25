@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿'use client';
+﻿﻿﻿﻿﻿﻿﻿﻿﻿'use client';
 
 
 
@@ -2337,24 +2337,21 @@ ${result.path}`);
 
         {/* Left Sidebars: FeatureManager & PropertyManager */}
 
-        <aside className="w-[290px] h-full bg-surface border-r border-border flex flex-col z-10 shrink-0">
-
+        <aside className="w-[300px] h-full bg-[#F5F6F9] border-r border-slate-300 flex flex-col z-10 shrink-0">
           {/* SolidWorks Tab Header */}
-
-          <div className="h-[28px] w-full bg-surface flex items-center justify-around border-b border-border/60 text-secondary-text text-[14px]"> <span className="text-primary font-bold cursor-pointer" title="FeatureManager 設計樹">Feature Tree</span> <span className="hover:text-primary-text cursor-pointer" title="PropertyManager 屬性經理">Properties</span> <span className="hover:text-primary-text cursor-pointer" title="ConfigurationManager 設定經理">Configurations</span> </div> <div className="flex-grow flex flex-col overflow-hidden">
-
+          <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
+            {["Tree", "Properties", "Configs"].map((tab, idx) => (
+              <div key={tab} className={`flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter cursor-pointer border-r border-slate-300 ${idx === (isSketchMode ? 1 : 0) ? 'bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]' : 'text-slate-500 hover:bg-slate-100'}`}>
+                {tab}
+              </div>
+            ))}
+          </div>
+          <div className="flex-grow flex flex-col overflow-hidden">
             {isSketchMode ? (
-
               /* Active Sketch Editor Panel */
-
-              <div className="flex-grow overflow-y-auto p-3 bg-primary/5 border-l-4 border-primary"> <div className="text-[14px] uppercase tracking-wider text-primary mb-3 font-bold flex justify-between items-center"> <span>Active Sketch Editor</span> <button
-
-                    onClick={resetSketchSession}
-
-                    className="text-error hover:underline text-[13px]"
-
-                  > </button> </div> <div className="space-y-3"> <SketchPropertyManager /> </div> </div>
-
+              <div className="flex-grow flex flex-col overflow-hidden">
+                 <SketchPropertyManager />
+              </div>
             ) : activeTab === 'ASSEMBLY' ? (
 
               <MatePanel />
