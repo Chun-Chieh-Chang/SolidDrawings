@@ -7,6 +7,7 @@
  */
 
 import * as THREE from 'three';
+import { computeFaceGeometricSignature } from './geometric-signature';
 
 /**
  * Map Three.js face normal to OCCT direction
@@ -84,11 +85,16 @@ export function calculateEdgeLength(
 }
 
 /**
- * Map Three.js mesh UUID to OCCT shape ID
- * This is a placeholder - in production, you'd use OCCT's TopoDS_Shape::HashCode()
+ * Map Three.js mesh UUID to a stable topology reference id.
+ * Prefer geometric signature when face data is available; fall back to mesh UUID.
  */
-export function mapMeshToShapeUUID(meshUUID: string): string {
-  // In production, this would map to OCCT TopoDS_Shape hash code
+export function mapMeshToShapeUUID(
+  meshUUID: string,
+  faceHint?: { normal: THREE.Vector3; centroid: THREE.Vector3; area: number },
+): string {
+  if (faceHint) {
+    return computeFaceGeometricSignature(faceHint.normal, faceHint.centroid, faceHint.area);
+  }
   return `occt_shape_${meshUUID}`;
 }
 

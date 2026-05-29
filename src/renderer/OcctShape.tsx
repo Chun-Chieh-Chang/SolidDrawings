@@ -33,7 +33,15 @@ export default function OcctShape({
   position = [0, 0, 0],
   rotation = [0, 0, 0]
 }: OcctShapeProps) {
-  const { isSketchMode, activePropertyManager, features, setSelectedId, setSelectedSubNodeType } = useCadStore();
+  const {
+    isSketchMode,
+    activePropertyManager,
+    pendingFeatureCommand,
+    features,
+    setSelectedId,
+    setSelectedSubNodeType,
+    viewportDisplayMode,
+  } = useCadStore();
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry();
@@ -74,7 +82,9 @@ export default function OcctShape({
     if (topologySelector) {
       const ndcX = e.pointer ? e.pointer.x : 0;
       const ndcY = e.pointer ? e.pointer.y : 0;
-      const filterType = activePropertyManager?.selectionFilter || 'ALL';
+      const filterType = pendingFeatureCommand
+        ? 'EDGE_ONLY'
+        : (activePropertyManager?.selectionFilter || 'ALL');
       const preserve = isSketchMode || activePropertyManager !== null;
       
       const selected = topologySelector.selectAtPosition(ndcX, ndcY, preserve, filterType);
@@ -126,18 +136,22 @@ export default function OcctShape({
       userData={{ type: 'B_REP_SHAPE', face_metadata: data.face_metadata }}
       onClick={handleMeshClick}
     >
-      <meshStandardMaterial 
-        color={color} 
-        roughness={0.3} 
-        metalness={0.2} 
+      <meshStandardMaterial
+        color={color}
+        roughness={0.3}
+        metalness={0.2}
         flatShading={false}
         side={THREE.DoubleSide}
+        wireframe={viewportDisplayMode === 'WIREFRAME'}
+        transparent={viewportDisplayMode === 'WIREFRAME'}
+        opacity={viewportDisplayMode === 'WIREFRAME' ? 0.85 : 1}
       />
-      {/* Edge visualization */}
-      <lineSegments>
-        <edgesGeometry args={[geometry]} />
-        <lineBasicMaterial color="#1E293B" linewidth={1} />
-      </lineSegments>
+      {viewportDisplayMode !== 'SHADED' && (
+        <lineSegments>
+          <edgesGeometry args={[geometry]} />
+          <lineBasicMaterial color="#1E293B" linewidth={1} />
+        </lineSegments>
+      )}
     </mesh>
   );
 }

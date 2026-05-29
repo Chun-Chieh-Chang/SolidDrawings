@@ -13,6 +13,23 @@ export interface MeshData {
   face_metadata?: FaceMetadata[];
 }
 
+export interface RebuildMeshPayload {
+  type: string;
+  data: MeshData;
+  ref_geometry?: unknown[];
+  warnings?: { feature?: string; code?: string; message: string }[];
+}
+
+export class RebuildError extends Error {
+  constructor(
+    message: string,
+    public readonly detail?: string,
+  ) {
+    super(message);
+    this.name = 'RebuildError';
+  }
+}
+
 export interface CADFeature {
   id: string;
   type: string;
@@ -41,19 +58,40 @@ export class HeavyEngineClient {
     }
   }
 
-  public async rebuild(features: CADFeature[], deflection: number = 0.01, signal?: AbortSignal): Promise<MeshData[]> {
+  public async rebuild(
+    features: CADFeature[],
+    deflection: number = 0.01,
+    signal?: AbortSignal,
+    options?: { fromFeatureIndex?: number; featureFingerprint?: string },
+  ): Promise<RebuildMeshPayload[]> {
     try {
       const response = await fetch(`${this.baseUrl}/rebuild`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ features, deflection }),
+        body: JSON.stringify({
+          features,
+          deflection,
+          fromFeatureIndex: options?.fromFeatureIndex ?? 0,
+          featureFingerprint: options?.featureFingerprint,
+        }),
         signal,
       });
-      if (!response.ok) throw new Error('Rebuild failed');
+      if (!response.ok) {
+        let detail = '';
+        try {
+          const body = await response.json();
+          detail = typeof body?.detail === 'string' ? body.detail : JSON.stringify(body);
+        } catch {
+          detail = await response.text().catch(() => '');
+        }
+        throw new RebuildError(detail || `Rebuild failed (${response.status})`, detail);
+      }
       return await response.json();
     } catch (error) {
+      if (error instanceof RebuildError) throw error;
+      if ((error as Error).name === 'AbortError') throw error;
       console.error('[HeavyEngineClient] Rebuild error:', error);
-      return [];
+      throw new RebuildError((error as Error).message || 'Rebuild failed');
     }
   }
 
@@ -142,6 +180,24 @@ export class HeavyEngineClient {
     } catch (error) {
       console.error('[HeavyEngineClient] Interference detection error:', error);
       return [];
+    }
+  }
+  public async uploadStepFile(file: File): Promise<{ filepath: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`${this.baseUrl}/upload_step`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to upload STEP file');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] STEP upload error:', error);
+      throw error;
     }
   }
 }

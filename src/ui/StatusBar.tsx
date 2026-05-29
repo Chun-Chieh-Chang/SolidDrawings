@@ -13,70 +13,31 @@ import { analyzeSketchDefinitions } from '../utils/geometry/ConstraintSolver';
 export const StatusBar: React.FC = () => {
 
   const { 
-
     isSketchMode, 
-
     sketchNodes, 
-
-    sketchEdges, 
-
-    sketchConstraints,
-
     mousePos,
-
     hint,
-
-    activePlane
-
+    solverReport
   } = useCadStore();
 
-
-
-  const definitionReport = useMemo(() => {
-
-    if (!isSketchMode) return null;
-
-    return analyzeSketchDefinitions(sketchNodes, sketchEdges, sketchConstraints);
-
-  }, [isSketchMode, sketchNodes, sketchEdges, sketchConstraints]);
-
-
-
   const definitionStatus = useMemo(() => {
-
-    if (!isSketchMode || !definitionReport) return null;
-
+    if (!isSketchMode) return null;
     
-
-    if (definitionReport.hasConflict) {
-
-      return { text: ' (Over Defined)', color: 'text-red-500 font-black' };
-
-    }
-
-
-
     const nodeIds = Object.keys(sketchNodes);
-
     if (nodeIds.length === 0) return { text: ' (Empty)', color: 'text-slate-400' };
 
+    if (!solverReport) return { text: 'Under Defined', color: 'text-blue-500 font-bold' };
 
-
-    const isFullyDefined = nodeIds.every(id => definitionReport.nodes[id] === 'FULLY');
-
-    
-
-    if (isFullyDefined) {
-
-      return { text: 'Fully Defined', color: 'text-slate-800 font-bold' };
-
-    } else {
-
-      return { text: 'Under Defined', color: 'text-blue-500 font-bold' };
-
+    if (solverReport.dof < 0) {
+      return { text: ' (Over Defined)', color: 'text-red-500 font-black' };
     }
 
-  }, [isSketchMode, sketchNodes, definitionReport]);
+    if (solverReport.dof === 0) {
+      return { text: 'Fully Defined', color: 'text-slate-800 font-bold' };
+    } else {
+      return { text: 'Under Defined', color: 'text-blue-500 font-bold' };
+    }
+  }, [isSketchMode, sketchNodes, solverReport]);
 
 
 

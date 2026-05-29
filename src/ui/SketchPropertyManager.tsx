@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useCadStore } from '../store/useCadStore';
-import { solveConstraints } from '../utils/geometry/ConstraintSolver';
+import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
 export const SketchPropertyManager: React.FC = () => {
   const {
@@ -36,7 +36,7 @@ export const SketchPropertyManager: React.FC = () => {
     });
   }, [selectedEntityIds, sketchConstraints]);
 
-  const handleDeleteEntities = () => {
+  const handleDeleteEntities = async () => {
     const nextNodes = { ...sketchNodes };
     const nextEdges = { ...sketchEdges };
     const nextConstraints = { ...sketchConstraints };
@@ -68,9 +68,11 @@ export const SketchPropertyManager: React.FC = () => {
     setSketchEdges(nextEdges);
     setSketchConstraints(nextConstraints);
     setSelectedEntityIds([]);
+    await commitPreciseSketchSolve();
+    triggerRebuild();
   };
 
-  const applyConstraint = (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE') => {
+  const applyConstraint = async (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE') => {
     const cid = `c_${Date.now()}`;
     let newConstraint: any = { id: cid, type };
 
@@ -123,14 +125,23 @@ export const SketchPropertyManager: React.FC = () => {
     const nextConstraints = { ...sketchConstraints, [cid]: newConstraint };
     setSketchConstraints(nextConstraints);
 
-    const nextNodes = solveConstraints(sketchNodes, sketchEdges, nextConstraints);
-    setSketchNodes(nextNodes);
+    const previewNodes = previewSolve(sketchNodes, sketchEdges, nextConstraints, 6);
+    setSketchNodes(previewNodes);
+    await commitPreciseSketchSolve();
+    triggerRebuild();
   };
 
-  const deleteConstraint = (cid: string) => {
+  const deleteConstraint = async (cid: string) => {
     const nextConstraints = { ...sketchConstraints };
     delete nextConstraints[cid];
     setSketchConstraints(nextConstraints);
+    await commitPreciseSketchSolve();
+    triggerRebuild();
+  };
+
+  const triggerRebuild = () => {
+    const rebuildHook = (window as any).__handleRebuild;
+    if (rebuildHook) rebuildHook();
   };
 
   return (

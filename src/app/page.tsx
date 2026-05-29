@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿'use client';
+'use client';
 
 
 
@@ -40,6 +40,14 @@ import { ShortcutBox } from '@/ui/ShortcutBox';
 
 import { ContextMenu } from '@/ui/ContextMenu';
 
+import { usePartDocument } from '@/hooks/usePartDocument';
+
+import { usePartRebuild } from '@/hooks/usePartRebuild';
+
+import { FeatureManagerPanel } from '@/ui/FeatureManagerPanel';
+
+import { PartFeaturePropertyManager } from '@/ui/PartFeaturePropertyManager';
+
 
 
 const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' => (
@@ -79,7 +87,6 @@ export interface SketchEntity {
 export default function Home() {
 
   const client = HeavyEngineClient.getInstance();
-  const rebuildController = useRef<AbortController | null>(null);
 
   // Electron Native Integration
 
@@ -176,6 +183,8 @@ export default function Home() {
 
     removeFeature,
 
+    removeFeatures,
+
     updateFeatureParams,
 
     editingFeatureId,
@@ -234,9 +243,44 @@ export default function Home() {
 
     sketchNodes, setSketchNodes, sketchEdges, setSketchEdges, sketchConstraints, setSketchConstraints,
 
-    hint, setHint } = useCadStore();
+    hint, setHint,
 
+    pendingFeatureCommand, setPendingFeatureCommand,
 
+    defaultFilletRadius, defaultChamferDistance } = useCadStore();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImportStep = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    try {
+      const client = HeavyEngineClient.getInstance();
+      const result = await client.uploadStepFile(file);
+      if (result && result.filepath) {
+        addFeature({
+          id: `dumb_${Date.now()}`,
+          name: file.name,
+          type: 'DUMB_SOLID',
+          parameters: {
+            filepath: result.filepath,
+            x: 0,
+            y: 0,
+            z: 0
+          }
+        });
+        handleRebuild();
+      }
+    } catch (err) {
+      console.error('[Import] Failed to import STEP:', err);
+      alert('Failed to import STEP file.');
+    } finally {
+      setLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Hint Logic Update
 
@@ -266,6 +310,14 @@ export default function Home() {
 
       setHint(` (${measurementMode})`);
 
+    } else if (pendingFeatureCommand === 'FILLET') {
+
+      setHint('Select edge for Fillet (Esc to cancel)');
+
+    } else if (pendingFeatureCommand === 'CHAMFER') {
+
+      setHint('Select edge for Chamfer (Esc to cancel)');
+
     } else if (selectedTopology?.type === 'FACE') {
 
       setHint('Selected');
@@ -280,7 +332,7 @@ export default function Home() {
 
     }
 
-  }, [isSketchMode, sketchTool, measurementMode, selectedTopology, selectedId, features, setHint]);
+  }, [isSketchMode, sketchTool, measurementMode, selectedTopology, selectedId, features, pendingFeatureCommand, setHint]);
 
 
 
@@ -296,87 +348,33 @@ export default function Home() {
 
 
 
-  const [hoveredTreeId, setHoveredTreeId] = useState<string | null>(null);
-
-
-
-  const getTreeRelation = useCallback((targetId: string, hoveredId: string | null): 'NONE' | 'PARENT' | 'CHILD' => {
-
-    if (!hoveredId || targetId === hoveredId) return 'NONE';
-
-
-
-    // 1. If hovered is a Feature
-
-    if (hoveredId.startsWith('feat_')) {
-
-      const hoveredFeat = features.find(f => f.id === hoveredId);
-
-      const hoveredPlane = hoveredFeat?.parameters?.plane || 'FRONT';
-
-
-
-      // Standard plane relationships
-
-      if (targetId === hoveredPlane || targetId === 'ORIGIN') return 'PARENT';
-
-
-
-      // Feature-to-Feature relationships
-
-      if (hoveredId === 'feat_base_plate') {
-
-        if (targetId === 'feat_center_hole' || targetId === 'feat_corner_fillets') return 'CHILD';
-
-      }
-
-      if (hoveredId === 'feat_center_hole' || hoveredId === 'feat_corner_fillets') {
-
-        if (targetId === 'feat_base_plate') return 'PARENT';
-
-      }
-
-      
-
-      // Dynamic fallback for custom features
-
-      if (targetId === 'feat_base_plate') return 'PARENT';
-
-      if (hoveredId === 'feat_base_plate') return 'CHILD';
-
-    }
-
-
-
-    // 2. If hovered is a Standard Plane or Origin
-
-    if (hoveredId === 'FRONT' || hoveredId === 'TOP' || hoveredId === 'RIGHT' || hoveredId === 'ORIGIN') {
-
-      if (targetId.startsWith('feat_')) {
-
-        const targetFeat = features.find(f => f.id === targetId);
-
-        const targetPlane = targetFeat?.parameters?.plane || 'FRONT';
-
-
-
-        if (hoveredId === 'ORIGIN') return 'CHILD';
-
-        if (targetPlane === hoveredId) return 'CHILD';
-
-      }
-
-    }
-
-
-
-    return 'NONE';
-
-  }, [features]);
-
-
-
   const measurementService = useMemo(() => new MeasurementService(), []);
+
+  const handleStartPlaneSketch = useCallback(
+    (plane: 'FRONT' | 'TOP' | 'RIGHT') => {
+      setEditingFeatureId(null);
+      setSketchPoints([]);
+      setSketchRelations([]);
+      setActivePlane(plane);
+      setSketchMode(true);
+      setSketchTool('SELECT');
+      setContextMenu(null);
+    },
+    [setEditingFeatureId, setActivePlane, setSketchMode, setSketchTool, setContextMenu],
+  );
+
+  const handlePlaneContextMenu = useCallback(
+    (e: React.MouseEvent, plane: string) => {
+      setContextMenu({
+        visible: true,
+        x: e.clientX,
+        y: e.clientY,
+        type: 'BACKGROUND',
+        data: { plane },
+      });
+    },
+    [setContextMenu],
+  );
 
 
 
@@ -597,6 +595,17 @@ export default function Home() {
 
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
 
+  const { handleRebuild, resetRebuildCache, abortRebuild } = usePartRebuild(
+    features,
+    setMeshData,
+    setLoading,
+    setEngineStatus,
+  );
+
+  const appliedEdgeFeatureRef = useRef<string | null>(null);
+
+  const { loadCadData: loadPartDocument, handleSaveProject } = usePartDocument(features);
+
   const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING'>('FEATURES');
 
   const [massProps, setMassProps] = useState<{
@@ -616,6 +625,7 @@ export default function Home() {
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
 
   
+
 
 
 
@@ -821,6 +831,28 @@ export default function Home() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
 
+      if (e.key === 'Escape' && useCadStore.getState().pendingFeatureCommand) {
+
+        if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+
+          return;
+
+        }
+
+        e.preventDefault();
+
+        setPendingFeatureCommand(null);
+
+        setSelectedTopology(null);
+
+        appliedEdgeFeatureRef.current = null;
+
+        setHint('Ready');
+
+        return;
+
+      }
+
       if (e.key.toLowerCase() === 's') {
 
         if (document.activeElement && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
@@ -859,7 +891,7 @@ export default function Home() {
 
     };
 
-  }, [setShortcutBox]);
+  }, [setShortcutBox, setPendingFeatureCommand, setSelectedTopology, setHint]);
 
 
 
@@ -971,11 +1003,19 @@ export default function Home() {
 
 
 
+    const mateEntity = {
+      id: clickedTopo.id,
+      type: clickedTopo.type,
+      componentId: 'root',
+      coordinates: clickedTopo.coordinates,
+      normal: clickedTopo.normal,
+    };
+
     let nextSelection = [...prevSelection];
 
-    if (nextSelection.length >= 2) nextSelection = [clickedTopo];
+    if (nextSelection.length >= 2) nextSelection = [mateEntity];
 
-    else nextSelection.push(clickedTopo);
+    else nextSelection.push(mateEntity);
 
 
 
@@ -984,6 +1024,126 @@ export default function Home() {
     useCadStore.getState().setSelectedTopology(null);
 
   }, [activeTab, isSketchMode, setMateSelection]);
+
+
+
+  // Fillet / Chamfer: pick edge after ribbon command
+
+  useEffect(() => {
+
+    const cmd = pendingFeatureCommand;
+
+    const topo = selectedTopology;
+
+    if (isSketchMode || !cmd || !topo || topo.type !== 'EDGE') return;
+
+    const start = topo.edgeData?.start;
+
+    const end = topo.edgeData?.end;
+
+    if (!start || !end) return;
+
+    if (topo.id && appliedEdgeFeatureRef.current === topo.id) return;
+
+    appliedEdgeFeatureRef.current = topo.id ?? `edge_${Date.now()}`;
+
+
+
+    const featureId = `feat_${Date.now()}`;
+
+    if (cmd === 'FILLET') {
+
+      addFeature({
+
+        id: featureId,
+
+        type: 'FILLET',
+
+        name: `Fillet ${features.length + 1}`,
+
+        parameters: {
+
+          radius: defaultFilletRadius,
+
+          edge_start: start,
+
+          edge_end: end,
+
+          signature: topo.signature,
+
+          operation: 'ADD',
+
+        },
+
+      });
+
+    } else {
+
+      addFeature({
+
+        id: featureId,
+
+        type: 'CHAMFER',
+
+        name: `Chamfer ${features.length + 1}`,
+
+        parameters: {
+
+          distance: defaultChamferDistance,
+
+          edge_start: start,
+
+          edge_end: end,
+
+          signature: topo.signature,
+
+          operation: 'ADD',
+
+        },
+
+      });
+
+    }
+
+
+
+    setPendingFeatureCommand(null);
+
+    setSelectedTopology(null);
+
+    setSelectedId(featureId);
+
+    setHint('Ready');
+
+    setTimeout(handleRebuild, 50);
+
+  }, [
+
+    pendingFeatureCommand,
+
+    selectedTopology,
+
+    isSketchMode,
+
+    features.length,
+
+    defaultFilletRadius,
+
+    defaultChamferDistance,
+
+    addFeature,
+
+    setPendingFeatureCommand,
+
+    setSelectedTopology,
+
+    setSelectedId,
+
+    setHint,
+
+    handleRebuild,
+
+  ]);
 
 
 
@@ -1044,113 +1204,6 @@ export default function Home() {
     handleSaveProject();
 
   };
-
-
-
-  const handleRebuild = useCallback(async () => {
-
-    const { isSketchMode, editingFeatureId, rollbackIndex } = useCadStore.getState();
-
-    
-
-    // Determine the active features based on the history rollback state
-
-    let activeFeatures = features;
-
-    
-
-    // Priority 1: Rollback Index (Manual Bar)
-
-    if (rollbackIndex !== null) {
-
-      activeFeatures = features.slice(0, rollbackIndex + 1);
-
-    }
-
-    
-
-    // Priority 2: Auto-Rollback on Edit (SolidWorks behavior)
-
-    if (isSketchMode && editingFeatureId) {
-
-      const index = features.findIndex(f => f.id === editingFeatureId);
-
-      if (index !== -1) {
-
-        // Rollback history: Exclude the current feature being edited and all subsequent features
-
-        activeFeatures = features.slice(0, index);
-
-      }
-
-    }
-
-
-
-    if (activeFeatures.length === 0) {
-
-      setMeshData([]);
-
-      return;
-
-    }
-
-
-
-    setLoading(true);
-
-    try {
-
-      const client = HeavyEngineClient.getInstance();
-  const rebuildController = useRef<AbortController | null>(null);
-
-
-
-      // Check health first to update UI
-
-      const isAlive = await client.checkHealth();
-
-      setEngineStatus(isAlive ? 'CONNECTED' : 'DISCONNECTED');
-
-
-
-      if (!isAlive) {
-
-        console.warn('[API] Heavy Engine is not responding.');
-
-        setLoading(false);
-
-        return;
-
-      }
-
-
-
-      console.log('[API] Sending rolled-back feature list to Python Heavy Engine...', activeFeatures);
-
-      const results = await client.rebuild(activeFeatures, 0.01, rebuildController.current?.signal);
-
-
-
-      if (results && Array.isArray(results)) {
-
-        setMeshData(results);
-
-      }
-
-    } catch (err) {
-
-      console.error('[API] Rebuild request failed:', err);
-
-      setEngineStatus('DISCONNECTED');
-
-    } finally {
-
-      setLoading(false);
-
-    }
-
-  }, [features, setMeshData]); // Removed unnecessary dependencies to use getState() internally
 
 
 
@@ -1272,63 +1325,18 @@ export default function Home() {
 
 
 
-  const loadCadData = useCallback(async (content: string, filePath: string) => {
-
-    try {
-
-      const data = JSON.parse(content);
-
-      if (data.schema === "3D-BUILDER-PARAMETRIC-SCHEMA") {
-
-        useCadStore.setState({
-
-          features: data.features || [],
-
-          sketchNodes: data.sketchNodes || {},
-
-          sketchEdges: data.sketchEdges || {},
-
-          sketchConstraints: data.sketchConstraints || {}
-
-        });
-
-        setTimeout(handleRebuild, 50);
-
-        appAPI.notify('', `: ${filePath}`);
-
-      } else if (data.features) {
-
-        useCadStore.setState({ features: data.features });
-
-        setTimeout(handleRebuild, 50);
-
-        appAPI.notify('', `Part: ${filePath}`);
-
-      } else {
-
-        appAPI.notify('', '');
-
-      }
-
-    } catch (e) {
-
-      // If it's a binary SolidWorks file (not JSON), show the Translator modal
-
+  const loadCadData = useCallback(
+    async (content: string, filePath: string) => {
       const pathLower = filePath.toLowerCase();
-
       if (pathLower.endsWith('.sldprt') || pathLower.endsWith('.sldasm')) {
-
         setShowTranslatorModal(true);
-
-      } else {
-
-        appAPI.notify('', ' STEP/IGES ');
-
+        return;
       }
-
-    }
-
-  }, [handleRebuild]);
+      resetRebuildCache();
+      await loadPartDocument(content, filePath, () => setTimeout(handleRebuild, 50));
+    },
+    [handleRebuild, loadPartDocument, resetRebuildCache],
+  );
 
 
 
@@ -1377,50 +1385,6 @@ export default function Home() {
         setLoading(false);
 
       }
-
-    }
-
-  };
-
-
-
-  const handleSaveProject = async () => {
-
-    if (typeof window === 'undefined' || !window.electronAPI) {
-
-      alert(' Electron ');
-
-      return;
-
-    }
-
-
-
-    const state = useCadStore.getState();
-
-    const payload = JSON.stringify({
-
-      schema: "3D-BUILDER-PARAMETRIC-SCHEMA",
-
-      version: "3.2.0",
-
-      features: features,
-
-      sketchNodes: state.sketchNodes,
-
-      sketchEdges: state.sketchEdges,
-
-      sketchConstraints: state.sketchConstraints
-
-    }, null, 2);
-
-
-
-    const result = await window.electronAPI.file.save(payload);
-
-    if (result && result.success && result.path) {
-
-      appAPI.notify('', `3D-Builder Project: ${result.path}`);
 
     }
 
@@ -1605,7 +1569,152 @@ export default function Home() {
 
     setTimeout(handleRebuild, 50);
 
-  }, [sketchNodes, sketchEdges, activePlane, editingFeatureId, features, sketchRelations, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId]);
+  }, [sketchNodes, sketchEdges, activePlane, editingFeatureId, features, sketchRelations, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId, sketchConstraints]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      (window as any).__handleRebuild = handleRebuild;
+      (window as any).__handleExtrude = handleExitAndExtrude;
+    }
+  }, [handleRebuild, handleExitAndExtrude]);
+
+
+
+  const handleRevolveFromSketch = useCallback(() => {
+
+    const solidLoops = extractAllClosedLoops(sketchNodes, sketchEdges);
+
+    if (solidLoops.length === 0 || solidLoops[0].length < 3) {
+
+      alert('Invalid Sketch Profile: No closed loop found.\nDraw a closed profile before Revolve Boss.');
+
+      return;
+
+    }
+
+    if (!activePlane) return;
+
+
+
+    const existingFeature = editingFeatureId ? features.find(f => f.id === editingFeatureId) : null;
+
+    const existingParams = existingFeature?.parameters ?? {};
+
+    const nextParams = {
+
+      ...existingParams,
+
+      points: solidLoops,
+
+      sketchNodes: { ...sketchNodes },
+
+      sketchEdges: { ...sketchEdges },
+
+      sketchConstraints: { ...sketchConstraints },
+
+      angle: existingParams.angle ?? 360,
+
+      x: existingParams.x ?? 0,
+
+      y: existingParams.y ?? 0,
+
+      z: existingParams.z ?? 0,
+
+      operation: existingParams.operation ?? 'ADD',
+
+      plane: activePlane,
+
+      relations: [...sketchRelations],
+
+      ...(activePlane === 'FACE' ? {
+
+        faceOrigin: activeFaceOrigin,
+
+        faceNormal: activeFaceNormal,
+
+        faceId: activeFaceId
+
+      } : {})
+
+    };
+
+
+
+    let featureId = editingFeatureId;
+
+    if (featureId && existingFeature) {
+
+      useCadStore.setState((s) => ({
+
+        features: s.features.map((f) =>
+
+          f.id === featureId ? { ...f, type: 'REVOLVE', parameters: nextParams } : f
+
+        ),
+
+      }));
+
+    } else {
+
+      featureId = `feat_${Date.now()}`;
+
+      addFeature({
+
+        id: featureId,
+
+        type: 'REVOLVE',
+
+        name: `Revolve ${features.length + 1}`,
+
+        parameters: nextParams,
+
+      });
+
+    }
+
+
+
+    resetSketchSession();
+
+    setRollbackIndex(null);
+
+    setSelectedId(featureId);
+
+    setTimeout(handleRebuild, 50);
+
+  }, [
+
+    sketchNodes,
+
+    sketchEdges,
+
+    sketchConstraints,
+
+    activePlane,
+
+    editingFeatureId,
+
+    features,
+
+    sketchRelations,
+
+    updateFeatureParams,
+
+    addFeature,
+
+    resetSketchSession,
+
+    setSelectedId,
+
+    handleRebuild,
+
+    activeFaceOrigin,
+
+    activeFaceNormal,
+
+    activeFaceId,
+
+  ]);
 
 
 
@@ -2285,6 +2394,41 @@ ${result.path}`);
                 </div>
                 <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Cut</span>
               </button>
+              <div className="w-[1px] h-10 bg-border/50 mx-2" />
+              <button
+                onClick={() => {
+                  const loops = extractAllClosedLoops(sketchNodes, sketchEdges);
+                  if (isSketchMode && loops.length > 0 && loops[0].length >= 3) handleRevolveFromSketch();
+                  else { setSketchMode(true); setSketchTool('SELECT'); setHint('Draw closed profile, then Revolved Boss/Base'); }
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand ? 'border-transparent' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Revolve Boss/Base"
+              >
+                <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m7.8 16.2-2.9 2.9"/><path d="M2 12h4"/><path d="m7.8 7.8-2.9-2.9"/><circle cx="12" cy="12" r="3"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Revolve</span>
+              </button>
+              <button
+                onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); setPendingFeatureCommand('FILLET'); setSelectedTopology(null); }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'FILLET' ? 'border-[#005B9A] bg-white shadow-sm' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Fillet"
+              >
+                <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M4 4v16"/><path d="M4 12c4 0 8-4 8-8"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Fillet</span>
+              </button>
+              <button
+                onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); setPendingFeatureCommand('CHAMFER'); setSelectedTopology(null); }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'CHAMFER' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Chamfer"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'CHAMFER' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20V4"/><path d="M4 20 16 4"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Chamfer</span>
+              </button>
             </div>
           ) : activeTab === 'SKETCH' ? (
             <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
@@ -2362,477 +2506,28 @@ ${result.path}`);
 
             ) : (
 
-              /* FeatureManager Design Tree */
-
-              <div className="flex-1 overflow-y-auto p-3 flex flex-col"> <div className="text-[11px] uppercase tracking-[0.2em] text-secondary-text mb-4 font-black flex justify-between items-center border-b border-border pb-2"> <span>Feature Tree</span> <button onClick={handleRebuild} className="text-primary hover:text-primary-dark transition-all" title="Rebuild Model"> 🔄 </button> </div>
-
-
-
-                {/* Standard SolidWorks Meta Nodes */}
-
-                <div className="space-y-1.5 text-[14px] select-none"> <div className="flex items-center gap-2 p-1 text-primary-text font-bold"> <span> </span> <span>📦</span> <span>Part1</span> </div> <div className="pl-4 space-y-1 text-secondary-text"> <div className="flex items-center gap-2 p-0.5 hover:text-primary-text cursor-pointer"> <span> </span> <span>📡</span> <span>Sensors</span> </div> <div className="flex items-center gap-2 p-0.5 hover:text-primary-text cursor-pointer"> <span> </span> <span>📝</span> <span>Annotations</span> </div> <div className="flex items-center gap-2 p-0.5 hover:text-primary-text cursor-pointer border-b border-border/40 pb-1.5"> <span> </span> <span>🧊</span> <span>Material</span> </div>
-
-
-
-                    {/* Standard Plane Selection (Double click triggers sketch) */}
-
-                    {(() => {
-
-                      const frontRel = getTreeRelation('FRONT', hoveredTreeId);
-
-                      const topRel = getTreeRelation('TOP', hoveredTreeId);
-
-                      const rightRel = getTreeRelation('RIGHT', hoveredTreeId);
-
-                      const originRel = getTreeRelation('ORIGIN', hoveredTreeId);
-
-
-
-                      return (
-
-                        <> <div
-
-                            onClick={(e) => { 
-
-                              setActivePlane('FRONT'); 
-
-                              setSelectedId(null); 
-
-                              setContextMenu({ 
-
-                                visible: true, 
-
-                                x: e.clientX, 
-
-                                y: e.clientY,
-
-                                type: 'BACKGROUND',
-
-                                data: { plane: 'FRONT' }
-
-                              });
-
-                            }}
-
-                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('FRONT'); setSketchMode(true); setSketchTool('SELECT'); setContextMenu(null); }}
-
-                            onMouseEnter={() => setHoveredTreeId('FRONT')}
-
-                            onMouseLeave={() => setHoveredTreeId(null)}
-
-                            className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border ${
-
-                              activePlane === 'FRONT' 
-
-                                ? 'bg-primary/10 border-primary/30 text-primary font-bold' 
-
-                                : frontRel === 'PARENT'
-
-                                ? 'bg-blue-50 border-blue-200 text-blue-900 font-medium'
-
-                                : frontRel === 'CHILD'
-
-                                ? 'bg-purple-50 border-purple-200 text-purple-900 font-medium'
-
-                                : 'hover:bg-slate-100 border-transparent hover:text-primary-text'
-
-                            }`}
-
-                            title="Sketch Mode"
-
-                          >
-
-                            <div className="flex items-center gap-2"> <span> </span> <span>📄</span> <span>Reference Plane</span> </div> <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
-
-                              {frontRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded"> (Parent)</span>}
-
-                              {frontRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded"> (Child)</span>}
-
-                              {activePlane === 'FRONT' && <span className="bg-primary/10 text-primary px-1 rounded uppercase"> </span>}
-
-                            </div> </div> <div
-
-                            onClick={(e) => { 
-
-                              setActivePlane('TOP'); 
-
-                              setSelectedId(null); 
-
-                              setContextMenu({ 
-
-                                visible: true, 
-
-                                x: e.clientX, 
-
-                                y: e.clientY,
-
-                                type: 'BACKGROUND',
-
-                                data: { plane: 'TOP' }
-
-                              });
-
-                            }}
-
-                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('TOP'); setSketchMode(true); setSketchTool('SELECT'); setContextMenu(null); }}
-
-                            onMouseEnter={() => setHoveredTreeId('TOP')}
-
-                            onMouseLeave={() => setHoveredTreeId(null)}
-
-                            className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border ${
-
-                              activePlane === 'TOP' 
-
-                                ? 'bg-primary/10 border-primary/30 text-primary font-bold' 
-
-                                : topRel === 'PARENT'
-
-                                ? 'bg-blue-50 border-blue-200 text-blue-900 font-medium'
-
-                                : topRel === 'CHILD'
-
-                                ? 'bg-purple-50 border-purple-200 text-purple-900 font-medium'
-
-                                : 'hover:bg-slate-100 border-transparent hover:text-primary-text'
-
-                            }`}
-
-                            title="Sketch Mode"
-
-                          >
-
-                            <div className="flex items-center gap-2"> <span> </span> <span>📄</span> <span>Reference Plane</span> </div> <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
-
-                              {topRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded"> (Parent)</span>}
-
-                              {topRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded"> (Child)</span>}
-
-                              {activePlane === 'TOP' && <span className="bg-primary/10 text-primary px-1 rounded uppercase"> </span>}
-
-                            </div> </div> <div
-
-                            onClick={(e) => { 
-
-                              setActivePlane('RIGHT'); 
-
-                              setSelectedId(null); 
-
-                              setContextMenu({ 
-
-                                visible: true, 
-
-                                x: e.clientX, 
-
-                                y: e.clientY,
-
-                                type: 'BACKGROUND',
-
-                                data: { plane: 'RIGHT' }
-
-                              });
-
-                            }}
-
-                            onDoubleClick={() => { setEditingFeatureId(null); setSketchPoints([]); setSketchRelations([]); setActivePlane('RIGHT'); setSketchMode(true); setSketchTool('SELECT'); setContextMenu(null); }}
-
-                            onMouseEnter={() => setHoveredTreeId('RIGHT')}
-
-                            onMouseLeave={() => setHoveredTreeId(null)}
-
-                            className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border ${
-
-                              activePlane === 'RIGHT' 
-
-                                ? 'bg-primary/10 border-primary/30 text-primary font-bold' 
-
-                                : rightRel === 'PARENT'
-
-                                ? 'bg-blue-50 border-blue-200 text-blue-900 font-medium'
-
-                                : rightRel === 'CHILD'
-
-                                ? 'bg-purple-50 border-purple-200 text-purple-900 font-medium'
-
-                                : 'hover:bg-slate-100 border-transparent hover:text-primary-text'
-
-                            }`}
-
-                            title="Sketch Mode"
-
-                          >
-
-                            <div className="flex items-center gap-2"> <span> </span> <span>📄</span> <span>Reference Plane</span> </div> <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
-
-                              {rightRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded"> (Parent)</span>}
-
-                              {rightRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded"> (Child)</span>}
-
-                              {activePlane === 'RIGHT' && <span className="bg-primary/10 text-primary px-1 rounded uppercase"> </span>}
-
-                            </div> </div> <div 
-
-                            onMouseEnter={() => setHoveredTreeId('ORIGIN')}
-
-                            onMouseLeave={() => setHoveredTreeId(null)}
-
-                            className={`flex items-center justify-between p-1 rounded cursor-pointer transition-all border border-transparent ${
-
-                              originRel === 'PARENT'
-
-                                ? 'bg-blue-50 border-blue-200 text-blue-900 font-medium'
-
-                                : originRel === 'CHILD'
-
-                                ? 'bg-purple-50 border-purple-200 text-purple-900 font-medium'
-
-                                : 'hover:bg-slate-100 hover:text-primary-text'
-
-                            }`}
-
-                          >
-
-                            <div className="flex items-center gap-2 p-0.5"> <span> </span> <span>📍</span> <span>Origin</span> </div> <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold mr-1">
-
-                              {originRel === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded"> (Parent)</span>}
-
-                              {originRel === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1 py-0.2 rounded"> (Child)</span>}
-
-                            </div> </div> </>
-
-                      );
-
-                    })()}
-
-                  </div>
-
-
-
-                  {/* Chronological History Tree */}
-
-                  <div className="pl-2 pt-2 space-y-1 relative"> <div className="text-[13px] uppercase tracking-wider text-secondary-text font-bold mb-1"> </div>
-
-                    
-
-                    {/* Top-level Rollback Target (Rollback to start) */}
-
-                    <div 
-
-                      className={`h-1 w-full rounded-full transition-all cursor-row-resize ${rollbackIndex === -1 ? 'bg-blue-600 h-1.5 shadow-md' : 'bg-transparent hover:bg-blue-200'}`}
-
-                      onClick={() => setRollbackIndex(rollbackIndex === -1 ? null : -1)}
-
-                      title=""
-
-                    />
-
-
-
-                    {features.map((f, fIdx) => {
-
-                      const relState = getTreeRelation(f.id, hoveredTreeId);
-
-                      const isExtrudeOrRevolve = f.type === 'EXTRUDE' || f.type === 'REVOLVE';
-
-                      const isRolledBack = rollbackIndex !== null && fIdx > rollbackIndex;
-
-                      let sketchNum = 1;
-
-                      if (f.id === 'feat_base_plate') sketchNum = 1;
-
-                      else if (f.id === 'feat_center_hole') sketchNum = 2;
-
-                      else {
-
-                        const extrudeFeats = features.filter(x => x.type === 'EXTRUDE' || x.type === 'REVOLVE');
-
-                        const idx = extrudeFeats.findIndex(x => x.id === f.id);
-
-                        sketchNum = idx >= 0 ? idx + 1 : fIdx + 1;
-
-                      }
-
-
-
-                      return (
-
-                        <Fragment key={f.id}> <div 
-
-                            className={`flex flex-col border border-transparent rounded transition-all ${isRolledBack ? 'opacity-40 grayscale-[0.5]' : ''}`}
-
-                            onMouseEnter={() => setHoveredTreeId(f.id)}
-
-                            onMouseLeave={() => setHoveredTreeId(null)}
-
-                          >
-
-                            {/* Feature Row */}
-
-                            <div
-
-                              onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('FEATURE'); }}
-
-                              onDoubleClick={() => handleEditFeatureSketch(f)}
-
-                              className={`group flex items-center justify-between p-1.5 rounded cursor-pointer transition-all border ${
-
-                                editingFeatureId === f.id
-
-                                  ? 'bg-emerald-50 border-emerald-300 text-slate-900 font-bold'
-
-                                  : selectedId === f.id && selectedSubNodeType === 'FEATURE'
-
-                                  ? 'bg-primary/10 border-primary/30 text-primary-text font-bold'
-
-                                  : relState === 'PARENT'
-
-                                  ? 'bg-blue-50/70 border-blue-200 text-blue-900 font-medium'
-
-                                  : relState === 'CHILD'
-
-                                  ? 'bg-purple-50/70 border-purple-200 text-purple-900 font-medium'
-
-                                  : 'hover:bg-slate-100 border-transparent text-slate-700'
-
-                              }`}
-
-                            >
-
-                              <div className="flex items-center gap-2"> <span className="text-sm">
-
-                                  {f.type === 'REVOLVE' ? '🔄' : f.type === 'EXTRUDE' ? (f.parameters.operation === 'CUT' ? '🔨' : '🏗️') : f.type === 'BOX' ? '📦' : f.type === 'CYLINDER' ? '🛢️' : '🛠️'}
-
-                                </span> <div className="flex flex-col"> <span className="text-[14px] leading-tight">{f.name}</span> <span className="text-[13px] text-secondary-text font-mono leading-none uppercase">{f.type === 'EXTRUDE' ? f.parameters.operation : f.type}</span>
-
-                                  {editingFeatureId === f.id && (
-
-                                    <span className="mt-0.5 text-[12px] text-emerald-700 font-bold uppercase leading-none">Editing sketch</span>
-
-                                  )}
-
-                                </div> </div> <div className="flex items-center gap-1 shrink-0 text-[12px] font-bold">
-
-                                {relState === 'PARENT' && <span className="bg-blue-100 text-blue-600 px-1 py-0.2 rounded"> (Parent)</span>}
-
-                                {relState === 'CHILD' && <span className="bg-purple-100 text-purple-600 px-1.5 py-0.2 rounded"> (Child)</span>}
-
-                                <button
-
-                                  onClick={(e) => {
-
-                                    e.stopPropagation();
-
-                                    removeFeature(f.id);
-
-                                    setSelectedId(null);
-
-                                    setTimeout(handleRebuild, 50);
-
-                                  }}
-
-                                  onDoubleClick={(e) => e.stopPropagation()}
-
-                                  className="opacity-30 group-hover:opacity-100 p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-all border border-transparent hover:border-red-200"
-
-                                  title="Delete Feature"
-
-                                >
-                                  🗑️
-                                
-
-                                  
-
-                                </button> </div> </div>
-
-
-
-                            {/* Nested Sketch Child Node */}
-
-                            {isExtrudeOrRevolve && (
-
-                              <div
-
-                                onClick={() => { setSelectedId(f.id); setSelectedSubNodeType('SKETCH'); }}
-
-                                onDoubleClick={() => handleEditFeatureSketch(f)}
-
-                                className={`pl-7 pr-2 py-1 flex items-center justify-between gap-1.5 cursor-pointer text-[14px] select-none rounded transition-all border border-transparent ${
-
-                                  selectedId === f.id && selectedSubNodeType === 'SKETCH'
-
-                                    ? 'bg-pink-100/90 border border-pink-300 text-pink-700 font-bold shadow-xs'
-
-                                    : 'text-secondary-text hover:text-primary hover:bg-slate-100/50'
-
-                                }`}
-
-                                title="Double-click to edit"
-
-                              >
-
-                                <div className="flex items-center gap-1.5 overflow-hidden"> <span> </span> <span>✏️</span> <span>✏️</span> <span className="italic hover:underline truncate">Sketch {sketchNum}</span> </div> <div className="flex items-center gap-1.5 shrink-0">
-
-                                  {editingFeatureId === f.id && (
-
-                                    <span className="text-[12px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono animate-pulse"> </span>
-
-                                  )}
-
-                                  <button
-
-                                    onClick={(e) => {
-
-                                      e.stopPropagation();
-
-                                      toggleSketchVisibility(f.id);
-
-                                    }}
-
-                                    className={`p-0.5 rounded transition-all hover:bg-slate-200 ${
-
-                                      visibleSketches.includes(f.id) ? 'text-primary' : 'text-slate-300'
-
-                                    }`}
-
-                                    title={visibleSketches.includes(f.id) ? "" : ""}
-
-                                  >
-
-                                    {visibleSketches.includes(f.id) ? '' : ''}
-
-                                  </button> </div> </div>
-
-                            )}
-
-                          </div>
-
-                          
-
-                          {/* Rollback Line after each feature */}
-
-                          <div 
-
-                            className={`h-1 w-full rounded-full transition-all cursor-row-resize ${rollbackIndex === fIdx ? 'bg-blue-600 h-1.5 shadow-md' : 'bg-transparent hover:bg-blue-200'}`}
-
-                            onClick={() => setRollbackIndex(rollbackIndex === fIdx ? null : fIdx)}
-
-                            title=""
-
-                          />
-
-                        </Fragment>
-
-                      );
-
-                    })}
-
-                  </div> </div> </div>
+              <FeatureManagerPanel
+                features={features}
+                rollbackIndex={rollbackIndex}
+                setRollbackIndex={setRollbackIndex}
+                activePlane={activePlane}
+                setActivePlane={setActivePlane}
+                selectedId={selectedId}
+                setSelectedId={setSelectedId}
+                selectedSubNodeType={selectedSubNodeType}
+                setSelectedSubNodeType={setSelectedSubNodeType}
+                editingFeatureId={editingFeatureId}
+                visibleSketches={visibleSketches}
+                toggleSketchVisibility={toggleSketchVisibility}
+                removeFeature={removeFeature}
+                removeFeatures={removeFeatures}
+                onRebuild={handleRebuild}
+                onEditFeatureSketch={handleEditFeatureSketch}
+                onStartPlaneSketch={handleStartPlaneSketch}
+                onPlaneContextMenu={handlePlaneContextMenu}
+              />
 
             )}
-
-          </div>
-
-
 
           {/*  (Face Selection) */}
 
@@ -2896,419 +2591,16 @@ ${result.path}`);
 
 
 
-          {/* PropertyManager () */}
-
+          {/* PropertyManager */}
           {!isSketchMode && selectedFeature && selectedSubNodeType !== 'SKETCH' && measurementMode === 'NONE' && (!selectedTopology || selectedTopology.type !== 'FACE') && (
-
-            <div className="h-[250px] w-full border-t border-border bg-surface flex flex-col p-3 z-10 shrink-0"> <div className="text-[14px] uppercase tracking-wider text-secondary-text mb-2 font-bold flex justify-between items-center border-b border-border/40 pb-1"> <span> PropertyManager</span> <span className="text-[13px] bg-primary/10 text-primary px-1 rounded uppercase font-mono">{selectedFeature.type}</span> </div> <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
-
-                {selectedFeature.type === 'PATTERN' ? (
-
-                  <div className="bg-surface p-2 rounded border border-border shadow-sm"> <div className="text-[13px] text-primary font-bold uppercase mb-1.5 border-b border-border/30 pb-0.5">Pattern</div> <div className="space-y-2 text-[14px] pt-1">
-
-                      {/* Target Feature Selector */}
-
-                      <div className="flex items-center justify-between gap-2"> <label className="text-[13px] text-secondary-text font-medium uppercase shrink-0"> </label> <select
-
-                          value={selectedFeature.parameters.target_feature_id || ''}
-
-                          onChange={(e) => onParamChange('target_feature_id', e.target.value)}
-
-                          className="bg-surface border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text w-[120px]"
-
-                        >
-
-                          <option value="">...</option>
-
-                          {features
-
-                            .filter(f => f.id !== selectedFeature.id && f.type !== 'PATTERN')
-
-                            .map(f => (
-
-                              <option key={f.id} value={f.id}>{f.name}</option>
-
-                            ))
-
-                          }
-
-                        </select> </div>
-
-
-
-                      {/* Pattern Type */}
-
-                      <div className="flex items-center justify-between gap-2"> <label className="text-[13px] text-secondary-text font-medium uppercase shrink-0">Pattern</label> <select
-
-                          value={selectedFeature.parameters.pattern_type || 'CIRCULAR'}
-
-                          onChange={(e) => onParamChange('pattern_type', e.target.value)}
-
-                          className="bg-surface border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text w-[120px]"
-
-                        >
-
-                          <option value="CIRCULAR">Pattern</option> <option value="LINEAR">Pattern</option> </select> </div>
-
-
-
-                      {/* Axis */}
-
-                      <div className="flex items-center justify-between gap-2"> <label className="text-[13px] text-secondary-text font-medium uppercase shrink-0"> </label> <select
-
-                          value={selectedFeature.parameters.axis || 'Y'}
-
-                          onChange={(e) => onParamChange('axis', e.target.value)}
-
-                          className="bg-surface border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text w-[120px]"
-
-                        >
-
-                          <option value="X">X  (Axis X)</option> <option value="Y">Y  (Axis Y)</option> <option value="Z">Z  (Axis Z)</option> </select> </div>
-
-
-
-                      {/* Count */}
-
-                      <div className="flex items-center justify-between gap-2"> <label className="text-[13px] text-secondary-text font-medium uppercase shrink-0"> (Count)</label> <input
-
-                          type="number"
-
-                          step="1"
-
-                          min="1"
-
-                          value={selectedFeature.parameters.count ?? 4}
-
-                          onChange={(e) => onParamChange('count', e.target.value)}
-
-                          className="bg-surface border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text font-mono w-[120px] text-right"
-
-                        />
-
-                      </div>
-
-
-
-                      {/* Spacing */}
-
-                      <div className="flex items-center justify-between gap-2"> <label className="text-[13px] text-secondary-text font-medium uppercase shrink-0">
-
-                          {selectedFeature.parameters.pattern_type === 'CIRCULAR' ? ' ()' : ' (mm)'}
-
-                        </label> <input
-
-                          type="number"
-
-                          step="1"
-
-                          value={selectedFeature.parameters.spacing ?? 90.0}
-
-                          onChange={(e) => onParamChange('spacing', e.target.value)}
-
-                          className="bg-surface border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text font-mono w-[120px] text-right"
-
-                        />
-
-                      </div> </div> </div>
-
-                ) : (
-
-                  /* direction header */
-
-                  <div className="bg-surface p-2 rounded border border-border shadow-sm"> <div className="text-[13px] text-primary font-bold uppercase mb-1.5"> 1 (Direction 1)</div> <div className="space-y-2 text-[14px]">
-
-                      {Object.keys(selectedFeature.parameters).map((key) => {
-
-                        // Avoid showing points or relations array directly as a raw field, edit coordinates instead
-
-                        if (key === 'points' || key === 'relations' || key === 'faceOrigin' || key === 'faceNormal' || key === 'faceId') return null;
-
-                        return (
-
-                          <div key={key} className="flex items-center justify-between gap-2"> <label className="text-[13px] text-secondary-text font-medium uppercase shrink-0">{key}</label>
-
-                            {key === 'operation' ? (
-
-                              <select
-
-                                value={selectedFeature.parameters[key]}
-
-                                onChange={(e) => onParamChange(key, e.target.value)}
-
-                                className="bg-surface border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text w-[120px]"
-
-                              >
-
-                                <option value="ADD">- (JOIN)</option> <option value="CUT">- (CUT)</option> </select>
-
-                            ) : key === 'plane' ? (
-
-                              <select
-
-                                value={selectedFeature.parameters[key]}
-
-                                onChange={(e) => onParamChange(key, e.target.value)}
-
-                                className="bg-surface border border-[#C4C7CE] rounded px-1 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text w-[120px]"
-
-                              >
-
-                                <option value="FRONT">FRONT (XY)</option> <option value="TOP">TOP (XZ)</option> <option value="RIGHT">RIGHT (YZ)</option> <option value="FACE"> (LCS)</option> </select>
-
-                            ) : (
-
-                              <input
-
-                                type="number"
-
-                                step="1"
-
-                                value={selectedFeature.parameters[key]}
-
-                                onChange={(e) => onParamChange(key, e.target.value)}
-
-                                className="bg-surface border border-[#C4C7CE] rounded px-1.5 py-0.5 text-[14px] focus:border-primary outline-none text-primary-text font-mono w-[120px] text-right"
-
-                              />
-
-                            )}
-
-                          </div>
-
-                        );
-
-                      })}
-
-                    </div> </div>
-
-                )}
-
-
-
-                {/* Sketch Relations & Constraints Card */}
-
-                {selectedFeature.parameters.relations && selectedFeature.parameters.relations.length > 0 && (
-
-                  <div className="bg-surface p-2.5 rounded border border-border shadow-sm"> <div className="text-[13px] text-slate-700 font-bold uppercase mb-1.5 border-b border-border/30 pb-0.5 flex justify-between items-center"> <span>  (Relations)</span> <span className="text-[12px] text-emerald-600 font-bold bg-emerald-50 px-1 rounded animate-pulse">Fully Defined</span> </div> <div className="space-y-1 max-h-[85px] overflow-y-auto pr-0.5">
-
-                      {selectedFeature.parameters.relations.map((rel: string, rIdx: number) => (
-
-                        <div key={rIdx} className="flex items-center gap-1.5 text-[13px] text-secondary-text bg-[#F8FAFC] px-1.5 py-0.5 rounded border border-[#E2E8F0] font-mono"> <span className="text-emerald-500"> </span> <span className="font-bold text-primary-text">{rel}</span> <span className="text-slate-400 text-[13px] ml-auto"> </span> </div>
-
-                      ))}
-
-                    </div> </div>
-
-                )}
-
-
-
-                {/* Parent/Child Relations Card () */}
-
-                {(() => {
-
-                  const getParentsAndChildren = (targetFeature: any, allFeatures: any[]) => {
-
-                    const parents: { id: string; name: string; type: string }[] = [];
-
-                    const children: { id: string; name: string; type: string }[] = [];
-
-
-
-                    const targetIdx = allFeatures.findIndex(f => f.id === targetFeature.id);
-
-                    if (targetIdx === -1) return { parents, children };
-
-
-
-                    // 1. Determine parents
-
-                    for (let i = 0; i < targetIdx; i++) {
-
-                      const f = allFeatures[i];
-
-                      if (targetFeature.type === 'EXTRUDE') {
-
-                        if (targetFeature.parameters.operation === 'CUT' && f.type === 'EXTRUDE' && f.parameters.operation === 'ADD') {
-
-                          parents.push({ id: f.id, name: f.name, type: f.type });
-
-                        }
-
-                      } else if (targetFeature.type === 'FILLET' || targetFeature.type === 'CHAMFER') {
-
-                        if (f.type === 'EXTRUDE' || f.type === 'BOX' || f.type === 'CYLINDER' || f.type === 'SPHERE' || f.type === 'REVOLVE') {
-
-                          parents.push({ id: f.id, name: f.name, type: f.type });
-
-                        }
-
-                      } else if (targetFeature.type === 'REVOLVE') {
-
-                        if (f.type === 'EXTRUDE' && f.parameters.operation === 'ADD') {
-
-                          parents.push({ id: f.id, name: f.name, type: f.type });
-
-                        }
-
-                      }
-
-                    }
-
-
-
-                    // Always add its own sketch for extrudes/revolves
-
-                    if (targetFeature.type === 'EXTRUDE' || targetFeature.type === 'REVOLVE') {
-
-                      const sketchNum = targetFeature.name.match(/\d+/)?.[0] || '1';
-
-                      parents.unshift({ id: `${targetFeature.id}_sketch`, name: `草圖${sketchNum} (Sketch${sketchNum})`, type: 'SKETCH' });
-
-                    }
-
-
-
-                    // 2. Determine children
-
-                    for (let i = targetIdx + 1; i < allFeatures.length; i++) {
-
-                      const f = allFeatures[i];
-
-                      if (targetFeature.type === 'EXTRUDE' && targetFeature.parameters.operation === 'ADD') {
-
-                        if (f.type === 'EXTRUDE' || f.type === 'FILLET' || f.type === 'CHAMFER' || f.type === 'REVOLVE') {
-
-                          children.push({ id: f.id, name: f.name, type: f.type });
-
-                        }
-
-                      } else if (targetFeature.type === 'EXTRUDE' && targetFeature.parameters.operation === 'CUT') {
-
-                        if (f.type === 'FILLET' || f.type === 'CHAMFER') {
-
-                          children.push({ id: f.id, name: f.name, type: f.type });
-
-                        }
-
-                      }
-
-                    }
-
-
-
-                    return { parents, children };
-
-                  };
-
-
-
-                  const { parents, children } = getParentsAndChildren(selectedFeature, features);
-
-                  if (parents.length === 0 && children.length === 0) return null;
-
-
-
-                  return (
-
-                    <div className="bg-surface p-2.5 rounded border border-border shadow-sm space-y-2"> <div className="text-[13px] text-slate-700 font-bold uppercase border-b border-border/30 pb-0.5 flex justify-between items-center"> <span className="flex items-center gap-1">  (Parent/Child Relations)</span> <span className="text-[12px] text-primary font-bold bg-primary/10 px-1 rounded font-mono"> </span> </div> <div className="grid grid-cols-2 gap-2 text-[9.5px]">
-
-                        {/* Parents Column */}
-
-                        <div className="space-y-1"> <div className="text-[13px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-0.5"> <span> </span>  (Parents)
-
-                          </div>
-
-                          {parents.length === 0 ? (
-
-                            <div className="text-[13px] text-slate-400 italic p-1 bg-slate-50 rounded text-center border border-dashed border-[#E5E7EB]"> </div>
-
-                          ) : (
-
-                            <div className="space-y-1 max-h-[70px] overflow-y-auto pr-0.5">
-
-                              {parents.map((p) => (
-
-                                <button
-
-                                  key={p.id}
-
-                                  onClick={() => {
-
-                                    if (p.type === 'SKETCH') {
-
-                                      handleEditFeatureSketch(selectedFeature);
-
-                                    } else {
-
-                                      setSelectedId(p.id);
-
-                                    }
-
-                                  }}
-
-                                  className="w-full text-left truncate px-1.5 py-0.5 rounded border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 transition-all font-medium leading-tight flex items-center gap-1"
-
-                                >
-
-                                  <span className="text-[13px]"> </span> <span className="truncate">{p.name}</span> </button>
-
-                              ))}
-
-                            </div>
-
-                          )}
-
-                        </div>
-
-
-
-                        {/* Children Column */}
-
-                        <div className="space-y-1"> <div className="text-[13px] text-slate-400 font-semibold uppercase tracking-wider flex items-center gap-0.5"> <span> </span>  (Children)
-
-                          </div>
-
-                          {children.length === 0 ? (
-
-                            <div className="text-[13px] text-slate-400 italic p-1 bg-slate-50 rounded text-center border border-dashed border-[#E5E7EB]"> </div>
-
-                          ) : (
-
-                            <div className="space-y-1 max-h-[70px] overflow-y-auto pr-0.5">
-
-                              {children.map((c) => (
-
-                                <button
-
-                                  key={c.id}
-
-                                  onClick={() => setSelectedId(c.id)}
-
-                                  className="w-full text-left truncate px-1.5 py-0.5 rounded border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-800 transition-all font-medium leading-tight flex items-center gap-1"
-
-                                >
-
-                                  <span className="text-[13px]"> </span> <span className="truncate">{c.name}</span> </button>
-
-                              ))}
-
-                            </div>
-
-                          )}
-
-                        </div> </div> </div>
-
-                  );
-
-                })()}
-
-              </div> </div>
-
+            <PartFeaturePropertyManager
+              selectedFeature={selectedFeature}
+              features={features}
+              onParamChange={onParamChange}
+              onEditSketch={handleEditFeatureSketch}
+              onSelectFeature={setSelectedId}
+            />
           )}
-
-
 
           {/* Sketch Properties Manager () */}
 
@@ -3422,6 +2714,8 @@ ${result.path}`);
 
           )}
 
+          </div>
+
         </aside>
 
 
@@ -3498,12 +2792,24 @@ ${result.path}`);
 
 
 
-          {/* Loading Overlay */}
-
+          {/* Rebuild Progress & Abort Overlay */}
           {loading && (
-
-            <div className="absolute inset-0 bg-background/25 backdrop-blur-[1px] flex items-center justify-center pointer-events-none z-30"> <div className="glass-effect px-5 py-2.5 rounded text-[14px] font-bold text-primary animate-pulse border border-primary/30 shadow-sm flex items-center gap-2"> <span> </span> <span>B-REP ...</span> </div> </div>
-
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4 animate-fade-in">
+              <div className="w-[380px] bg-slate-900/90 border border-slate-700/60 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-slate-100 relative overflow-hidden backdrop-blur-xl items-center">
+                <div className="absolute -top-12 -left-12 w-32 h-32 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" />
+                <div className="flex flex-col items-center gap-3 z-10 w-full">
+                  <div className="w-10 h-10 border-4 border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+                  <span className="text-[14px] font-bold text-slate-200 tracking-wide">重建幾何中... (Rebuilding Geometry)</span>
+                  <p className="text-[12px] text-slate-400 text-center mb-2">正在計算特徵樹與邊界表示法 (B-Rep)。若計算時間過長，您可以中斷操作。</p>
+                  <button
+                    onClick={() => abortRebuild()}
+                    className="w-full py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-400 hover:text-red-300 rounded font-bold transition-all text-[13px] shadow-inner"
+                  >
+                    取消 (Abort)
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
 

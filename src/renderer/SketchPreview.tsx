@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useMemo, useState } from 'react';
 import * as THREE from 'three';
@@ -6,6 +6,7 @@ import { useCadStore } from '../store/useCadStore';
 import { v4 as uuidv4 } from 'uuid';
 import { Line, Html } from '@react-three/drei';
 import { analyzeSketchDefinitions, solveConstraints } from '../utils/geometry/ConstraintSolver';
+import { commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
 export const SketchPreview = () => {
   const { 
@@ -22,7 +23,10 @@ export const SketchPreview = () => {
     selectedId,
     selectedSubNodeType,
     features,
-    visibleSketches
+    visibleSketches,
+    mousePos,
+    gridSnap,
+    solverReport
   } = useCadStore();
 
   const [hoveredEntityId, setHoveredEntityId] = useState<string | null>(null);
@@ -31,9 +35,9 @@ export const SketchPreview = () => {
   const [draggingDimId, setDraggingDimId] = useState<string | null>(null);
   const [dragStartPos, setDragStartPos] = useState<{ x: number, y: number } | null>(null);
   const [dragStartOffset, setDragStartOffset] = useState<number>(12);
+  const [draggingNodeId, setDraggingNodeId] = useState<string | null>(null);
 
   const selectedFeature = useMemo(() => features.find(f => f.id === selectedId), [features, selectedId]);
-
 
   React.useEffect(() => {
     if (!draggingDimId || !dragStartPos) return;
@@ -155,6 +159,62 @@ export const SketchPreview = () => {
     if (activePlane === 'FACE') return faceBasis;
     return customBasis;
   }, [activePlane, faceBasis, customBasis]);
+
+  const get2DPointFrom3D = (pos3D: [number, number, number], plane: string, basis?: any): { u: number, v: number } => {
+    const point = new THREE.Vector3(...pos3D);
+    if (plane === 'FRONT') return { u: point.x, v: point.y };
+    if (plane === 'TOP') return { u: point.x, v: point.z };
+    if (plane === 'RIGHT') return { u: point.y, v: point.z };
+    if (basis) {
+      const diff = point.clone().sub(basis.origin);
+      const u = diff.dot(basis.xDir);
+      const v = diff.dot(basis.yDir);
+      return { u, v };
+    }
+    return { u: point.x, v: point.y };
+  };
+
+  // Window pointerup listener for node dragging
+  React.useEffect(() => {
+    if (!draggingNodeId) return;
+
+    const handlePointerUp = async () => {
+      setDraggingNodeId(null);
+      await commitPreciseSketchSolve();
+      
+      const rebuildHook = (window as any).__handleRebuild;
+      if (rebuildHook) {
+        rebuildHook();
+      }
+    };
+
+    window.addEventListener('pointerup', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointerup', handlePointerUp);
+    };
+  }, [draggingNodeId]);
+
+  // Node dragging constraint relaxation loop
+  React.useEffect(() => {
+    if (!draggingNodeId || !isSketchMode || !activePlane) return;
+
+    const uv = get2DPointFrom3D(mousePos, activePlane, activeBasis);
+    let u = uv.u;
+    let v = uv.v;
+
+    if (gridSnap) {
+      u = Math.round(u / 5) * 5;
+      v = Math.round(v / 5) * 5;
+    }
+
+    const nextNodes = {
+      ...sketchNodes,
+      [draggingNodeId]: { ...sketchNodes[draggingNodeId], x: u, y: v }
+    };
+
+    const resolvedNodes = solveConstraints(nextNodes, sketchEdges, sketchConstraints, 8);
+    setSketchNodes(resolvedNodes);
+  }, [mousePos, draggingNodeId, activePlane, activeBasis, gridSnap, isSketchMode]);
 
   const get3DPointForPlane = (u: number, v: number, plane: string, basis?: any): [number, number, number] => {
     if (plane === 'FRONT') return [u, v, 0];
@@ -295,7 +355,7 @@ export const SketchPreview = () => {
     );
   }, [sketchConstraints]);
 
-  const handleSaveConstraintValue = (constraintId: string) => {
+  const handleSaveConstraintValue = async (constraintId: string) => {
     const val = parseFloat(inputValue);
     if (!isNaN(val) && val > 0) {
       const currentConstraints = { ...useCadStore.getState().sketchConstraints };
@@ -305,10 +365,12 @@ export const SketchPreview = () => {
           value: val
         };
         setSketchConstraints(currentConstraints);
+        await commitPreciseSketchSolve();
         
-        // Auto-solve
-        const solvedNodes = solveConstraints(sketchNodes, sketchEdges, currentConstraints);
-        setSketchNodes(solvedNodes);
+        const rebuildHook = (window as any).__handleRebuild;
+        if (rebuildHook) {
+          rebuildHook();
+        }
       }
     }
     setEditingConstraintId(null);
@@ -341,14 +403,17 @@ export const SketchPreview = () => {
         const isHovered = hoveredEntityId === edge.id;
         const isCenterline = edge.type === 'CENTER_LINE' || edge.isConstruction;
         
+        const isFullyDefined = solverReport?.dof === 0;
+        const isOverDefined = solverReport !== undefined && solverReport !== null && solverReport.dof < 0;
+
         const edgeState = definitionReport.edges[edge.id];
         const strokeColor = isSelected
           ? "#ec4899"
           : isHovered
           ? "#f59e0b"
-          : edgeState === 'CONFLICT'
+          : (isOverDefined || edgeState === 'CONFLICT')
           ? "#ef4444"
-          : edgeState === 'FULLY'
+          : (isFullyDefined || edgeState === 'FULLY')
           ? "#000000"
           : isCenterline
           ? "#6b7280"
@@ -386,6 +451,9 @@ export const SketchPreview = () => {
         const isHovered = hoveredEntityId === node.id;
         const pos = get3DPointForPlane(node.x, node.y, activePlane, activeBasis);
 
+        const isFullyDefined = solverReport?.dof === 0;
+        const isOverDefined = solverReport !== undefined && solverReport !== null && solverReport.dof < 0;
+
         const nodeState = definitionReport.nodes[node.id];
         const dotColor = isSelected
           ? "#ec4899"
@@ -393,10 +461,10 @@ export const SketchPreview = () => {
           ? "#f59e0b"
           : node.isFixed
           ? "#10b981"
-          : nodeState === 'CONFLICT'
+          : (isOverDefined || nodeState === 'CONFLICT')
           ? "#ef4444"
-          : nodeState === 'FULLY'
-          ? "#0f172a"
+          : (isFullyDefined || nodeState === 'FULLY')
+          ? "#0f172a" // Almost black
           : "#3b82f6";
 
         return (
@@ -406,6 +474,11 @@ export const SketchPreview = () => {
             onClick={(e) => { e.stopPropagation(); handleEntityClick(node.id); }}
             onPointerOver={(e) => { if (!isSketchMode) return; e.stopPropagation(); setHoveredEntityId(node.id); }}
             onPointerOut={(e) => { if (!isSketchMode) return; setHoveredEntityId(null); }}
+            onPointerDown={(e) => {
+              if (!isSketchMode) return;
+              e.stopPropagation();
+              setDraggingNodeId(node.id);
+            }}
           >
             <sphereGeometry args={[isSelected || isHovered ? 0.35 : 0.2, 12, 12]} />
             <meshBasicMaterial

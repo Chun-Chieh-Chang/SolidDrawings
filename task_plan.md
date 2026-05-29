@@ -1,23 +1,30 @@
-# Task Plan - Phase 14 Closure & Baseline
+# Task Plan - Phase 20：M1 Alpha-usable 零件（對標 Usable Parity）
 
-## [P] Plan: 建立 Phase 14 穩定基準點與系統性 PDCA 查核
-- **目標**：完成基準面交互優化，實裝自動化型別防禦，並對全專案計畫執行 PDCA 閉環查核。
-- **驗收標準**：
-    1. `npx tsc --noEmit` 通過。
-    2. `npm run pdca:check` 通過。
-    3. 遺留的 `.sldprt` 命名與 `sketchPoints` 渲染邏輯已清理/遷移。
-    4. Git Tag `v3.2.0-Phase14-Baseline` 已推送。
+> **Plan of Record**：[SOLIDWORKS_USABLE_PARITY_ROADMAP.md](docs/productization/SOLIDWORKS_USABLE_PARITY_ROADMAP.md) · [SOLIDWORKS_GAP_AUDIT.md](docs/productization/SOLIDWORKS_GAP_AUDIT.md)
 
-## [D] Do: 執行任務
-- [x] 基準面點擊選取與高亮邏輯。
-- [x] 「正對面 (Normal To)」視角切換功能。
-- [x] Git pre-commit hook (Type checking) 實裝。
-- [x] 冗餘檔案清理（除 task_plan.md 外）。
+## [P] Plan
+- 目標里程碑：**M1**（工程師可在本產品內完成 6/8 標準測試件，CI Golden 必跑 OCC）。
+- 對標基準：**SolidWorks 2015** 零件模式核心（非 2024+）。
+- Phase 19 已閉環：GAP 查核、`viewportDisplayMode`、`PartFeaturePropertyManager` 拆分。
 
-## [C] Check: 確效驗證
-- **Status**: 已完成所有代碼修訂與文檔更新。
-- **Verification**: 自動化檢查腳本已確認所有必要文件（DEV_LOG.md, task_plan.md 等）均存在且符合規範。
+## [D] Do — 下一輪 5 項工程優先級（非 Demo 打磨）
 
-## [A] Act: 優化與總結
-- **RCA/CAPA**: 已針對今日清理任務引發的 PDCA 失敗執行了 RCA。
-- **下一步**: 準備進入 Phase 15 - 幾何數據鏈深度打通。
+| 優先 | 工作項 | 對應驗收 | 說明 |
+|------|--------|----------|------|
+| **P1** | Golden + pythonocc 進 CI 必跑 | M0-T*, M1-T1 | `run_golden.py` 在無 OCC 時 fail 或標記；禁止 mock 冒充 B-Rep 發佈 |
+| **P2** | 封閉輪廓 + Extrude 可讀錯誤 | M1-T2, M1-T5 | 擠出前檢查；Fillet 半徑過大等後端訊息進 UI toast |
+| **P3** | Fillet/Chamfer 拓撲 + `geometric-signature` | M1-T4, M1-T3 | 重建後邊解析；打通選邊 → 特徵參數鏈 |
+| **P4** | Extrude/Fillet PropertyManager 嚮導式 Rollout | M1-T1 | 取代 raw parameters key 列表 |
+| **P5** | 刪除父特徵 SW 式確認 + 連帶刪除 | M1-T6 | FeatureManager 刪除流 |
+
+**刻意延後（M2/M3）**：STEP 匯入 UI、`.3dbasm`、工程圖標題欄、ShortcutBox 全補（P2  backlog）。
+
+## [C] Check
+- [ ] `python tests/regression/run_golden.py`（需 OCC 全綠）
+- [ ] `npx tsc --noEmit`
+- [ ] 手動：M1-T1 L-Bracket 從零到存檔（檢查清單見 ROADMAP §4 M1）
+- [ ] `npm run pdca:check`（若變更 plan 文件）
+
+## [A] Act
+- 完成 P1–P3 後更新 GAP_AUDIT §2–4 狀態表與 ROADMAP M1 勾選。
+- 未通過 Golden → DEV_LOG RCA/CAPA，不得宣稱 Alpha-usable。

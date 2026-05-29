@@ -1,9 +1,34 @@
-﻿from fastapi import APIRouter, HTTPException
+import os
+import shutil
+import uuid
+from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from typing import List, Optional
 from app.services import geometry_service
 
 router = APIRouter()
+
+UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+@router.post("/upload_step")
+async def upload_step_file(file: UploadFile = File(...)):
+    try:
+        if not file.filename.lower().endswith(('.step', '.stp')):
+            raise HTTPException(status_code=400, detail="Invalid file extension. Only .step or .stp allowed.")
+            
+        unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        # Return absolute path so geometry_service can open it
+        return {"filepath": os.path.abspath(file_path)}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
 class BoxParams(BaseModel):
     width: float = 10.0
@@ -29,6 +54,8 @@ class AssemblyRequest(BaseModel):
     features: List[FeatureDefinition]
     materialId: Optional[str] = "GENERIC"
     deflection: Optional[float] = 0.01
+    fromFeatureIndex: Optional[int] = 0
+    featureFingerprint: Optional[str] = None
 
 @router.post("/box")
 async def create_box(params: BoxParams):
@@ -59,10 +86,14 @@ async def rebuild_assembly(request: AssemblyRequest):
     try:
         print("[DEBUG] Rebuild Request Features:", [f.dict() for f in request.features])
         # We now process the entire feature tree as a single B-Rep solid (SolidWorks Part style)
-        result = geometry_service.process_features(request.features, deflection=request.deflection)
+        result = geometry_service.process_features_cached(
+            request.features,
+            deflection=request.deflection or 0.01,
+            from_feature_index=request.fromFeatureIndex or 0,
+            feature_fingerprint=request.featureFingerprint,
+        )
         if result:
-            # Return as a single mesh item for the renderer to display as one part
-            return [result] 
+            return [result]
         return []
     except Exception as e:
         import traceback

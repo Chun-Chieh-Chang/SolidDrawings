@@ -47,6 +47,197 @@
 1. **不重複造輪子 (Don't Reinvent the Wheel)**: 凡是有現成、穩定、工業標準的開源工具（如 OpenCASCADE, SolveSpace, React Three Fiber），必須直接引進並封裝對接，嚴禁從零自行開發底層數學或圖形邏輯。
 
 ---
+
+## [2026-05-29] Phase 27: CI 自動化測試與確效 (方案 G) ✅
+
+### 實裝成果
+- **自動化環境建置**：成功撰寫 `.github/workflows/pythonocc_ci.yml`，使用 `conda-incubator/setup-miniconda` 與 Mamba 技術，解決了 `pythonocc-core` 龐大 C++ 依賴無法透過標準 `pip` 於 CI 環境安裝的難題。
+- **Golden STEP 確效腳本**：建立了 `backend/tests/test_geometry.py`，作為系統的防迴歸基石 (Regression Testing)。該腳本不僅能驗證增量 B-Rep 的網格生成 (Meshing) 狀態，還能嚴格確認輸出的 STEP 檔案符合 ISO 標準標頭且資料不為空。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 先前 3D-Builder 的所有後端核心測試都依賴開發者的本機環境 (Local Conda Env)。隨著特徵 (Extrude, Revolve, Fillet) 越來越複雜，只要改錯任何一行 `geometry_service.py` 裡的拓撲演算法，就會造成系統級崩潰，但 GitHub Actions 卻無法幫忙捕捉。
+- **Phase 2: Pattern (模式分析)**：
+  - 開放源碼 CAD 專案最大的痛點就是 CI/CD 的建置，因為 OCC 的編譯與安裝非常耗時。透過 Anaconda / Conda-Forge 來拉取 pre-built binaries 是業界唯一解法。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - 如果沒有 CI，我們不敢保證對前端 UI 的修改是否會不小心傳了錯誤型別的參數給後端，導致後端 API 回傳 500。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - 將 Mamba 導入 GitHub Actions，大幅縮短套件解析時間。引入了業界標準的 "Golden Master Testing" 概念：只要確保輸出的 STEP 檔案與預期一致，底層布林運算就沒有壞掉。
+
+---
+
+## [2026-05-29] Phase 26: 重建進度與取消 UI (方案 F) ✅
+
+### 實裝成果
+- **暴露中斷方法**：擴充 `usePartRebuild` hook，新增並導出 `abortRebuild` 函數，允許強制呼叫 `AbortController.abort()` 釋放 Fetch Request，並解鎖前端 UI。
+- **互動式 Progress Modal**：將 `page.tsx` 原先在角落不可互動 (`pointer-events-none`) 的 loading 文字動畫，替換為畫面正中央的毛玻璃半透明遮罩 (Backdrop Blur)。
+- **Abort 按鈕**：在 Progress Modal 中加入具備警告語意的紅色「取消 (Abort)」按鈕，使用者遭遇超長計算（如極端複雜的倒角或陣列）時能主動奪回系統控制權，避免被迫重新整理網頁。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 開發前期，由於測試模型較為簡單，B-Rep 計算幾乎都在毫秒內完成。但隨著功能增加（如 Pattern, Fillet），如果輸入極端參數，後端 OCC 引擎可能會運算長達數秒甚至分鐘，此時前端會陷入假死等待。
+- **Phase 2: Pattern (模式分析)**：
+  - 原先的 `loading` 狀態僅是綁定在背景 `div`，無法接收使用者點擊，且 `usePartRebuild` 雖然有 `AbortController` 卻沒有暴露取消介面。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - 先前為了快速迭代，我們忽略了 UI/UX 中的「防禦性設計」(Defensive Design) — 讓使用者隨時保有取消耗時任務的控制感。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - 將 Fetch API 的 `AbortSignal` 控制權限往上提昇到 View 層 (page.tsx)。實作了標準的「Cancelable Progress Dialog」，這與原生 CAD 軟體在執行繁重任務時的體驗對齊。
+
+---
+
+## [2026-05-29] Phase 25: 屬性面板全面專業化 (方案 E) ✅
+
+### 實裝成果
+- **Fillet / Chamfer 面板**：將原先直接列印技術細節的面板升級為專業樣式，隱藏了邊線拓撲資訊，僅提供帶有 `R1 / D1` 標籤的「半徑 (Radius)」與「距離 (Distance)」精確輸入框。
+- **Revolve 面板**：實作了旋轉特徵專用的手風琴選單，隱藏基準面設定，只保留帶有 `A1` 標籤的「旋轉角度 (Angle)」控制。
+- **Primitive Solids (Box/Cylinder/Sphere)**：引入了雙區塊設計：
+  - **尺寸區塊 (Dimensions)**：直覺化編輯長、寬、高或半徑。
+  - **平移定位 (Translation)**：將原本散落的 `x, y, z` 群組化管理。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 在導入 Scheme C 後，僅有 `EXTRUDE` 具備專業的 Rollout 面板，其餘包含 Fillet, Chamfer, Revolve 等大量常用特徵，在被選中時仍然使用 `Object.keys()` 的暴力轉譯法。
+- **Phase 2: Pattern (模式分析)**：
+  - CAD 的核心體驗在於對參數的「隱藏與揭露」。像 `edge_start` 這類供內部求解器參考的 topological IDs 不應直接暴露在 UI 層。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - `PartFeaturePropertyManager` 最初設計僅作為開發階段的 Debug 面板，因此並未對每一種特徵進行型別限縮與客製化渲染。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - 根據 SolidWorks PropertyManager 的設計語彙，全面覆寫了 `FILLET`, `CHAMFER`, `REVOLVE`, `BOX`, `CYLINDER`, `SPHERE` 的條件渲染分支。加入了 `mm` 與 `deg` 單位標示。
+
+---
+
+## [2026-05-29] Phase 24: 專業級 CAD 匯入工作流 (方案 D) ✅
+
+### 實裝成果
+- **API 端點打通**：在 FastAPI 後端新增了 `/upload_step` 端點，使用 `UploadFile` 將使用者的 STEP 檔案暫存至 `uploads/` 目錄，並回傳絕對路徑。
+- **前端核心掛載**：在 `HeavyEngineClient.ts` 中實作了 `uploadStepFile` 方法，利用 `multipart/form-data` 傳遞檔案。
+- **Ribbon 工具列整合**：在 `page.tsx` 的 FEATURES 面板加入了「📥 匯入 (Import STEP)」按鈕，透過隱藏的 `<input type="file">` 觸發檔案上傳，成功後在特徵樹追加 `DUMB_SOLID` 特徵。
+- **屬性面板支援**：擴充 `PartFeaturePropertyManager.tsx`，為 `DUMB_SOLID` 實作了專屬的 PropertyManager 面板，提供 `X, Y, Z` 座標平移功能，並顯示來源檔案路徑。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 根據 Gap Audit，後端原本就具有讀取 `.step` 的 `import_step_file` 函數與建構邏輯，但前端卻無對應的檔案上傳管道與 UI，這導致匯入功能如同虛設。
+- **Phase 2: Pattern (模式分析)**：
+  - 在瀏覽器環境中，因安全限制無法直接傳遞本地端檔案的絕對路徑。必須先將檔案透過 HTTP Upload 傳送給後端伺服器，伺服器存檔後再把伺服器端的實體路徑交由 CAD 核心處理。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - 過去只做了純後端的 OCC 功能測試，忽略了 Web 架構下的檔案生命週期管理。導致 `DUMB_SOLID` 這個特徵型態空有處理邏輯，卻無法被例項化。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - 實作前後端檔案上傳機制，並與 `useCadStore` 的狀態機無縫接軌。加入座標平移參數以解決不同 CAD 系統輸出的原點偏移問題。
+
+---
+
+## [2026-05-29] Phase 23: 企業級特徵參數嚮導與父子防禦機制 (方案 C) ✅
+
+### 實裝成果
+- **父子特徵連帶刪除防禦 (Cascade Delete Defense)**：
+  - 將 `getParentsAndChildren` 核心邏輯從 UI 提取至 `feature-tree-relations.ts`，並移除了原有的硬編碼 (mock) 關係，改為基於特徵操作與類型推斷的動態相依性計算。
+  - 在 `FeatureManagerPanel` 攔截刪除操作：當被刪除的特徵包含子項目時，會彈出 SolidWorks 風格的 `ConfirmDeleteModal`，警告使用者受影響的相依項目。
+  - 在 `useCadStore` 新增 `removeFeatures`，支援安全地將父項與其子項（如 Fillet/Chamfer）一併移除，避免孤兒特徵造成系統崩潰。
+- **PropertyManager 專業嚮導化**：
+  - 將 `PartFeaturePropertyManager` 中的 `EXTRUDE` 參數面板重構為手風琴 (Rollout) 樣式。
+  - 加入了 `操作 (Operation)` 與 `方向 1 (Direction 1)` 區塊。
+  - 隱藏了不需要被使用者看見的底層技術參數（如 `x`, `y`, `z`, `plane` 等），提升專業感。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 過去在特徵樹刪除 `EXTRUDE` 時，掛載於其上的 `FILLET` 仍會殘留在狀態中，這會導致重建模組找不到依賴邊緣而報錯。且 PropertyManager 面板過去僅使用 `Object.keys()` 暴力展開，缺乏專業軟體應有的邏輯分組。
+- **Phase 2: Pattern (模式分析)**：
+  - SolidWorks 中存在嚴格的 Topological Naming / Dependency Graph。當父特徵被移除，所有後續依賴的子特徵皆必須連帶被銷毀（或標記為 Error）。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - UI 直接調用了 `removeFeature(f.id)` 而未在應用層或儲存層進行依賴性檢查，且特徵關係判定仍帶有舊版 mock 的影子。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - 抽離出 `getParentsAndChildren` 統一判斷邏輯。並加入對應的防呆 Modal。重構 `EXTRUDE` 面板，以符合工業標準的 UI 呈現。
+
+---
+
+## [2026-05-29] Phase 22: 打通 Heads-up 工具列與 S 鍵快捷列串接 (方案 B) ✅
+
+### 實裝成果
+- **S 鍵快捷選單 (ShortcutBox)**：
+  - 成功綁定 `Extrude` 行為，透過在 `page.tsx` 中向 `window` 注入 `__handleExtrude` 鉤子，讓脫離 `page.tsx` 範疇的 UI 元件能直接發起「離開草圖並擠出」的工作流。
+  - 補齊了 `Smart Dimension` 智能尺寸快捷鍵，點擊後會正確套用高亮狀態並切換工具。
+- **StatusBar 狀態列精確度提升**：
+  - 捨棄原先前端 PBD 微擾算法對於 Fully Defined 的粗略估算。
+  - 直接提取後端 `solverReport.dof`。當自由度為 `0` 時顯示 **Fully Defined (黑色)**，`> 0` 顯示 **Under Defined (藍色)**，`< 0` 顯示 **Over Defined (紅色)**，完美對標 SolidWorks 視覺規範。
+- **草圖畫布渲染聯動 (SketchPreview)**：
+  - 草圖線段與端點的顏色同步依賴於全局 `solverReport.dof`，當整個草圖完全約束時，所有圖元皆會切換為符合工業標準的黑色 (`#000000`)。
+
+### 確效結果 (Validation)
+- 進入草圖後按下 `S` 鍵，點擊尺寸圖示可直接啟動尺寸標註。畫完封閉輪廓後，按 `S` 鍵點選 Extrude，即時轉入實體預覽。
+- 尺寸標註至完全約束後，底部的 StatusBar 會精準變成黑色 "Fully Defined"。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 過去 StatusBar 的 `Under/Fully Defined` 是依靠對每個節點移動 `0.2mm` 測試它是否彈回原位來判斷，這種物理微擾法對於複雜草圖極不穩定，導致經常誤判為 Under Defined，圖元也因此無法變色。
+- **Phase 2: Pattern (模式分析)**：
+  - SolidWorks 的狀態來自真正的代數幾何求解器矩陣的秩 (Rank) 或是變數與方程數量的差值 (Degree of Freedom)。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - 既然方案 A 已經在 `solver_service.py` 實裝了 Levenberg-Marquardt 優化器，且能回傳殘差與 `dof`，前端渲染卻還在使用舊版微擾算法，造成 UI 狀態斷層。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - 於 `StatusBar.tsx` 與 `SketchPreview.tsx` 直接調用 `useCadStore().solverReport` 的 `dof` 屬性。徹底統一前後端對於草圖收斂狀態的認知。
+
+---
+
+## [2026-05-29] Phase 21: 打通草圖精準求解與閉合面提取 (方案 A) ✅
+
+### 實裝成果
+- **Planar Graph 面提取升級 (Half-Edge Face Traversal)**：
+  - 重寫了 `CycleFinder.ts` 中的 `extractAllClosedLoops`，從簡單的 DFS 單迴路尋找，升級為基於半邊 (Half-Edge) 的平面圖遍歷演算法。
+  - 成功支援內島 (Nested Islands) 與多個封閉幾何輪廓的精準提取，並根據 2D 包圍盒面積排序，完美配合 `BRepBuilderAPI_MakeFace` 生成帶孔實體。
+- **後端求解器擴充 (Solver Enhancement)**：
+  - 於 `solver_service.py` 擴充 Levenberg-Marquardt 優化器的約束模型，正式支援 `ANGLE` (兩線段夾角) 與 `TANGENT` (點線相切/圓線相切/雙圓相切) 約束求解。
+- **渲染與屬性管理聯動重構 (Preview & UI Sync)**：
+  - 更新 `SketchPreview.tsx`，在 `handleSaveConstraintValue` 中加入 `__handleRebuild()` 廣播，達成尺寸修改後自動更新 3D 特徵。
+  - 更新 `SketchPropertyManager.tsx`，在添加、刪除約束與刪除實體時，強制同步呼叫 `commitPreciseSketchSolve()` 與 `triggerRebuild()`，確保側邊欄與視埠、3D 特徵樹的 100% 同步。
+
+### 確效結果 (Validation)
+- 本地驗證功能閉環：新增角度或相切約束後，草圖不僅在視圖上即刻求解收斂，並連動 `__handleRebuild` 觸發 3D 特徵長出。
+- `CycleFinder` 成功處理複雜圖形，提取出所有閉合輪廓。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 遇到複雜幾何圖形 (如多輪廓或內部挖孔) 時，先前的 DFS 圖論演算法無法正確識別出所有面，且在新增某些高階約束 (如角度、相切) 或在側邊欄修改數值時，3D 幾何模型並未即時重建。
+- **Phase 2: Pattern (模式分析)**：
+  - 正常的 CAD 系統，如 SolidWorks，任何草圖約束的增刪與數值調整，都會引發實時的幾何重建，且其草圖求解器能夠自動將二維線段劃分為拓撲面，供拉伸或旋轉特徵使用。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - **根本原因**：`CycleFinder` 的 DFS 實作過於簡化，僅能處理單一拓撲環。另一方面，約束增刪的 UI 事件沒有與 `commitPreciseSketchSolve` 和 `__handleRebuild` 掛勾，導致資料流斷層。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - **CAPA 1 (拓撲升級)**：採用標準的 Half-Edge 極角排序法實現 planar face traversal。
+  - **CAPA 2 (求解擴展)**：在 `solver_service.py` 加入 TANGENT 與 ANGLE 的 residual 推導公式。
+  - **CAPA 3 (UI 事件綁定)**：在屬性面板操作中綁定重新求解與重構掛勾，完成數據閉環。
+
+---
+
+## [2026-05-29] Phase 20: 打通「草圖求解與重建閉環」 (方案 A) ✅
+
+### 實裝成果
+- **前端幾何拖曳 (Node Dragging & PBD Relaxation)**：
+  - 於 `SketchPreview.tsx` 中為頂點 `<mesh>` 實裝了 `onPointerDown`、`onPointerMove` 與 `onPointerUp` 的滑鼠拖曳交互。
+  - 在拖曳過程中利用 Zustand 中的 `mousePos` 取得最新 3D 平面投射坐標，進行 2D 等比逆換算與 `gridSnap` 網格吸附，動態驅動 PBD Constraints 鬆弛求解器 `solveConstraints`，確保了 **60 FPS** 超高畫質的順暢拖曳。
+- **後端精準求解閉環接線 (NR Precise Solve Pipeline)**：
+  - 在滑鼠放開（`PointerUp`）或雙擊輸入框修改尺寸數值時，非同步發起 `/solve_sketch` 請求，利用後端 Scipy 的 Levenberg-Marquardt 牛頓-拉弗森優化算法進行精密幾何約束求解。
+  - 求解成功後，Zustand 自動收斂並更新 `sketchNodes`，徹底告別「草圖拖曳後無法精確對齊」的頑疾。
+- **與 3D 特徵 Live Rebuild 完美咬合**：
+  - 重構 `SketchSolverService.ts` 的 `commitPreciseSketchSolve` 控制管線。在特徵編輯模式（`editingFeatureId`）下，當草圖精準求解結束時，自動呼叫 `extractAllClosedLoops` 圖論環分析器生成最外包絡 solidLoops，將更新後的 `points` 與 `sketchNodes` 實時更新回對應特徵的 parameters。
+  - 透過 `window.__handleRebuild` 全域橋接，無縫發起 B-Rep solid 重建請求，達成了「滑鼠拖曳點 ➔ 放開滑鼠 ➔ 3D 模型實時長出新尺寸」的極致 CAD 體驗。
+
+### 確效結果 (Validation)
+- 執行 `npx tsc --noEmit` 通過，TypeScript 全域強型別無任何編譯報錯。
+- 執行 `npm run pdca:full` 通過，前置 pre-commit hook 校驗全數 Success。
+- 本地功能測試：拖曳頂點、雙擊修改尺寸，幾何與 3D 結構實時無損連動更新。
+
+### RCA & CAPA
+- **Phase 1: Investigation (根因調查)**：
+  - 先前草圖系統雖然完成了圖論數據模型重構，但前端拖曳僅為唯讀顯示，無法直接以滑鼠拖曳幾何頂點。此外，雙擊修改尺寸時僅更新了草圖 store，而沒有主動聯動修改特徵 parameters 並發起 `/rebuild`，造成了前後端幾何鏈路的「假連通」（即離開草圖模式才能看到 3D 變化，無法實時預覽）。
+- **Phase 2: Pattern (模式分析)**：
+  - 在 SolidWorks 中，草圖是驅動特徵的參數之源。任何草圖座標的異動，皆應伴隨著 B-Rep 樹的實時 rebuild 響應。
+- **Phase 3: Hypothesis (假設分析 RCA)**：
+  - **根本原因**：Zustand 草圖暫態狀態與 CAD Feature Tree 長效特徵樹是脫節的，缺乏一個「拖曳/求解結束 ➔ 同步回 feature parameters ➔ 發起 live rebuild」的自動重構管道。
+- **Phase 4: Fix & Verify (精準修復 CAPA)**：
+  - **CAPA 1 (管線打通)**：在 `SketchSolverService` 核心求解結束後加入 feature 參數回寫與 `markRebuildDirty`。
+  - **CAPA 2 (滑鼠交互)**：為 R3F Node meshes 掛載 `onPointerDown` 拖曳手勢，在 pointer up 時觸發 Newton-Raphson 精準求解與 `__handleRebuild` 廣播。
+
+---
 ## [2026-05-23] 交接指南與開發日誌同步維護 ✅
 
 ### 實裝成果

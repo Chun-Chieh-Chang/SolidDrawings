@@ -10,15 +10,21 @@ from app.services import geometry_service
 
 FIXTURES_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../fixtures'))
 
+# L-Bracket: 15000 + 9000 - (pi * 3^2 * 20)
+L_BRACKET_VOLUME = 15000 + 9000 - (3.14159265 * 3**2 * 20)
+
 EXPECTATIONS = {
     "box_10x10x10.3dbpart": {
         "volume": 1000.0,
-        "surface_area": 600.0
+        "surface_area": 600.0,
     },
     "extrude_square_10x10_h5.3dbpart": {
         "volume": 500.0,
-        "surface_area": 400.0
-    }
+        "surface_area": 400.0,
+    },
+    "l_bracket_benchmark.3dbpart": {
+        "volume": L_BRACKET_VOLUME,
+    },
 }
 
 def run_regression():
@@ -51,19 +57,29 @@ def run_regression():
             actual_vol = props.get('volume', 0.0)
             actual_area = props.get('surface_area', 0.0)
             
-            vol_err = abs(actual_vol - expected['volume'])
-            area_err = abs(actual_area - expected['surface_area'])
-            
-            # Tolerance for floating point (OCCT might have slight variations based on deflection)
+            vol_err = abs(actual_vol - expected["volume"])
+            area_err = (
+                abs(actual_area - expected["surface_area"])
+                if "surface_area" in expected
+                else 0.0
+            )
+
             TOL = 1e-1
-            
-            if vol_err < TOL and area_err < TOL:
-                print(f"  [PASS] Volume: {actual_vol:.2f}, Area: {actual_area:.2f}")
+
+            area_ok = "surface_area" not in expected or area_err < TOL
+            if vol_err < TOL and area_ok:
+                area_msg = (
+                    f", Area: {actual_area:.2f}"
+                    if "surface_area" in expected
+                    else ""
+                )
+                print(f"  [PASS] Volume: {actual_vol:.2f}{area_msg}")
                 passed += 1
             else:
-                print(f"  [FAIL] Discrepancy detected!")
+                print("  [FAIL] Discrepancy detected!")
                 print(f"    Volume: Expected {expected['volume']}, Got {actual_vol}")
-                print(f"    Area:   Expected {expected['surface_area']}, Got {actual_area}")
+                if "surface_area" in expected:
+                    print(f"    Area:   Expected {expected['surface_area']}, Got {actual_area}")
                 failed += 1
                 
         except Exception as e:

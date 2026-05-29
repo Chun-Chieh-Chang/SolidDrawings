@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING';
@@ -8,6 +8,10 @@ export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | '
 export interface MateEntity {
   componentId: string;
   topologyId: string;
+  /** World-space point on the selected face/edge (assembly solver). */
+  localOrigin?: [number, number, number];
+  /** Face normal or edge direction in component space. */
+  localNormal?: [number, number, number];
 }
 
 export interface CADMate {
@@ -69,6 +73,14 @@ export interface CADShortcutBox {
   visible: boolean;
   x: number;
   y: number;
+}
+
+export type CadToastType = 'error' | 'warning' | 'info';
+
+export interface CadToastItem {
+  id: string;
+  message: string;
+  type: CadToastType;
 }
 
 export interface CADContextMenu {
@@ -139,11 +151,19 @@ interface CadState {
   setFeatures: (features: CADFeature[]) => void;
   addFeature: (feature: CADFeature) => void;
   removeFeature: (id: string) => void;
+  removeFeatures: (ids: string[]) => void;
   updateFeatureParams: (id: string, params: any) => void;
   editingFeatureId: string | null;
   setEditingFeatureId: (id: string | null) => void;
   rollbackIndex: number | null;
   setRollbackIndex: (index: number | null) => void;
+
+  /** When false, debounced rebuild can skip identical feature-tree fingerprints. */
+  rebuildDirty: boolean;
+  /** First feature index affected by the latest edit (for future incremental kernel rebuild). */
+  dirtyFromFeatureIndex: number;
+  markRebuildDirty: (fromFeatureIndex?: number) => void;
+  clearRebuildDirty: () => void;
 
   selectedId: string | null;
   setSelectedId: (id: string | null) => void;
@@ -204,6 +224,16 @@ interface CadState {
 
   hint: string;
   setHint: (hint: string) => void;
+
+  toasts: CadToastItem[];
+  pushToast: (message: string, type?: CadToastType) => void;
+  dismissToast: (id: string) => void;
+
+  /** SolidWorks-style applied-feature placement: pick edges after ribbon command. */
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | null) => void;
+  defaultFilletRadius: number;
+  defaultChamferDistance: number;
   
   referencePlanes: any[];
   setReferencePlanes: (planes: any[]) => void;
@@ -212,6 +242,9 @@ interface CadState {
   
   activePropertyManager: any;
   setActivePropertyManager: (mgr: any) => void;
+
+  viewportDisplayMode: 'SHADED' | 'SHADED_EDGES' | 'WIREFRAME';
+  setViewportDisplayMode: (mode: 'SHADED' | 'SHADED_EDGES' | 'WIREFRAME') => void;
 
   cameraNormalTrigger: number;
   cameraNormalFlip: boolean;
@@ -262,31 +295,80 @@ export const useCadStore = create<CadState>()(
       })),
 
       sketchNodes: {},
-      setSketchNodes: (nodes) => set((state) => ({ 
-        sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes 
-      })),
+      setSketchNodes: (nodes) => {
+        get().markRebuildDirty(0);
+        set((state) => ({
+          sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes
+        }));
+      },
       sketchEdges: {},
-      setSketchEdges: (edges) => set((state) => ({ 
-        sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges 
-      })),
+      setSketchEdges: (edges) => {
+        get().markRebuildDirty(0);
+        set((state) => ({
+          sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges
+        }));
+      },
       sketchConstraints: {},
-      setSketchConstraints: (constraints) => set((state) => ({ 
-        sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints 
-      })),
+      setSketchConstraints: (constraints) => {
+        get().markRebuildDirty(0);
+        set((state) => ({
+          sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints
+        }));
+      },
       setSketchRelations: (rels) => {},
 
       features: [{ id: 'ai_constructed_cylinder', type: 'CYLINDER', name: 'AI Built Cylinder', parameters: { radius: 20, height: 50, x: 0, y: 0, z: 0 } }],
-      setFeatures: (features) => { get().saveSnapshot(); set({ features }); },
-      addFeature: (feature) => { get().saveSnapshot(); set((state) => ({ features: [...state.features, feature] })); },
-      removeFeature: (id) => { get().saveSnapshot(); set((state) => ({ features: state.features.filter(f => f.id !== id) })); },
-      updateFeatureParams: (id, params) => { get().saveSnapshot(); set((state) => ({
-        features: state.features.map(f => f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f)
-      })); },
-      
+      setFeatures: (features) => {
+        get().saveSnapshot();
+        get().markRebuildDirty(0);
+        set({ features });
+      },
+      addFeature: (feature) => {
+        get().saveSnapshot();
+        const fromIndex = get().features.length;
+        get().markRebuildDirty(fromIndex);
+        set((state) => ({ features: [...state.features, feature] }));
+      },
+      removeFeature: (id) => {
+        get().saveSnapshot();
+        const fromIndex = get().features.findIndex((f) => f.id === id);
+        get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0);
+        set((state) => ({ features: state.features.filter(f => f.id !== id) }));
+      },
+      removeFeatures: (ids) => {
+        get().saveSnapshot();
+        let minIndex = get().features.length;
+        ids.forEach(id => {
+          const idx = get().features.findIndex(f => f.id === id);
+          if (idx >= 0 && idx < minIndex) minIndex = idx;
+        });
+        get().markRebuildDirty(minIndex < get().features.length ? minIndex : 0);
+        set((state) => ({ features: state.features.filter(f => !ids.includes(f.id)) }));
+      },
+      updateFeatureParams: (id, params) => {
+        get().saveSnapshot();
+        const fromIndex = get().features.findIndex((f) => f.id === id);
+        get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0);
+        set((state) => ({
+          features: state.features.map(f => f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f)
+        }));
+      },
+
+      rebuildDirty: true,
+      dirtyFromFeatureIndex: 0,
+      markRebuildDirty: (fromFeatureIndex = 0) => set((state) => ({
+        rebuildDirty: true,
+        dirtyFromFeatureIndex: Math.min(state.dirtyFromFeatureIndex, fromFeatureIndex),
+      })),
+      clearRebuildDirty: () => set({
+        rebuildDirty: false,
+        dirtyFromFeatureIndex: Number.MAX_SAFE_INTEGER,
+      }),
+
       editingFeatureId: null,
       setEditingFeatureId: (editingFeatureId) => set({ editingFeatureId }),
       rollbackIndex: null,
-      setRollbackIndex: (rollbackIndex) => set({ rollbackIndex }),
+      setRollbackIndex: (rollbackIndex) => set({ rollbackIndex, rebuildDirty: true }),
 
       selectedId: null,
       setSelectedId: (selectedId) => set({ selectedId }),
@@ -297,15 +379,24 @@ export const useCadStore = create<CadState>()(
         visibleSketches: state.visibleSketches.includes(featureId) ? state.visibleSketches.filter(id => id !== featureId) : [...state.visibleSketches, featureId]
       })),
 
-      setSuppressed: (id, suppressed) => { get().saveSnapshot(); set((state) => ({
-        features: state.features.map(f => f.id === id ? { ...f, isSuppressed: suppressed } : f)
-      })); },
-      reorderFeatures: (startIndex, endIndex) => { get().saveSnapshot(); set((state) => {
-        const nextFeatures = [...state.features];
-        const [removed] = nextFeatures.splice(startIndex, 1);
-        nextFeatures.splice(endIndex, 0, removed);
-        return { features: nextFeatures };
-      }); },
+      setSuppressed: (id, suppressed) => {
+        get().saveSnapshot();
+        const fromIndex = get().features.findIndex((f) => f.id === id);
+        get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0);
+        set((state) => ({
+          features: state.features.map(f => f.id === id ? { ...f, isSuppressed: suppressed } : f)
+        }));
+      },
+      reorderFeatures: (startIndex, endIndex) => {
+        get().saveSnapshot();
+        get().markRebuildDirty(Math.min(startIndex, endIndex));
+        set((state) => {
+          const nextFeatures = [...state.features];
+          const [removed] = nextFeatures.splice(startIndex, 1);
+          nextFeatures.splice(endIndex, 0, removed);
+          return { features: nextFeatures };
+        });
+      },
       checkDependencies: () => set((state) => {
         const features = [...state.features];
         return { features: features.map((f, idx) => {
@@ -351,6 +442,7 @@ export const useCadStore = create<CadState>()(
         };
         return {
           ...previous,
+          rebuildDirty: true,
           history: { past: newPast, future: [current, ...state.history.future] }
         };
       }),
@@ -368,6 +460,7 @@ export const useCadStore = create<CadState>()(
         };
         return {
           ...next,
+          rebuildDirty: true,
           history: { past: [...state.history.past, current], future: newFuture }
         };
       }),
@@ -408,12 +501,35 @@ export const useCadStore = create<CadState>()(
       setMousePos: (mousePos) => set({ mousePos }),
       hint: 'Ready',
       setHint: (hint) => set({ hint }),
+
+      toasts: [],
+      pushToast: (message, type = 'error') => {
+        const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        set((state) => ({
+          toasts: [...state.toasts.slice(-4), { id, message, type }],
+        }));
+        setTimeout(() => {
+          const current = get().toasts;
+          if (current.some((t) => t.id === id)) {
+            set({ toasts: current.filter((t) => t.id !== id) });
+          }
+        }, 7000);
+      },
+      dismissToast: (id) =>
+        set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
+      pendingFeatureCommand: null,
+      setPendingFeatureCommand: (pendingFeatureCommand) => set({ pendingFeatureCommand }),
+      defaultFilletRadius: 2,
+      defaultChamferDistance: 1.5,
       referencePlanes: [],
       setReferencePlanes: (referencePlanes) => set({ referencePlanes }),
       referenceAxes: [],
       setReferenceAxes: (referenceAxes) => set({ referenceAxes }),
       activePropertyManager: null,
       setActivePropertyManager: (activePropertyManager) => set({ activePropertyManager }),
+
+      viewportDisplayMode: 'SHADED_EDGES',
+      setViewportDisplayMode: (viewportDisplayMode) => set({ viewportDisplayMode }),
 
       cameraNormalTrigger: 0,
       cameraNormalFlip: false,

@@ -3,7 +3,7 @@ import { Plane, Text, Html, Sphere, Line } from '@react-three/drei';
 import { useCadStore } from '../store/useCadStore';
 import * as THREE from 'three';
 import { v4 as uuidv4 } from 'uuid';
-import { solveConstraints } from '../utils/geometry/ConstraintSolver';
+import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
 export const DatumPlanes = () => {
   const { 
@@ -270,7 +270,7 @@ export const DatumPlanes = () => {
             nextEdges[eId] = { id: eId, type: 'LINE', nodeIds: [lastClickedNodeId, nId] };
             
             // Auto Constraint logic can be added here
-            const solved = solveConstraints(nextNodes, nextEdges, nextConstraints);
+            const solved = previewSolve(nextNodes, nextEdges, nextConstraints, 4);
             Object.assign(nextNodes, solved);
             
             nextLastNodeId = nId;
@@ -318,6 +318,10 @@ export const DatumPlanes = () => {
       setSketchNewChain(false);
       setLastClickedUV({ u, v });
       setHasMovedAway(false);
+    }
+
+    if (isSketchMode) {
+      void commitPreciseSketchSolve();
     }
   };
 

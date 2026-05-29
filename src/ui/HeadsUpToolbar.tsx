@@ -36,9 +36,16 @@ const SectionIcon = () => (
 );
 
 export const HeadsUpToolbar: React.FC = () => {
-  const { triggerCameraNormal, setActivePlane, controls, isSketchMode, setSketchMode } = useCadStore();
+  const {
+    triggerCameraNormal,
+    setActivePlane,
+    controls,
+    isSketchMode,
+    setSketchMode,
+    viewportDisplayMode,
+    setViewportDisplayMode,
+  } = useCadStore();
   const [showOrientation, setShowOrientation] = useState(false);
-  const [displayStyle, setDisplayStyle] = useState<'SHADED' | 'WIREFRAME'>('SHADED');
 
   const handleZoomToFit = () => { if (controls) controls.reset(); };
 
@@ -89,8 +96,20 @@ export const HeadsUpToolbar: React.FC = () => {
 
       <div className="w-[1px] h-6 bg-slate-300/50 mx-1" />
 
-      <button onClick={() => setDisplayStyle(displayStyle === 'SHADED' ? 'WIREFRAME' : 'SHADED')} className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all border-none bg-transparent cursor-pointer" title="Display Style">
-        <StyleIcon wireframe={displayStyle === 'WIREFRAME'} />
+      <button
+        onClick={() => {
+          const next =
+            viewportDisplayMode === 'SHADED_EDGES'
+              ? 'WIREFRAME'
+              : viewportDisplayMode === 'WIREFRAME'
+                ? 'SHADED'
+                : 'SHADED_EDGES';
+          setViewportDisplayMode(next);
+        }}
+        className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all border-none bg-transparent cursor-pointer"
+        title="顯示樣式：著色含邊線 / 線框"
+      >
+        <StyleIcon wireframe={viewportDisplayMode === 'WIREFRAME'} />
       </button>
 
       <button className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all opacity-40 cursor-not-allowed border-none bg-transparent" title="Section View (Under Dev)">

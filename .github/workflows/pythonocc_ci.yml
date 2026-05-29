@@ -1,0 +1,53 @@
+name: PythonOCC CI (Backend Tests)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  test:
+    name: Backend Pytest with PythonOCC
+    runs-on: ubuntu-latest
+    
+    # Needs bash login shell for conda activate
+    defaults:
+      run:
+        shell: bash -el {0}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Miniforge (Mamba)
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: test-env
+          use-mamba: true
+
+      - name: Install PythonOCC and Dependencies
+        run: |
+          # Use mamba to install pythonocc-core from conda-forge
+          mamba install -y -c conda-forge \
+            python=3.10 \
+            pythonocc-core \
+            pytest \
+            fastapi \
+            pydantic \
+            httpx \
+            uvicorn \
+            python-multipart
+
+      - name: Check Environment
+        run: |
+          python --version
+          conda list
+
+      - name: Run Backend Tests
+        working-directory: ./backend
+        run: |
+          # Setup PYTHONPATH so app module can be found
+          export PYTHONPATH=$(pwd)
+          pytest tests/ -v

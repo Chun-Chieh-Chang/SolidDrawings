@@ -1,4 +1,7 @@
 import math
+import json
+import hashlib
+from collections import OrderedDict
 
 try:
     from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
@@ -618,6 +621,106 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             return None
     return current_feat_shape
 
+_REBUILD_MESH_CACHE: OrderedDict[str, object] = OrderedDict()
+_REBUILD_CACHE_MAX = 48
+_SHAPE_PREFIX_CACHE: OrderedDict[str, object] = OrderedDict()
+_SHAPE_PREFIX_CACHE_MAX = 32
+
+
+def _store_shape_prefix(cache_key: str, shape) -> None:
+    if shape is None or (HAS_OCC and shape.IsNull()):
+        return
+    _SHAPE_PREFIX_CACHE[cache_key] = shape
+    _SHAPE_PREFIX_CACHE.move_to_end(cache_key)
+    while len(_SHAPE_PREFIX_CACHE) > _SHAPE_PREFIX_CACHE_MAX:
+        _SHAPE_PREFIX_CACHE.popitem(last=False)
+
+
+def _feature_tree_fingerprint(features) -> str:
+    serializable = []
+    for feat in features:
+        if hasattr(feat, "model_dump"):
+            serializable.append(feat.model_dump())
+        elif hasattr(feat, "dict"):
+            serializable.append(feat.dict())
+        elif hasattr(feat, "type"):
+            serializable.append(
+                {"id": feat.id, "type": feat.type, "parameters": feat.parameters}
+            )
+        else:
+            serializable.append(feat)
+    payload = json.dumps(serializable, sort_keys=True, default=str)
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def process_features_cached(
+    features,
+    deflection=0.01,
+    from_feature_index=0,
+    feature_fingerprint=None,
+):
+    """
+    Rebuild with LRU mesh cache. When from_feature_index > 0 and a cached
+    TopoDS prefix exists, only the suffix feature list is boolean-processed.
+    """
+    fp = feature_fingerprint or _feature_tree_fingerprint(features)
+    cache_key = f"{fp}|from:{from_feature_index}|def:{deflection}"
+    if cache_key in _REBUILD_MESH_CACHE:
+        _REBUILD_MESH_CACHE.move_to_end(cache_key)
+        return _REBUILD_MESH_CACHE[cache_key]
+
+    from_index = max(0, int(from_feature_index or 0))
+    result = None
+
+    if not HAS_OCC:
+        result = process_features(features, deflection=deflection)
+    elif from_index > 0 and from_index < len(features):
+        prefix = features[:from_index]
+        prefix_key = _feature_tree_fingerprint(prefix)
+        initial_shape = _SHAPE_PREFIX_CACHE.get(prefix_key)
+        if initial_shape is None:
+            initial_shape = build_shape_only(
+                prefix,
+                cache_prefixes=True,
+                full_features=features,
+                start_index=0,
+            )
+            if initial_shape is not None:
+                _store_shape_prefix(prefix_key, initial_shape)
+        if initial_shape is not None:
+            ref_geometry = []
+            final_shape = build_shape_only(
+                features[from_index:],
+                initial_shape=initial_shape,
+                cache_prefixes=True,
+                full_features=features,
+                start_index=from_index,
+            )
+            if final_shape:
+                result = {
+                    "type": "mesh",
+                    "data": _shape_to_mesh(final_shape, deflection),
+                    "ref_geometry": ref_geometry,
+                }
+        if result is None:
+            result = process_features(features, deflection=deflection)
+    else:
+        result = process_features(features, deflection=deflection)
+        if result is not None:
+            build_shape_only(
+                features,
+                cache_prefixes=True,
+                full_features=features,
+                start_index=0,
+            )
+
+    if result is not None:
+        _REBUILD_MESH_CACHE[cache_key] = result
+        while len(_REBUILD_MESH_CACHE) > _REBUILD_CACHE_MAX:
+            _REBUILD_MESH_CACHE.popitem(last=False)
+    return result
+
+
 def process_features(features, deflection=0.01):
     """
     The Core CAD Kernel: Processes a sequence of parametric features to build a B-Rep model.
@@ -801,9 +904,16 @@ def process_features(features, deflection=0.01):
         return {"type": "mesh", "data": _shape_to_mesh(final_shape, deflection), "ref_geometry": ref_geometry}
     return None
 
-def build_shape_only(features):
+def build_shape_only(
+    features,
+    initial_shape=None,
+    cache_prefixes=False,
+    full_features=None,
+    start_index=0,
+):
     """Processes features and returns the raw OCCT TopoDS_Shape."""
-    final_shape = None
+    final_shape = initial_shape
+    all_features = full_features if full_features is not None else features
     ref_geometry = [] # [{id, type, origin, normal/direction, xDir, yDir}]
 
     for feat in features:
@@ -826,13 +936,16 @@ def build_shape_only(features):
             ref_geometry.append({"id": f_id, "type": "AXIS", "data": res})
             continue
     
-    for feat in features:
+    for local_idx, feat in enumerate(features):
         if hasattr(feat, 'type'):
             f_type = feat.type
             params = feat.parameters
         else:
             f_type = feat.get('type')
             params = feat.get('parameters', {})
+
+        op = params.get('operation', 'ADD')
+        current_feat_shape = None
             
         if f_type == 'FILLET':
             if final_shape is not None:
@@ -968,6 +1081,11 @@ def build_shape_only(features):
                     final_shape = BRepAlgoAPI_Fuse(final_shape, current_feat_shape).Shape()
                 elif op == 'CUT':
                     final_shape = BRepAlgoAPI_Cut(final_shape, current_feat_shape).Shape()
+
+        if cache_prefixes and final_shape is not None and HAS_OCC and not final_shape.IsNull():
+            global_idx = start_index + local_idx
+            prefix_key = _feature_tree_fingerprint(all_features[: global_idx + 1])
+            _store_shape_prefix(prefix_key, final_shape)
 
     return final_shape
 
