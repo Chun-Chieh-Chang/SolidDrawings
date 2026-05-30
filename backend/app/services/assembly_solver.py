@@ -43,6 +43,7 @@ def solve_assembly_mates(components_dict, mates_list):
             ent2 = m.get('entity2', {})
             params = m.get('parameters', {})
             offset = float(params.get('offset', 0))
+            angle_target = float(params.get('angle', 0))
             
             def get_world_geom(ent):
                 cid = ent.get('componentId')
@@ -66,6 +67,12 @@ def solve_assembly_mates(components_dict, mates_list):
             p1, n1 = get_world_geom(ent1)
             p2, n2 = get_world_geom(ent2)
 
+            # Normalize normals for dot product operations
+            n1_mag = np.linalg.norm(n1)
+            if n1_mag > 1e-9: n1 /= n1_mag
+            n2_mag = np.linalg.norm(n2)
+            if n2_mag > 1e-9: n2 /= n2_mag
+
             align_flip = bool(params.get('alignmentFlip', False))
             sign = -1.0 if align_flip else 1.0
 
@@ -77,6 +84,7 @@ def solve_assembly_mates(components_dict, mates_list):
                 residuals.extend(dist_vec - np.dot(dist_vec, n1) * n1)
                 residuals.extend(np.cross(n1, n2))
             elif m_type == 'DISTANCE':
+                residuals.extend(np.cross(n1, sign * n2)) # Ensure parallelism
                 residuals.append(np.dot(p2 - p1, n1) - offset)
             elif m_type == 'PARALLEL':
                 residuals.extend(np.cross(n1, sign * n2))
@@ -85,6 +93,11 @@ def solve_assembly_mates(components_dict, mates_list):
             elif m_type == 'TANGENT':
                 residuals.extend(np.cross(n1, n2))
                 residuals.append(np.dot(p2 - p1, n1) - offset)
+            elif m_type == 'ANGLE':
+                # Dot product of normals should equal cos(angle)
+                angle_rad = math.radians(angle_target)
+                target_dot = math.cos(angle_rad)
+                residuals.append(np.dot(n1, n2) - (sign * target_dot))
         
         # Soft spring
         for i, cid in enumerate(variable_comps):

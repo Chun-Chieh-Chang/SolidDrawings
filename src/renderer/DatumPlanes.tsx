@@ -215,6 +215,7 @@ export const DatumPlanes = () => {
     const snapped = getSnappedUV(rawU, rawV);
     const u = snapped.u;
     const v = snapped.v;
+    const activeSnapType = cursorState?.type;
 
     const nId = snapped.id || uuidv4();
     const isOrigin = Math.abs(u) < 1e-5 && Math.abs(v) < 1e-5;
@@ -239,6 +240,17 @@ export const DatumPlanes = () => {
          } else {
             const eId = uuidv4();
             nextEdges[eId] = { id: eId, type: 'LINE', nodeIds: [lastClickedNodeId, nId] };
+            
+            // Auto-Constraint Capture
+            if (activeSnapType === 'HORIZONTAL' || activeSnapType === 'VERTICAL') {
+              const cId = uuidv4();
+              nextConstraints[cId] = {
+                id: cId,
+                type: activeSnapType,
+                edgeIds: [eId]
+              };
+            }
+
             const solved = previewSolve(nextNodes, nextEdges, nextConstraints, 4);
             Object.assign(nextNodes, solved);
             nextLastNodeId = nId;

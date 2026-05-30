@@ -25,8 +25,8 @@ export function mateToSolverPayload(
     };
   };
 
-  const offset =
-    mate.parameters?.offset ?? mate.offset ?? 0;
+  const offset = mate.parameters?.offset ?? mate.offset ?? 0;
+  const angle = mate.parameters?.angle ?? mate.angle ?? 0;
 
   return {
     type: mate.type,
@@ -34,6 +34,7 @@ export function mateToSolverPayload(
     entity2: resolveEntity(mate.entity2),
     parameters: {
       offset,
+      angle,
       alignmentFlip: mate.parameters?.alignmentFlip ?? mate.alignment === 'ANTI_ALIGNED',
     },
   };

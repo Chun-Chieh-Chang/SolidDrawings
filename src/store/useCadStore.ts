@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING' | 'RENDER';
 export type MeasurementMode = 'NONE' | 'DISTANCE' | 'ANGLE' | 'AREA' | 'VOLUME';
-export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT';
+export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT' | 'ANGLE';
 
 export interface MateEntity {
   componentId: string;
@@ -20,9 +20,10 @@ export interface CADMate {
   type: MateType;
   entity1: MateEntity;
   entity2: MateEntity;
-  parameters?: { offset?: number; alignmentFlip?: boolean };
+  parameters?: { offset?: number; angle?: number; alignmentFlip?: boolean };
   alignment?: 'ALIGNED' | 'ANTI_ALIGNED';
   offset?: number;
+  angle?: number;
 }
 
 export interface CADFeature {

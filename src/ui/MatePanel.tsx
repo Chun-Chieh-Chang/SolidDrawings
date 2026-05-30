@@ -17,6 +17,7 @@ export const MatePanel = () => {
 
   const [mateType, setMateType] = React.useState<MateType>('COINCIDENT');
   const [offset, setOffset] = React.useState<number>(0);
+  const [angle, setAngle] = React.useState<number>(0);
   const [alignment, setAlignment] = React.useState<'ALIGNED' | 'ANTI_ALIGNED'>('ANTI_ALIGNED');
 
   const assemblyService = new AssemblyService();
@@ -38,8 +39,13 @@ export const MatePanel = () => {
       entity1: toMateEntity(mateSelection[0]),
       entity2: toMateEntity(mateSelection[1]),
       alignment,
-      parameters: { offset: mateType === 'DISTANCE' ? offset : 0, alignmentFlip: alignment === 'ANTI_ALIGNED' },
-      offset: mateType === 'DISTANCE' ? offset : undefined,
+      parameters: { 
+        offset: (mateType === 'DISTANCE' || mateType === 'COINCIDENT') ? offset : 0, 
+        angle: mateType === 'ANGLE' ? angle : 0,
+        alignmentFlip: alignment === 'ANTI_ALIGNED' 
+      },
+      offset: (mateType === 'DISTANCE' || mateType === 'COINCIDENT') ? offset : undefined,
+      angle: mateType === 'ANGLE' ? angle : undefined,
     };
 
     addMate(newMate);
@@ -62,7 +68,7 @@ export const MatePanel = () => {
 
       {/* Mate Type Selection */}
       <div className="grid grid-cols-3 gap-1.5">
-        {(['COINCIDENT', 'PARALLEL', 'CONCENTRIC', 'DISTANCE', 'PERPENDICULAR', 'TANGENT'] as MateType[]).map((type) => (
+        {(['COINCIDENT', 'PARALLEL', 'CONCENTRIC', 'DISTANCE', 'PERPENDICULAR', 'TANGENT', 'ANGLE'] as MateType[]).map((type) => (
           <button
             key={type}
             onClick={() => setMateType(type)}
@@ -104,15 +110,33 @@ export const MatePanel = () => {
         </div> </div>
 
       {/* Mate Settings */}
-      {mateType === 'DISTANCE' && (
+      {(mateType === 'DISTANCE' || mateType === 'COINCIDENT') && (
         <div className="flex items-center gap-2">
-          <span className="text-[13px] text-slate-600 font-medium">距離:</span>
-          <input
-            type="number"
-            value={offset}
-            onChange={(e) => setOffset(parseFloat(e.target.value))}
-            className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-[13px] focus:border-primary outline-none"
-          />
+          <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">距離 (Offset):</span>
+          <div className="relative flex-1">
+            <input
+              type="number"
+              value={offset}
+              onChange={(e) => setOffset(parseFloat(e.target.value))}
+              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[13px] focus:border-primary outline-none text-right pr-7 font-mono"
+            />
+            <span className="absolute right-2 top-1.5 text-[11px] text-slate-400 font-bold">mm</span>
+          </div>
+        </div>
+      )}
+
+      {mateType === 'ANGLE' && (
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">角度 (Angle):</span>
+          <div className="relative flex-1">
+            <input
+              type="number"
+              value={angle}
+              onChange={(e) => setAngle(parseFloat(e.target.value))}
+              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[13px] focus:border-primary outline-none text-right pr-7 font-mono"
+            />
+            <span className="absolute right-2 top-1.5 text-[11px] text-slate-400 font-bold">deg</span>
+          </div>
         </div>
       )}
 

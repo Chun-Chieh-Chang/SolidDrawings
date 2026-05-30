@@ -51,11 +51,23 @@ src/
 | 61 | STEP Import UI Workflow | ✅ |
 | 62 | Convert & Offset Entities | ✅ |
 | 63 | Sweep & Loft UX | ✅ |
-| **65** | **Interactive Section View 3D** | ✅ **最新** |
+| 65 | Interactive Section View 3D | ✅ |
+| 67 | Auto-Constraint Application | ✅ |
+| **68** | **Standard Mates Maturity (Distance & Angle)** | ✅ **最新** |
 
 ---
 
-## 🔑 Phase 65 實作細節 (最新完成)
+## 🔑 Phase 68 實作細節 (最新完成)
+
+### 新增：Standard Mates Maturity (進階組合件配合)
+**功能描述**：擴展組合件配合能力，支援非零距離與角度定位，對標 SolidWorks 2000 標準。
+- **角度配合 (Angle Mate)**：後端 Scipy 求解器實作了基於法向內積的殘差方程，支援在 3D 空間中設定精確的元件夾角。
+- **距離配合 (Distance Mate)**：強化了偏移量 (`offset`) 的處理，允許兩個零件的面或邊保持固定的平移間距。
+- **動態 UI 輸入**：`MatePanel` 現在會根據選取的配合類型動態切換數值輸入框（距離為 mm，角度為 deg），並支援 Aligned / Anti-aligned 反轉。
+
+---
+
+## 🔑 Phase 67 實作細節 (最新完成)
 
 ### 新增：Interactive Section View 3D (全互動式 3D 剖面視圖)
 **功能描述**：大幅升級剖面視圖的操作體驗。

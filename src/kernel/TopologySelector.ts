@@ -154,6 +154,7 @@ export class TopologySelector {
 
       // 2. EDGE PICKING
       if (filterType === 'ALL' || filterType === 'EDGE_ONLY' || filterType === 'FACE_EDGE') {
+        const edgeMetadata = mesh.userData.edge_metadata as any[];
         const projAB = new THREE.Vector3();
         const projBC = new THREE.Vector3();
         const projCA = new THREE.Vector3();
@@ -166,32 +167,43 @@ export class TopologySelector {
 
         if (minDist < this.threshold) {
           let selectedEdge: [THREE.Vector3, THREE.Vector3] = [vA, vB];
-          let edgeId = `${mesh.uuid}_e_${idxA}_${idxB}`;
           let centerPoint = projAB;
+          let matchedMetadata = null;
 
           if (minDist === distBC) {
             selectedEdge = [vB, vC];
-            edgeId = `${mesh.uuid}_e_${idxB}_${idxC}`;
             centerPoint = projBC;
           } else if (minDist === distCA) {
             selectedEdge = [vC, vA];
-            edgeId = `${mesh.uuid}_e_${idxC}_${idxA}`;
             centerPoint = projCA;
           }
 
-                      const topology: SelectedTopology = {
-              type: 'EDGE',
-              id: edgeId,
-              coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
-              edgeData: {
-                start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
-                end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
-              },
-              signature: {
-                length: selectedEdge[0].distanceTo(selectedEdge[1])
-              },
-              componentId: mesh.userData.componentId,
-            };
+          // Resolve backend Edge ID
+          if (edgeMetadata) {
+            const mid = centerPoint;
+            matchedMetadata = edgeMetadata.find(m => {
+              const start = new THREE.Vector3(...m.start);
+              const end = new THREE.Vector3(...m.end);
+              // Check if midpoint of B-Rep edge matches our hit proximity
+              const dStart = mid.distanceTo(start);
+              const dEnd = mid.distanceTo(end);
+              return (dStart + dEnd) < m.length + 1.0; // Simple bounding box / proximity check
+            });
+          }
+
+          const topology: SelectedTopology = {
+            type: 'EDGE',
+            id: matchedMetadata?.id || `${mesh.uuid}_e_${idxA}_${idxB}`,
+            coordinates: [centerPoint.x, centerPoint.y, centerPoint.z],
+            edgeData: {
+              start: [selectedEdge[0].x, selectedEdge[0].y, selectedEdge[0].z],
+              end: [selectedEdge[1].x, selectedEdge[1].y, selectedEdge[1].z],
+            },
+            signature: {
+              length: selectedEdge[0].distanceTo(selectedEdge[1])
+            },
+            componentId: mesh.userData.componentId,
+          };
           useCadStore.getState().setSelectedTopology(topology);
           return topology;
         }
@@ -206,19 +218,18 @@ export class TopologySelector {
       if (filterType === 'ALL' || filterType === 'FACE_ONLY' || filterType === 'FACE_EDGE') {
         const metadata = mesh.userData.face_metadata as any[];
         let signature: FaceSignature | undefined;
+        let matchedFaceId = `${mesh.uuid}_f_${hit.faceIndex}`;
         let isCylinder = false;
         let finalCoordinates = [hitPoint.x, hitPoint.y, hitPoint.z] as [number, number, number];
         let finalNormal = hit.face.normal ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z] as [number, number, number] : undefined;
         
         if (metadata && hit.faceIndex !== undefined) {
-            // Map Three.js faceIndex to OCC face using index_range
-            // Three.js faceIndex is triangle index. Every 3 indices = 1 triangle.
-            // Vert index in geometry.index = faceIndex * 3
             const triangleStartIdx = (hit.faceIndex as number) * 3;
             const vertIdx = geometry.index ? geometry.index.getX(triangleStartIdx) : triangleStartIdx;
             
             const faceMatch = metadata.find(m => vertIdx >= m.index_range[0] && vertIdx < m.index_range[1]);
             if (faceMatch) {
+                matchedFaceId = faceMatch.id;
                 signature = { 
                     area: faceMatch.area, 
                     v_count: faceMatch.v_count, 
@@ -231,21 +242,14 @@ export class TopologySelector {
 
                 if (faceMatch.surface_type === 'CYLINDER' && faceMatch.axis_origin && faceMatch.axis_direction) {
                     isCylinder = true;
-                    // Transform the local axis from face_metadata to world space using mesh matrix
                     const localOrigin = new THREE.Vector3().fromArray(faceMatch.axis_origin);
                     const localDir = new THREE.Vector3().fromArray(faceMatch.axis_direction);
-                    
                     const worldOrigin = localOrigin.applyMatrix4(mesh.matrixWorld);
-                    
-                    // Transform direction vector (ignore translation)
                     const rotMatrix = new THREE.Matrix4().extractRotation(mesh.matrixWorld);
                     const worldDir = localDir.applyMatrix4(rotMatrix).normalize();
-
-                    // Project the hitPoint onto the world axis to get the precise coordinate on the axis
                     const originToHit = new THREE.Vector3().subVectors(hitPoint, worldOrigin);
                     const projectionLength = originToHit.dot(worldDir);
                     const projectedPoint = new THREE.Vector3().copy(worldOrigin).addScaledVector(worldDir, projectionLength);
-
                     finalCoordinates = [projectedPoint.x, projectedPoint.y, projectedPoint.z];
                     finalNormal = [worldDir.x, worldDir.y, worldDir.z];
                 }
@@ -254,7 +258,7 @@ export class TopologySelector {
 
         const topology: SelectedTopology = {
           type: 'FACE',
-          id: `${mesh.uuid}_f_${hit.faceIndex}`,
+          id: matchedFaceId,
           signature,
           coordinates: finalCoordinates,
           normal: finalNormal,

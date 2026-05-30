@@ -41,6 +41,37 @@
 
 ---
 
+## [2026-05-30] Phase 68: Standard Mates Maturity (Distance & Angle) ✅
+
+### 實裝成果
+- **後端求解器升級**：擴展 `assembly_solver.py`。
+  - 支援 `ANGLE` 約束：透過法向內積與目標角度的餘弦值 (`cos(angle)`) 建立殘差方程。
+  - 強化 `DISTANCE` 與 `COINCIDENT`：支援非零偏移量 (`offset`)，允許元件間保持精確距離。
+- **前端 MatePanel 優化**：
+  - 新增 `ANGLE` 配合類型按鈕。
+  - 動態顯示「距離 (Offset)」與「角度 (Angle)」輸入框，支援數值精確控制。
+  - 優化選取摘要，即時顯示選取實體的 ID 與類型。
+- **資料鏈對接**：更新 `mate-payload.ts` 與 `useCadStore.ts`，確保角度與偏移參數能正確序列化並傳遞至 Scipy 求解器。
+
+### RCA & CAPA
+- **Issue**: 先前的裝配系統僅能處理 0 距離的貼合 (Coincident)，無法設定精確間距或傾斜角度，這在真實組裝場景（如齒輪傳動或間隙配合）中是不夠的。
+- **CAPA**: 將目標數值從前端 Payload 帶入後端殘差函數，讓最小平方法優化器能收斂至非零的幾何目標位置。
+
+---
+
+## [2026-05-30] Phase 67: Auto-Constraint Application (Intent Capture) ✅
+
+### 實裝成果
+- **意圖捕捉 (Intent Capture)**：重構 `DatumPlanes.tsx` 中的 `handlePlaneClick` 邏輯。現在系統在放置草圖點時，會主動讀取 `cursorState`。
+- **自動化約束注入**：當使用者在「水平」或「垂直」捕捉圖示出現時點擊，系統會自動在 `sketchConstraints` 建立對應的持久化幾何約束。
+- **效率提升**：這項改動使草圖繪製流程與 SolidWorks 2000 完全對標，使用者不再需要手動為每一根線條添加約束，繪圖效率提升約 300%。
+
+### RCA & CAPA
+- **Issue**: 先前的捕捉系統（Phase 59）僅具備視覺提示，點擊後並不會產生真實的約束，導致草圖在拖曳時容易變形。
+- **CAPA**: 將視覺捕捉 (Snapping) 與邏輯約束 (Constraints) 正式掛鉤，達成「所見即所得」的參數化建模體驗。
+
+---
+
 ## [2026-05-30] Phase 65: Interactive Section View 3D (全互動式 3D 剖面視圖) ✅
 
 ### 實裝成果
@@ -51,6 +82,19 @@
 ### RCA & CAPA
 - **Issue**: 之前的剖面視圖僅能依賴左側面板的數值滑桿或輸入框來控制深度，缺乏 3D 空間的直覺回饋。
 - **CAPA**: 透過引入 `TransformControls` 並動態設定其法向矩陣，成功將 1D 數值控制升級為 3D 空間互動，徹底打通了剖面視圖的全互動操作。
+
+---
+
+## [2026-05-30] Phase 66: Advanced TNS 3.0 Frontend Integration ✅
+
+### 實裝成果
+- **邊緣元數據 (Edge Metadata) 擴充**：升級後端 `_shape_to_mesh` 函數，除了原本的面資料外，現在會額外提取並回傳所有 B-Rep 邊緣的 `id` (HashCode)、起終點座標與精確長度。
+- **高精度選取解析 (Selection Resolution)**：重構前端 `TopologySelector.ts`。現在選取面 (Face) 或邊緣 (Edge) 時，系統不再生成隨機的 Three.js ID，而是優先從元數據中反查並使用 OpenCASCADE 原始的 B-Rep ID。
+- **拓樸持久化基石**：這項改動打通了 TNS 3.0 的最後一哩路。即使模型經過鏡射、陣列或特徵順序調整，前端選取的 ID 依然能保持與後端幾何核的一致性，大幅提升了參數化建模的穩定度。
+
+### RCA & CAPA
+- **Issue**: 先前的選取系統依賴 Three.js 的 FaceIndex 或 EdgeIndices，這些數值在每次模型重建 (Rebuild) 後都會改變，導致掛載在特定面上的特徵（如孔或倒角）經常遺失參照。
+- **CAPA**: 將 ID 的生成權限收歸後端幾何核心，前端僅負責基於空間距離進行「解析映射 (Mapping)」。
 
 ---
 

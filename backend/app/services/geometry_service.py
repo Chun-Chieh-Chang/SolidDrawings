@@ -38,19 +38,23 @@ def _shape_to_mesh(shape, deflection=0.01):
     indices = []
     normals = []
     face_metadata = []
-    
-    
-    from OCC.Core.TopAbs import TopAbs_REVERSED
+    edge_metadata = []
+
+    from OCC.Core.TopAbs import TopAbs_REVERSED, TopAbs_FACE, TopAbs_EDGE
     from OCC.Core.TopoDS import topods
-    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
     from OCC.Core.BRepLProp import BRepLProp_SLProps
     from OCC.Core.GProp import GProp_GProps
     from OCC.Core.BRepGProp import brepgprop
     from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane
-    
+    from OCC.Core.BRep import BRep_Tool
+
+    # Extract Face Metadata
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while explorer.More():
         face = topods.Face(explorer.Current())
+        # ... (rest of face logic)
+
         location = face.Location()
         triangulation = BRep_Tool.Triangulation(face, location)
         
@@ -142,12 +146,40 @@ def _shape_to_mesh(shape, deflection=0.01):
             })
                 
         explorer.Next()
+
+    # Extract Edge Metadata
+    explorer_edge = TopExp_Explorer(shape, TopAbs_EDGE)
+    while explorer_edge.More():
+        edge = topods.Edge(explorer_edge.Current())
+        if not edge.IsNull():
+            v_exp = TopExp_Explorer(edge, TopAbs_VERTEX)
+            pnts = []
+            while v_exp.More():
+                v = topods.Vertex(v_exp.Current())
+                pt = BRep_Tool.Pnt(v)
+                pnts.append([pt.X(), pt.Y(), pt.Z()])
+                v_exp.Next()
+            
+            if len(pnts) >= 2:
+                # Basic signature
+                props = GProp_GProps()
+                brepgprop.LinearProperties(edge, props)
+                length = props.Mass()
+                
+                edge_metadata.append({
+                    "id": str(edge.HashCode(1000000)),
+                    "start": pnts[0],
+                    "end": pnts[-1],
+                    "length": length
+                })
+        explorer_edge.Next()
         
     return {
         "vertices": vertices,
         "indices": indices,
         "normals": normals,
-        "face_metadata": face_metadata
+        "face_metadata": face_metadata,
+        "edge_metadata": edge_metadata
     }
 
 def find_matching_edge(shape, target_start, target_end, signature=None):
