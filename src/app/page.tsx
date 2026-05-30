@@ -89,6 +89,24 @@ export default function Home() {
 
   useAppIntegrations(loadCadData, handleSaveProject, handlePrintToPDF);
 
+  const handleImportStep = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setLoading(true);
+    try {
+      const result = await client.uploadStepFile(file);
+      if (result?.filepath) {
+        addFeature({ id: `dumb_${Date.now()}`, name: file.name, type: 'DUMB_SOLID', parameters: { filepath: result.filepath, x: 0, y: 0, z: 0 } });
+        setTimeout(handleRebuild, 50);
+      }
+    } catch (err) {
+      useCadStore.getState().pushToast('Failed to import STEP file.', 'error');
+    } finally {
+      setLoading(false);
+      e.target.value = ''; // Reset input
+    }
+  };
+
   // Kernel Heartbeat
   useEffect(() => {
     const check = async () => {
@@ -229,6 +247,7 @@ export default function Home() {
         solidSketchPointCount={solidSketchPointCount}
         handleExitAndExtrude={handleExitAndExtrude}
         handleRevolveFromSketch={handleRevolveFromSketch}
+        handleImportStep={handleImportStep}
       />
 
       {engineStatus === 'DISCONNECTED' && (

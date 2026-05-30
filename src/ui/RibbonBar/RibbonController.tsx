@@ -12,6 +12,7 @@ interface RibbonControllerProps {
   solidSketchPointCount: number;
   handleExitAndExtrude: (op?: any) => void;
   handleRevolveFromSketch: () => void;
+  handleImportStep: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const RibbonController: React.FC<RibbonControllerProps> = ({
@@ -21,6 +22,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   solidSketchPointCount,
   handleExitAndExtrude,
   handleRevolveFromSketch,
+  handleImportStep,
 }) => {
   const {
     features,
@@ -115,6 +117,20 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
       <div className="flex-1 flex items-center px-6 py-2 gap-2 overflow-x-auto overflow-y-hidden bg-surface"> 
         {activeTab === 'FEATURES' ? (
           <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
+            <input 
+              type="file" 
+              accept=".step,.stp,.iges,.igs" 
+              className="hidden" 
+              ref={(ref) => { (window as any)._fileInputRef = ref; }}
+              onChange={handleImportStep} 
+            />
+            <button onClick={() => (window as any)._fileInputRef?.click()} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Import STEP">
+              <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Import</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { if (solidSketchPointCount >= 3) handleExitAndExtrude(); else { setSketchMode(true); setSketchTool('SELECT'); } }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Boss/Base">
               <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>

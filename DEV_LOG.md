@@ -16,6 +16,19 @@
 
 ---
 
+## [2026-05-30] Phase 61: Frontend STEP Import Workflow (SW 2000 Parity) ✅
+
+### 實裝成果
+- **前端匯入入口**：在 `RibbonController.tsx` 的 FEATURES 標籤頁中，實作了專屬的「Import STEP」按鈕。
+- **檔案選取機制**：透過隱藏的 `<input type="file" accept=".step,.stp,.iges,.igs" />` 元件，無縫橋接瀏覽器的檔案選取對話框。
+- **系統整合**：打通 `page.tsx` 中的 `handleImportStep` 回調，透過 `HeavyEngineClient.uploadStepFile` 上傳模型至後端，並將其解析為 `DUMB_SOLID` 特徵掛載於特徵樹，實現「外購件」匯入的工作流。
+
+### RCA & CAPA
+- **Issue**: 後端早在 Phase 24 就具備 `import_step_file` API，但前端一直缺乏對應的 UI 工作流，導致匯入功能處於懸空狀態。
+- **CAPA**: 補齊了前端最後一哩路，確保 STEP 檔案匯入的體驗符合工業標準。接下來的轉換實體 (Convert Entities) 功能將可直接運用這些匯入模型的邊緣。
+
+---
+
 ## [2026-05-30] Phase 60: Robust TNS 3.0 (Topology Genealogy) ✅
 
 ### 實裝成果
