@@ -35,95 +35,188 @@ export function PartFeaturePropertyManager({
       </div>
       <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
         {selectedFeature.type === 'PATTERN' ? (
-          <div className="bg-surface p-2 rounded border border-border shadow-sm space-y-2 text-[14px]">
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">目標特徵</span>
-              <select
-                value={selectedFeature.parameters.target_feature_id || ''}
-                onChange={(e) => onParamChange('target_feature_id', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1 py-0.5 w-[120px]"
-              >
-                <option value="">—</option>
-                {features
-                  .filter((f) => f.id !== selectedFeature.id && f.type !== 'PATTERN')
-                  .map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">陣列類型</span>
-              <select
-                value={selectedFeature.parameters.pattern_type || 'CIRCULAR'}
-                onChange={(e) => onParamChange('pattern_type', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1 py-0.5 w-[120px]"
-              >
-                <option value="CIRCULAR">圓周陣列</option>
-                <option value="LINEAR">線性陣列</option>
-              </select>
-            </label>
-            <div className="border-t border-border/50 pt-2 mt-2">
-              <span className="text-[13px] text-secondary-text block mb-1">方向參考 (Edge)</span>
-              <div className="bg-white border border-[#C4C7CE] rounded p-1 min-h-[30px] flex flex-wrap gap-1">
+          <div className="bg-surface p-3 rounded-xl border border-slate-200 shadow-sm space-y-4 text-[14px]">
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                目標特徵 (Features to Pattern)
+              </span>
+              <div className="space-y-2">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (!id) return;
+                    const current = selectedFeature.parameters.target_feature_ids || [];
+                    if (!current.includes(id)) {
+                      onParamChange('target_feature_ids', [...current, id]);
+                    }
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-[#005B9A] transition-colors"
+                >
+                  <option value="">+ 新增特徵...</option>
+                  {features
+                    .filter((f) => f.id !== selectedFeature.id && f.type !== 'PATTERN' && !(selectedFeature.parameters.target_feature_ids || []).includes(f.id))
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                </select>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedFeature.parameters.target_feature_ids || []).length === 0 && !selectedFeature.parameters.target_feature_id && (
+                    <div className="w-full py-3 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-[11px] italic">
+                      未選取目標特徵
+                    </div>
+                  )}
+                  {(selectedFeature.parameters.target_feature_ids || []).map((id: string) => {
+                    const feat = features.find(f => f.id === id);
+                    return (
+                      <div key={id} className="bg-[#005B9A]/10 text-[#005B9A] text-[11px] font-bold px-2 py-1 rounded-md border border-[#005B9A]/20 flex items-center gap-1.5 group">
+                        {feat?.name || id}
+                        <button 
+                          onClick={() => onParamChange('target_feature_ids', (selectedFeature.parameters.target_feature_ids || []).filter((tid: string) => tid !== id))} 
+                          className="hover:text-red-500 transition-colors"
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">類型</label>
+                <select
+                  value={selectedFeature.parameters.pattern_type || 'LINEAR'}
+                  onChange={(e) => onParamChange('pattern_type', e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A]"
+                >
+                  <option value="LINEAR">線性 (Linear)</option>
+                  <option value="CIRCULAR">環形 (Circular)</option>
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">數量</label>
+                <input
+                  type="number"
+                  value={selectedFeature.parameters.count || 2}
+                  onChange={(e) => onParamChange('count', e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">
+                  {selectedFeature.parameters.pattern_type === 'CIRCULAR' ? '角度' : '間距'}
+                </label>
+                <input
+                  type="number"
+                  value={selectedFeature.parameters.spacing || 10}
+                  onChange={(e) => onParamChange('spacing', e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A]"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">基準軸</label>
+                <select
+                  value={selectedFeature.parameters.axis || 'X'}
+                  onChange={(e) => onParamChange('axis', e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A]"
+                >
+                  <option value="X">X 軸</option>
+                  <option value="Y">Y 軸</option>
+                  <option value="Z">Z 軸</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3 space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>
+                方向參照 (Direction Ref)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[40px] flex flex-wrap gap-1.5 items-center">
                 {(selectedFeature.parameters.direction_refs || []).map((ref: any, idx: number) => (
-                  <div key={ref.id} className="bg-indigo-100 text-indigo-700 text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                  <div key={ref.id || idx} className="bg-emerald-100 text-emerald-700 text-[11px] font-bold px-2 py-1 rounded-md border border-emerald-200 flex items-center gap-1.5">
                     Edge {idx + 1}
-                    <button onClick={() => onParamChange('direction_refs', selectedFeature.parameters.direction_refs.filter((r: any) => r.id !== ref.id))} className="hover:text-red-500">×</button>
+                    <button onClick={() => onParamChange('direction_refs', [])} className="hover:text-red-500 transition-colors">×</button>
                   </div>
                 ))}
                 {(selectedFeature.parameters.direction_refs || []).length === 0 && (
-                  <span className="text-[11px] text-slate-400 p-1 italic">請點選 3D 視窗中的直線邊緣</span>
+                  <span className="text-[11px] text-slate-400 italic px-1">選取邊緣以定義方向</span>
                 )}
               </div>
             </div>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">數量</span>
-              <input
-                type="number"
-                min={1}
-                value={selectedFeature.parameters.count ?? 4}
-                onChange={(e) => onParamChange('count', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[120px] text-right font-mono"
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">間距</span>
-              <input
-                type="number"
-                value={selectedFeature.parameters.spacing ?? 90}
-                onChange={(e) => onParamChange('spacing', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[120px] text-right font-mono"
-              />
-            </label>
           </div>
         ) : selectedFeature.type === 'MIRROR' ? (
-          <div className="bg-surface p-2 rounded border border-border shadow-sm space-y-2 text-[14px]">
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">目標特徵</span>
-              <select
-                value={selectedFeature.parameters.target_feature_id || ''}
-                onChange={(e) => onParamChange('target_feature_id', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1 py-0.5 w-[120px]"
-              >
-                <option value="">全部 (Mirror Body)</option>
-                {features.filter((f) => f.id !== selectedFeature.id && f.type !== 'MIRROR').map((f) => (
-                  <option key={f.id} value={f.id}>{f.name}</option>
-                ))}
-              </select>
-            </label>
-            <div className="border-t border-border/50 pt-2 mt-2">
-              <span className="text-[13px] text-secondary-text block mb-1">鏡射平面 (Plane/Face)</span>
-              <div className="bg-white border border-[#C4C7CE] rounded p-1 min-h-[30px] flex flex-wrap gap-1">
+          <div className="bg-surface p-3 rounded-xl border border-slate-200 shadow-sm space-y-4 text-[14px]">
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20"/><path d="M3 7l6 5-6 5V7z"/><path d="M21 7l-6 5 6 5V7z"/></svg>
+                目標特徵 (Features to Mirror)
+              </span>
+              <div className="space-y-2">
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const id = e.target.value;
+                    if (!id) return;
+                    const current = selectedFeature.parameters.target_feature_ids || [];
+                    if (!current.includes(id)) {
+                      onParamChange('target_feature_ids', [...current, id]);
+                    }
+                  }}
+                  className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-[#005B9A] transition-colors"
+                >
+                  <option value="">+ 新增特徵...</option>
+                  {features
+                    .filter((f) => f.id !== selectedFeature.id && f.type !== 'MIRROR' && !(selectedFeature.parameters.target_feature_ids || []).includes(f.id))
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>{f.name}</option>
+                    ))}
+                </select>
+                <div className="flex flex-wrap gap-1.5">
+                  {(selectedFeature.parameters.target_feature_ids || []).length === 0 && !selectedFeature.parameters.target_feature_id && (
+                    <div className="w-full py-3 border-2 border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-[11px] italic">
+                      預設鏡射整體實體 (Mirror Body)
+                    </div>
+                  )}
+                  {(selectedFeature.parameters.target_feature_ids || []).map((id: string) => {
+                    const feat = features.find(f => f.id === id);
+                    return (
+                      <div key={id} className="bg-[#005B9A]/10 text-[#005B9A] text-[11px] font-bold px-2 py-1 rounded-md border border-[#005B9A]/20 flex items-center gap-1.5 group">
+                        {feat?.name || id}
+                        <button 
+                          onClick={() => onParamChange('target_feature_ids', (selectedFeature.parameters.target_feature_ids || []).filter((tid: string) => tid !== id))} 
+                          className="hover:text-red-500 transition-colors"
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                  {/* Legacy support display */}
+                  {selectedFeature.parameters.target_feature_id && !(selectedFeature.parameters.target_feature_ids || []).includes(selectedFeature.parameters.target_feature_id) && (
+                    <div className="bg-[#005B9A]/10 text-[#005B9A] text-[11px] font-bold px-2 py-1 rounded-md border border-[#005B9A]/20 flex items-center gap-1.5">
+                      {features.find(f => f.id === selectedFeature.parameters.target_feature_id)?.name || 'Legacy Target'}
+                      <button onClick={() => onParamChange('target_feature_id', null)} className="hover:text-red-500">×</button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-100 pt-3 space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>
+                鏡射平面 (Mirror Plane)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[40px] flex flex-wrap gap-1.5 items-center">
                 {(selectedFeature.parameters.mirror_plane_refs || []).map((ref: any, idx: number) => (
-                  <div key={ref.id} className="bg-indigo-100 text-indigo-700 text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                    {ref.type === 'FACE' ? 'Face' : ref.type} {idx + 1}
-                    <button onClick={() => onParamChange('mirror_plane_refs', [])} className="hover:text-red-500">×</button>
+                  <div key={ref.id || idx} className="bg-amber-100 text-amber-700 text-[11px] font-bold px-2 py-1 rounded-md border border-amber-200 flex items-center gap-1.5">
+                    {ref.type === 'FACE' ? 'Face' : (ref.id || 'Plane')}
+                    <button onClick={() => onParamChange('mirror_plane_refs', [])} className="hover:text-red-500 transition-colors">×</button>
                   </div>
                 ))}
                 {(selectedFeature.parameters.mirror_plane_refs || []).length === 0 && (
-                  <span className="text-[11px] text-slate-400 p-1 italic">請點選 3D 視窗中的平面</span>
+                  <span className="text-[11px] text-slate-400 italic px-1">請選取 3D 視窗中的平面或面</span>
                 )}
               </div>
             </div>

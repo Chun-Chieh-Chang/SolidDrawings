@@ -888,6 +888,59 @@ def process_features_cached(
     return result
 
 
+class TopologicalLinker:
+    """Tracks how shapes evolve through operations (Boolean, Transform)."""
+    def __init__(self):
+        self.mapping = {} # Original Shape Hash -> List of New Shape Hashes
+        self.shape_pool = {} # Hash -> Shape object
+        
+    def record_evolution(self, tool, original_shapes):
+        """Records Generated and Modified shapes from an OCC tool (e.g. BRepAlgoAPI)."""
+        from OCC.Core.TopExp import TopExp_Explorer
+        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE
+        
+        for orig in original_shapes:
+            if orig is None or (HAS_OCC and orig.IsNull()): continue
+            h_orig = orig.HashCode(10000000)
+            self.shape_pool[h_orig] = orig
+            
+            # Track both Faces and Edges
+            for sub_type in [TopAbs_FACE, TopAbs_EDGE]:
+                exp = TopExp_Explorer(orig, sub_type)
+                while exp.More():
+                    sub = exp.Current()
+                    h_sub = sub.HashCode(10000000)
+                    self.shape_pool[h_sub] = sub
+                    
+                    # Get Generated
+                    generated_list = tool.Generated(sub)
+                    if generated_list and not generated_list.IsNull():
+                        # Generated might be a compound or single shape depending on OCC version/tool
+                        # Usually it's a TopoDS_Shape which could be TopAbs_COMPOUND
+                        exp_gen = TopExp_Explorer(generated_list, sub_type)
+                        while exp_gen.More():
+                            gen_sub = exp_gen.Current()
+                            h_gen = gen_sub.HashCode(10000000)
+                            if h_sub not in self.mapping: self.mapping[h_sub] = []
+                            self.mapping[h_sub].append(h_gen)
+                            self.shape_pool[h_gen] = gen_sub
+                            exp_gen.Next()
+                        
+                    # Get Modified
+                    modified_list = tool.Modified(sub)
+                    if modified_list and not modified_list.IsNull():
+                        exp_mod = TopExp_Explorer(modified_list, sub_type)
+                        while exp_mod.More():
+                            mod_sub = exp_mod.Current()
+                            h_mod = mod_sub.HashCode(10000000)
+                            if h_sub not in self.mapping: self.mapping[h_sub] = []
+                            self.mapping[h_sub].append(h_mod)
+                            self.shape_pool[h_mod] = mod_sub
+                            exp_mod.Next()
+                    exp.Next()
+
+linker = TopologicalLinker()
+
 def process_features(features, deflection=0.01):
     """
     The Core CAD Kernel: Processes a sequence of parametric features to build a B-Rep model.
@@ -1084,10 +1137,21 @@ def process_features(features, deflection=0.01):
             if final_shape is None:
                 final_shape = current_feat_shape
             else:
-                if op == 'ADD':
-                    final_shape = BRepAlgoAPI_Fuse(final_shape, current_feat_shape).Shape()
-                elif op == 'CUT':
-                    final_shape = BRepAlgoAPI_Cut(final_shape, current_feat_shape).Shape()
+                try:
+                    if op == 'ADD':
+                        tool = BRepAlgoAPI_Fuse(final_shape, current_feat_shape)
+                    else:
+                        tool = BRepAlgoAPI_Cut(final_shape, current_feat_shape)
+                    
+                    tool.Build()
+                    if tool.IsDone():
+                        linker.record_evolution(tool, [final_shape, current_feat_shape])
+                        final_shape = tool.Shape()
+                except Exception as bool_err:
+                    print(f"[ERROR] Boolean TNS 3.0 failed: {bool_err}")
+                    # Fallback to standard non-tracking boolean
+                    if op == 'ADD': final_shape = BRepAlgoAPI_Fuse(final_shape, current_feat_shape).Shape()
+                    else: final_shape = BRepAlgoAPI_Cut(final_shape, current_feat_shape).Shape()
 
     if final_shape:
         return {"type": "mesh", "data": _shape_to_mesh(final_shape, deflection), "ref_geometry": ref_geometry}
@@ -1269,7 +1333,12 @@ def build_shape_only(
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
         elif f_type == 'PATTERN':
-            target_id = params.get('target_feature_id')
+            target_ids = params.get('target_feature_ids', [])
+            # Legacy support
+            single_target = params.get('target_feature_id')
+            if single_target and single_target not in target_ids:
+                target_ids.append(single_target)
+                
             pattern_type = params.get('pattern_type', 'LINEAR')
             count = int(params.get('count', 2))
             spacing = float(params.get('spacing', 10.0))
@@ -1300,45 +1369,49 @@ def build_shape_only(
                 else:
                     dir_vec = gp_Vec(0, 0, 1)
 
-            target_feat = None
-            for prev_feat in features:
-                prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
-                if prev_id == target_id:
-                    target_feat = prev_feat
-                    break
+            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+            
+            for target_id in target_ids:
+                target_feat = None
+                for prev_feat in features:
+                    prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
+                    if prev_id == target_id:
+                        target_feat = prev_feat
+                        break
 
-            if target_feat:
-                tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
-                tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
-                target_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, features)
+                if target_feat:
+                    tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
+                    tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
+                    target_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, features)
 
-                if target_shape:
-                    copies = []
-                    for i in range(1, count):
-                        trsf = gp_Trsf()
-                        if pattern_type == 'LINEAR':
-                            val = spacing * i
-                            trsf.SetTranslation(dir_vec.Multiplied(val))
-                        else:  # CIRCULAR
-                            angle_rad = math.radians(spacing * i)
-                            ax1 = gp_Ax1(dir_pnt, gp_Dir(dir_vec.X(), dir_vec.Y(), dir_vec.Z()))
-                            trsf.SetRotation(ax1, angle_rad)
+                    if target_shape:
+                        target_op = tf_params.get('operation', 'ADD')
+                        for i in range(1, count):
+                            trsf = gp_Trsf()
+                            if pattern_type == 'LINEAR':
+                                val = spacing * i
+                                trsf.SetTranslation(dir_vec.Multiplied(val))
+                            else:  # CIRCULAR
+                                angle_rad = math.radians(spacing * i)
+                                ax1 = gp_Ax1(dir_pnt, gp_Dir(dir_vec.X(), dir_vec.Y(), dir_vec.Z()))
+                                trsf.SetRotation(ax1, angle_rad)
 
-                        shape_copy = target_shape.Moved(TopLoc_Location(trsf))
-                        copies.append(shape_copy)
-
-                    target_op = tf_params.get('operation', 'ADD')
-                    for copy_shape in copies:
-                        if final_shape is None:
-                            final_shape = copy_shape
-                        else:
-                            if target_op == 'ADD':
-                                final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
-                            elif target_op == 'CUT':
-                                final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+                            copy_shape = BRepBuilderAPI_Transform(target_shape, trsf, True).Shape()
+                            if final_shape is None:
+                                final_shape = copy_shape
+                            else:
+                                if target_op == 'ADD':
+                                    final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                                elif target_op == 'CUT':
+                                    final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
                                 
         elif f_type == 'MIRROR':
-            target_id = params.get('target_feature_id')
+            target_ids = params.get('target_feature_ids', [])
+            # Legacy support for single target_id
+            single_target = params.get('target_feature_id')
+            if single_target and single_target not in target_ids:
+                target_ids.append(single_target)
+                
             mirror_plane_refs = params.get('mirror_plane_refs', [])
             
             ax2 = gp_Ax2(gp_Pnt(0,0,0), gp_Dir(0,0,1))
@@ -1361,29 +1434,33 @@ def build_shape_only(
             trsf = gp_Trsf()
             trsf.SetMirror(ax2)
             
-            if target_id:
-                target_feat = None
-                for prev_feat in features:
-                    prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
-                    if prev_id == target_id:
-                        target_feat = prev_feat
-                        break
-                
-                if target_feat:
-                    tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
-                    tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
-                    target_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, features)
+            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+            
+            if target_ids:
+                for target_id in target_ids:
+                    target_feat = None
+                    for prev_feat in features:
+                        prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
+                        if prev_id == target_id:
+                            target_feat = prev_feat
+                            break
                     
-                    if target_shape:
-                        copy_shape = target_shape.Moved(TopLoc_Location(trsf))
-                        target_op = tf_params.get('operation', 'ADD')
-                        if target_op == 'ADD':
-                            final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
-                        elif target_op == 'CUT':
-                            final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+                    if target_feat:
+                        tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
+                        tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
+                        target_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, features)
+                        
+                        if target_shape:
+                            # Use BRepBuilderAPI_Transform for mirror (better than Moved/TopLoc)
+                            copy_shape = BRepBuilderAPI_Transform(target_shape, trsf, True).Shape()
+                            target_op = tf_params.get('operation', 'ADD')
+                            if target_op == 'ADD':
+                                final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                            elif target_op == 'CUT':
+                                final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
             else:
                 if final_shape:
-                    copy_shape = final_shape.Moved(TopLoc_Location(trsf))
+                    copy_shape = BRepBuilderAPI_Transform(final_shape, trsf, True).Shape()
                     final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
 
         elif f_type == 'DRAFT':
@@ -1524,10 +1601,21 @@ def build_shape_only(
             if final_shape is None:
                 final_shape = current_feat_shape
             else:
-                if op == 'ADD':
-                    final_shape = BRepAlgoAPI_Fuse(final_shape, current_feat_shape).Shape()
-                elif op == 'CUT':
-                    final_shape = BRepAlgoAPI_Cut(final_shape, current_feat_shape).Shape()
+                try:
+                    if op == 'ADD':
+                        tool = BRepAlgoAPI_Fuse(final_shape, current_feat_shape)
+                    else:
+                        tool = BRepAlgoAPI_Cut(final_shape, current_feat_shape)
+                    
+                    tool.Build()
+                    if tool.IsDone():
+                        linker.record_evolution(tool, [final_shape, current_feat_shape])
+                        final_shape = tool.Shape()
+                except Exception as bool_err:
+                    print(f"[ERROR] Boolean TNS 3.0 failed: {bool_err}")
+                    # Fallback to standard non-tracking boolean
+                    if op == 'ADD': final_shape = BRepAlgoAPI_Fuse(final_shape, current_feat_shape).Shape()
+                    else: final_shape = BRepAlgoAPI_Cut(final_shape, current_feat_shape).Shape()
 
         if cache_prefixes and final_shape is not None and HAS_OCC and not final_shape.IsNull():
             global_idx = start_index + local_idx

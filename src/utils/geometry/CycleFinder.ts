@@ -237,3 +237,31 @@ export function extractAllPaths(
   return paths;
 }
 
+/**
+ * Identifies nodes with degree 1 in the non-construction sketch graph.
+ * These usually represent open ends of a profile.
+ */
+export function findDanglingNodes(
+  nodes: Record<string, SketchNode>,
+  edges: Record<string, SketchEdge>
+): string[] {
+  const edgeList = Object.values(edges).filter(e => !e.isConstruction);
+  const degrees = new Map<string, number>();
+
+  for (const e of edgeList) {
+    const n1 = e.nodeIds[0];
+    const n2 = e.nodeIds[e.nodeIds.length - 1];
+    if (nodes[n1]) degrees.set(n1, (degrees.get(n1) || 0) + 1);
+    if (nodes[n2]) degrees.set(n2, (degrees.get(n2) || 0) + 1);
+  }
+
+  const dangling: string[] = [];
+  for (const [nodeId, degree] of degrees.entries()) {
+    if (degree === 1) {
+      dangling.push(nodeId);
+    }
+  }
+
+  return dangling;
+}
+

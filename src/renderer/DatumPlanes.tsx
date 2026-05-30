@@ -12,7 +12,7 @@ export const DatumPlanes = () => {
     sketchNodes, setSketchNodes, sketchEdges, setSketchEdges, sketchConstraints, setSketchConstraints,
     sketchTool, setSketchTool,
     gridSnap,
-    setSketchRelations, setEditingFeatureId,
+    setEditingFeatureId,
     contextMenu, setContextMenu,
     meshData,
     sketchNewChain, setSketchNewChain,
@@ -91,25 +91,17 @@ export const DatumPlanes = () => {
     return new THREE.Vector3(u, v, 0);
   };
 
-  const featureSnapPoints = useMemo(() => {
-    if (!isSketchMode || !activePlane || !meshData) return [];
-    const points: [number, number][] = [];
-    return points;
-  }, [isSketchMode, activePlane, meshData, activeBasis]);
-
-    const getSnappedUV = (rawU: number, rawV: number) => {
+  const getSnappedUV = (rawU: number, rawV: number) => {
     let u = rawU;
     let v = rawV;
     let snappedId = null;
     const currentInferences: { p1: [number, number], p2: [number, number] }[] = [];
 
-    // A. Grid Snap
     if (gridSnap) {
       u = Math.round(u / 5) * 5;
       v = Math.round(v / 5) * 5;
     }
 
-    // B. Origin Snap
     if (Math.abs(u) < 1.5 && Math.abs(v) < 1.5) {
       setCursorState({ u: 0, v: 0, type: 'COINCIDENT' });
       setInferenceLines([]);
@@ -118,7 +110,6 @@ export const DatumPlanes = () => {
 
     const SNAP_DIST = 2.5;
 
-    // C. Node Snap (Coincident)
     for (const node of Object.values(sketchNodes)) {
       if (Math.hypot(node.x - rawU, node.y - rawV) < SNAP_DIST) {
         setCursorState({ u: node.x, v: node.y, type: 'COINCIDENT' });
@@ -127,13 +118,11 @@ export const DatumPlanes = () => {
       }
     }
 
-    // D. Smart Inferences (Horizontal/Vertical alignment with ANY node)
     let bestU = u;
     let bestV = v;
     let foundH = false;
     let foundV = false;
 
-    // First priority: Current Chain Last Node
     if (lastClickedUV) {
        if (Math.abs(rawU - lastClickedUV.u) < SNAP_DIST) {
          bestU = lastClickedUV.u; foundV = true;
@@ -145,7 +134,6 @@ export const DatumPlanes = () => {
        }
     }
 
-    // Second priority: Origin or other nodes
     if (!foundV || !foundH) {
       for (const node of Object.values(sketchNodes)) {
         if (!foundV && Math.abs(rawU - node.x) < SNAP_DIST) {
@@ -157,7 +145,6 @@ export const DatumPlanes = () => {
           currentInferences.push({ p1: [node.x, node.y], p2: [rawU, node.y] });
         }
       }
-      // Origin Inferences
       if (!foundV && Math.abs(rawU) < SNAP_DIST) { bestU = 0; foundV = true; currentInferences.push({ p1: [0, 0], p2: [0, rawV] }); }
       if (!foundH && Math.abs(rawV) < SNAP_DIST) { bestV = 0; foundH = true; currentInferences.push({ p1: [0, 0], p2: [rawU, 0] }); }
     }
@@ -200,34 +187,19 @@ export const DatumPlanes = () => {
   };
 
   const handlePlaneClick = (plane: string, event: any) => {
-    // Only accept Left Click (button === 0)
     if (event.button !== 0) return;
-
     if (contextMenu) {
       setContextMenu(null);
       return;
     }
-
     if (!isSketchMode) {
-      // If not in sketch mode, clicking a plane selects it as the active plane
       setActivePlane(plane);
-      
-      // Double click to enter sketch mode (simulated via rapid selection or we could add a timer)
-      // For now, let's make it more explicit: selecting a plane enables the "Sketch" button in UI
-      // But if the user clicks a standard plane, we can optionally jump into sketch mode immediately
-      // to keep the existing flow, while allowing custom planes to be selected first.
       if (['FRONT', 'TOP', 'RIGHT'].includes(plane)) {
         setSketchMode(true);
       }
       return;
     }
-
-    if (activePlane !== plane) {
-      // If in sketch mode but clicked a different plane, we might want to switch planes
-      // or simply ignore to prevent accidental sketch plane switching.
-      // SolidWorks requires exiting sketch mode first.
-      return;
-    }
+    if (activePlane !== plane) return;
     event.stopPropagation();
 
     const point = event.point;
@@ -244,7 +216,6 @@ export const DatumPlanes = () => {
     const u = snapped.u;
     const v = snapped.v;
 
-    // GRAPH SHADOW WRITE (Now Native)
     const nId = snapped.id || uuidv4();
     const isOrigin = Math.abs(u) < 1e-5 && Math.abs(v) < 1e-5;
     const newNode = { id: nId, x: u, y: v, isFixed: isOrigin };
@@ -268,18 +239,14 @@ export const DatumPlanes = () => {
          } else {
             const eId = uuidv4();
             nextEdges[eId] = { id: eId, type: 'LINE', nodeIds: [lastClickedNodeId, nId] };
-            
-            // Auto Constraint logic can be added here
             const solved = previewSolve(nextNodes, nextEdges, nextConstraints, 4);
             Object.assign(nextNodes, solved);
-            
             nextLastNodeId = nId;
          }
       } else if (sketchTool === 'SPLINE') {
          if (sketchNewChain || !lastClickedNodeId) {
             nextLastNodeId = nId;
          } else {
-            // Find if there's already an active spline edge ending at lastClickedNodeId
             let activeSplineEdgeId: string | null = null;
             for (const edge of Object.values(nextEdges)) {
                if (edge.type === 'SPLINE' && edge.nodeIds[edge.nodeIds.length - 1] === lastClickedNodeId) {
@@ -287,9 +254,8 @@ export const DatumPlanes = () => {
                   break;
                }
             }
-            if (activeSplineEdgeId) {
-               nextEdges[activeSplineEdgeId].nodeIds.push(nId);
-            } else {
+            if (activeSplineEdgeId) nextEdges[activeSplineEdgeId].nodeIds.push(nId);
+            else {
                const eId = uuidv4();
                nextEdges[eId] = { id: eId, type: 'SPLINE', nodeIds: [lastClickedNodeId, nId] };
             }
@@ -301,7 +267,7 @@ export const DatumPlanes = () => {
          } else {
             const eId = uuidv4();
             nextEdges[eId] = { id: eId, type: 'CIRCLE', nodeIds: [lastClickedNodeId, nId] };
-            nextLastNodeId = null; // Reset chain after circle
+            nextLastNodeId = null;
          }
       } else if (sketchTool === 'RECTANGLE') {
          if (sketchNewChain || !lastClickedNodeId) {
@@ -313,7 +279,6 @@ export const DatumPlanes = () => {
             const n4 = uuidv4();
             nextNodes[n2] = { id: n2, x: u, y: nextNodes[n1].y };
             nextNodes[n4] = { id: n4, x: nextNodes[n1].x, y: v };
-            
             const e1 = uuidv4(); const e2 = uuidv4(); const e3 = uuidv4(); const e4 = uuidv4();
             nextEdges[e1] = { id: e1, type: 'LINE', nodeIds: [n1, n2] };
             nextEdges[e2] = { id: e2, type: 'LINE', nodeIds: [n2, n3] };
@@ -322,7 +287,6 @@ export const DatumPlanes = () => {
             nextLastNodeId = null;
          }
       }
-
       return { sketchNodes: nextNodes, sketchEdges: nextEdges, sketchConstraints: nextConstraints };
     });
 
@@ -331,18 +295,14 @@ export const DatumPlanes = () => {
       setLastClickedNodeId(null);
       setFirstChainNodeId(null);
     } else {
-      if (sketchNewChain) {
-         setFirstChainNodeId(nId);
-      }
+      if (sketchNewChain) setFirstChainNodeId(nId);
       setLastClickedNodeId(nId);
       setSketchNewChain(false);
       setLastClickedUV({ u, v });
       setHasMovedAway(false);
     }
 
-    if (isSketchMode) {
-      void commitPreciseSketchSolve();
-    }
+    if (isSketchMode) void commitPreciseSketchSolve();
   };
 
   const handlePlaneDoubleClick = (plane: string, event: any) => {
@@ -379,7 +339,6 @@ export const DatumPlanes = () => {
         name="FRONT"
         args={[200, 200]}
         position={[0, 0, 0]}
-        rotation={[0, 0, 0]}
         visible={isSketchMode ? activePlane === 'FRONT' : true}
         onPointerOver={() => setHovered('FRONT')}
         onPointerOut={() => { setHovered(null); setCursorState(null); }}
@@ -396,10 +355,8 @@ export const DatumPlanes = () => {
       >
         <meshBasicMaterial 
           color={activePlane === 'FRONT' ? "#60A5FA" : hovered === 'FRONT' ? "#94A3B8" : "#475569"} 
-          transparent 
-          opacity={activePlane === 'FRONT' ? 0.05 : 0.15} 
-          side={THREE.DoubleSide} 
-          depthWrite={false}
+          transparent opacity={activePlane === 'FRONT' ? 0.05 : 0.15} 
+          side={THREE.DoubleSide} depthWrite={false}
         />
         <lineSegments>
           <edgesGeometry args={[new THREE.PlaneGeometry(200, 200)]} />
@@ -436,10 +393,8 @@ export const DatumPlanes = () => {
       >
         <meshBasicMaterial 
           color={activePlane === 'TOP' ? "#60A5FA" : hovered === 'TOP' ? "#94A3B8" : "#475569"} 
-          transparent 
-          opacity={activePlane === 'TOP' ? 0.05 : 0.15} 
-          side={THREE.DoubleSide} 
-          depthWrite={false}
+          transparent opacity={activePlane === 'TOP' ? 0.05 : 0.15} 
+          side={THREE.DoubleSide} depthWrite={false}
         />
         <lineSegments>
           <edgesGeometry args={[new THREE.PlaneGeometry(200, 200)]} />
@@ -476,10 +431,8 @@ export const DatumPlanes = () => {
       >
         <meshBasicMaterial 
           color={activePlane === 'RIGHT' ? "#60A5FA" : hovered === 'RIGHT' ? "#94A3B8" : "#475569"} 
-          transparent 
-          opacity={activePlane === 'RIGHT' ? 0.05 : 0.15} 
-          side={THREE.DoubleSide} 
-          depthWrite={false}
+          transparent opacity={activePlane === 'RIGHT' ? 0.05 : 0.15} 
+          side={THREE.DoubleSide} depthWrite={false}
         />
         <lineSegments>
           <edgesGeometry args={[new THREE.PlaneGeometry(200, 200)]} />
@@ -496,35 +449,55 @@ export const DatumPlanes = () => {
         )}
       </Plane>
 
-      {/* Render O-Snap Cursor & Guides */}
       {cursorState && (
         <group position={get3DPnt(cursorState.u, cursorState.v)}>
-          <Sphere args={[0.5, 16, 16]}>
-            <meshBasicMaterial color={cursorState.type === 'COINCIDENT' ? '#F59E0B' : '#3B82F6'} />
-          </Sphere>
-          <Html position={[1, 1, 0]} center className="pointer-events-none">
-            <div className="bg-slate-900/90 text-[10px] text-sky-300 font-mono px-1 py-0.5 rounded border border-slate-700">
-              {cursorState.type || `${cursorState.u.toFixed(1)}, ${cursorState.v.toFixed(1)}`}
+          <mesh scale={[1.2, 1.2, 1.2]}>
+            <sphereGeometry args={[0.4, 16, 16]} />
+            <meshBasicMaterial color={cursorState.type === 'COINCIDENT' ? '#F59E0B' : '#3B82F6'} transparent opacity={0.8} />
+          </mesh>
+          <Html position={[1.5, 1.5, 0]} center className="pointer-events-none">
+            <div className={`flex items-center justify-center w-6 h-6 rounded-sm shadow-md border border-amber-500/50 transition-all animate-in zoom-in-50 duration-75 ${
+              cursorState.type === 'COINCIDENT' ? 'bg-[#F59E0B]' : 'bg-[#3B82F6]'
+            }`}>
+              {cursorState.type === 'HORIZONTAL' && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><line x1="4" y1="12" x2="20" y2="12"/></svg>
+              )}
+              {cursorState.type === 'VERTICAL' && (
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4"><line x1="12" y1="4" x2="12" y2="20"/></svg>
+              )}
+              {cursorState.type === 'COINCIDENT' && (
+                <div className="w-2 h-2 rounded-full bg-white shadow-sm" />
+              )}
             </div>
           </Html>
-      {/* Render Permanent User-defined Reference Planes */}
+        </group>
+      )}
+
+      {inferenceLines.map((line, idx) => (
+        <Line
+          key={idx}
+          points={[get3DPnt(line.p1[0], line.p1[1]), get3DPnt(line.p2[0], line.p2[1])]}
+          color="#F59E0B"
+          lineWidth={1.5}
+          dashed
+          dashScale={2}
+          dashSize={1}
+          gapSize={1}
+        />
+      ))}
+
       {referencePlanes.map((plane) => {
         const { id, origin, normal, xDir, yDir, name } = plane;
         const originVec = new THREE.Vector3(...origin);
         const normalVec = new THREE.Vector3(...normal);
         const xDirVec = new THREE.Vector3(...xDir);
         const yDirVec = new THREE.Vector3(...yDir);
-        
         const isSelected = activePlane === id;
-        
         return (
           <group key={id} position={originVec} quaternion={new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xDirVec, yDirVec, normalVec))}>
             <Plane
               args={[150, 150]}
-              onPointerDown={(e) => {
-                  e.stopPropagation();
-                  handlePlaneClick(id, e);
-              }}
+              onPointerDown={(e) => { e.stopPropagation(); handlePlaneClick(id, e); }}
               onPointerOver={() => setHovered(id)}
               onPointerOut={() => setHovered(null)}
               onPointerMove={handlePointerMove}
@@ -532,10 +505,8 @@ export const DatumPlanes = () => {
             >
               <meshStandardMaterial 
                 color={isSelected ? "#60A5FA" : hovered === id ? "#94A3B8" : "#475569"} 
-                transparent 
-                opacity={isSelected ? 0.2 : 0.1} 
-                side={THREE.DoubleSide}
-                depthWrite={false}
+                transparent opacity={isSelected ? 0.2 : 0.1} 
+                side={THREE.DoubleSide} depthWrite={false}
               />
               <lineSegments>
                 <edgesGeometry args={[new THREE.PlaneGeometry(150, 150)]} />
@@ -553,71 +524,24 @@ export const DatumPlanes = () => {
         );
       })}
 
-      {/* Render Computed Custom Reference Planes (Preview) */}
       {computedRefGeometry?.filter(g => g.type === 'PLANE').map((plane) => {
         const { id, data } = plane;
         const origin = new THREE.Vector3(...data.origin);
         const normal = new THREE.Vector3(...data.normal);
         const xDir = new THREE.Vector3(...data.xDir);
         const yDir = new THREE.Vector3(...data.yDir);
-        
         const isSelected = activePlane === id;
-        
         return (
           <group key={id} position={origin} quaternion={new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xDir, yDir, normal))}>
             <Plane
               args={[100, 100]}
               onPointerDown={(e) => {
                   e.stopPropagation();
-                  useCadStore.getState().setActivePlane(id);
+                  setActivePlane(id);
                   useCadStore.getState().setSelectedId(id);
               }}
             >
-              <meshStandardMaterial 
-                color={isSelected ? "#3B82F6" : "#94A3B8"} 
-                transparent 
-                opacity={isSelected ? 0.3 : 0.15} 
-                side={THREE.DoubleSide}
-              />
-            </Plane>
-            <Html position={[0, 0, 0]}>
-              <div className={`text-[9px] font-bold px-1 rounded border ${isSelected ? 'bg-primary text-white border-primary' : 'bg-white/80 text-slate-500 border-slate-300'}`}>
-                {id}
-              </div>
-            </Html>
-          </group>
-        );
-      })}
-    </group>
-      )}
-
-      {/* Reference Geometry Rendering is omitted for brevity but can be added back */}
-          {/* Render Computed Custom Reference Planes */}
-      {computedRefGeometry?.filter(g => g.type === 'PLANE').map((plane) => {
-        const { id, data } = plane;
-        const origin = new THREE.Vector3(...data.origin);
-        const normal = new THREE.Vector3(...data.normal);
-        const xDir = new THREE.Vector3(...data.xDir);
-        const yDir = new THREE.Vector3(...data.yDir);
-        
-        const isSelected = activePlane === id;
-        
-        return (
-          <group key={id} position={origin} quaternion={new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xDir, yDir, normal))}>
-            <Plane
-              args={[100, 100]}
-              onPointerDown={(e) => {
-                  e.stopPropagation();
-                  useCadStore.getState().setActivePlane(id);
-                  useCadStore.getState().setSelectedId(id);
-              }}
-            >
-              <meshStandardMaterial 
-                color={isSelected ? "#3B82F6" : "#94A3B8"} 
-                transparent 
-                opacity={isSelected ? 0.3 : 0.15} 
-                side={THREE.DoubleSide}
-              />
+              <meshStandardMaterial color={isSelected ? "#3B82F6" : "#94A3B8"} transparent opacity={isSelected ? 0.3 : 0.15} side={THREE.DoubleSide} />
             </Plane>
             <Html position={[0, 0, 0]}>
               <div className={`text-[9px] font-bold px-1 rounded border ${isSelected ? 'bg-primary text-white border-primary' : 'bg-white/80 text-slate-500 border-slate-300'}`}>

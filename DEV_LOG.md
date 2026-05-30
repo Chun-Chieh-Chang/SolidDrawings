@@ -9,42 +9,97 @@
 > - **Phase 3: Hypothesis (假設分析 RCA)** - 根本原因假設與驗證結果
 > - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
 
-
-# DEV_LOG.md - Skill Architect 開發日誌
-
-> **⚠️ Anti-Vibe Coding 紀律宣告**
-> 所有 Bug 修復與系統變更，必須在此日誌留下 RCA (Root Cause Analysis) 與 CAPA (Corrective and Preventive Actions) 的結構化紀錄。禁止「猜測性」的盲目修復。
-> 
-> **標準診斷模板 (Standard Diagnostic Template)：**
-> - **Phase 1: Investigation (根因調查)** - 錯誤重現路徑與證據蒐集
-> - **Phase 2: Pattern (模式分析)** - 正常範例對比與參考文件查閱
-> - **Phase 3: Hypothesis (假設分析 RCA)** - 根本原因假設與驗證結果
-> - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
-
-
-
-
-
-# DEV_LOG.md - Skill Architect 開發日誌
-
-> **⚠️ Anti-Vibe Coding 紀律宣告**
-> 所有 Bug 修復與系統變更，必須在此日誌留下 RCA (Root Cause Analysis) 與 CAPA (Corrective and Preventive Actions) 的結構化紀錄。禁止「猜測性」的盲目修復。
-> 
-> **標準診斷模板 (Standard Diagnostic Template)：**
-> - **Phase 1: Investigation (根因調查)** - 錯誤重現路徑與證據蒐集
-> - **Phase 2: Pattern (模式分析)** - 正常範例對比與參考文件查閱
-> - **Phase 3: Hypothesis (假設分析 RCA)** - 根本原因假設與驗證結果
-> - **Phase 4: Fix & Verify (精準修復 CAPA)** - 修復邏輯、驗證結果與預防策略
-
-
-
-
-
-
 ---
 
 ## 🛑 專案開發鐵律 (Core Development Principles)
 1. **不重複造輪子 (Don't Reinvent the Wheel)**: 凡是有現成、穩定、工業標準的開源工具（如 OpenCASCADE, SolveSpace, React Three Fiber），必須直接引進並封裝對接，嚴禁從零自行開發底層數學或圖形邏輯。
+
+---
+
+## [2026-05-30] Phase 60: Robust TNS 3.0 (Topology Genealogy) ✅
+
+### 實裝成果
+- **演化追蹤機制**：實作 `TopologicalLinker` 類別，利用 OpenCASCADE 的 `Generated()` 與 `Modified()` API，在每次 Boolean 運算 (Fuse/Cut) 時精準記錄拓樸結構的「血統」變化。
+- **持久化 ID 映射**：系統現在能識別哪些新生成的面是由哪個原始面「演化」而來，解決了在鏡射或陣列操作後，子特徵（如孔）因 ID 飄移而遺失參照的工業級痛點。
+
+---
+
+## [2026-05-30] Phase 59: Dynamic Constraint Guidance (Sketching UX) ✅
+
+### 實裝成果
+- **專業級約束標誌**：重構 `DatumPlanes.tsx`，將原本的文字提示替換為 SolidWorks 風格的黃色與藍色標籤，具備動態圖示（水平、垂直、重合）。
+- **視覺引導強化**：優化了對齊推導線 (Inference Lines) 的顯示效果，並在滑鼠靠近捕捉點時提供即時的視覺縮放反饋。
+
+---
+
+## [2026-05-30] Phase 58: Multi-feature Patterning ✅
+
+### 實裝成果
+- **陣列特徵升級**：將 `PATTERN` (線性與圓周陣列) 從單一對象升級為支援 `target_feature_ids` 列表。
+- **幾何精度優化**：後端全面改用 `BRepBuilderAPI_Transform` 進行陣列複製，確保在高數量陣列下仍能保持拓樸一致性。
+- **前端 Chip UI**：同步 `MIRROR` 特徵的優化，實作多選特徵管理介面。
+
+---
+
+## [2026-05-30] Phase 57: Advanced 3D Mirror Feature ✅
+
+### 實裝成果
+- **多特徵鏡射支援**：後端 `geometry_service.py` 升級支援 `target_feature_ids` 列表，允許同時鏡射多個特定特徵（如一組孔或多個筋），而非僅限於整體實體鏡射。
+- **高精度幾何轉換**：將鏡射邏輯從舊有的 `Moved(TopLoc_Location)` 替換為 `BRepBuilderAPI_Transform`，顯著提升鏡射後的幾何精度與拓撲穩定性。
+- **專業級 UI 優化**：
+  - 在 `PartFeaturePropertyManager` 實作「多選晶片 (Multi-select Chip) 」介面，方便使用者新增、檢視或移除鏡射目標。
+  - 支援「鏡射實體 (Mirror Body)」與「鏡射特徵 (Mirror Features)」模式的無縫切換。
+- **向下相容性**：前端 UI 與後端邏輯皆保留對單一 `target_feature_id` 的支援，確保舊存檔能正常重建。
+
+### RCA & CAPA
+- **Issue**: 之前的鏡射功能極其受限，無法選取多個特徵，且使用平移矩陣處理鏡射在複雜幾何下可能導致拓撲錯誤。
+- **CAPA**: 採用專門的鏡射轉換 API 並重構參數模型。未來「陣列 (Pattern)」特徵也應對標此模式，支援多特徵陣列。
+
+---
+
+## [2026-05-30] Phase 56: Sketch Validation UX & Toast System ✅
+
+### 實裝成果
+- **專業級 Toast 系統**：捨棄原生 `alert`，引進具備 7 秒自動消失機制的 `CadToast` 系統，支援 error, warning, info 三種層級，對標主流 CAD 軟體通知風格。
+- **斷點動態標示**：擴展 `CycleFinder.ts` 算法，當草圖無法閉合時，自動計算並回傳「懸空端點 (Dangling Nodes)」。
+- **3D 視覺回饋**：在 `Viewport.tsx` 實作 `DanglingNodesRenderer`，以**紅色呼吸燈 (Red Pulse Markers)** 在 3D 空間標示出草圖缺口，引導使用者修正。
+- **架構大掃除**：徹底移除所有組件中殘留的 `sketchPoints` 與 `sketchRelations` 舊版屬性，確保系統完全運行於 Graph-based 拓樸模型。
+
+### RCA & CAPA
+- **Issue**: 過去草圖未閉合時僅有簡陋彈窗，且使用者難以在複雜草圖中找到微小的斷點，導致建模失敗時缺乏直觀的除錯手段。
+- **CAPA**: 將「診斷」與「提示」整合進 `useFeatureBuilders` 工作流。建模失敗時，系統會自動切換至診斷模式，直到草圖閉合或 Session 重置。
+
+---
+
+## [2026-05-30] Phase 55: Architecture Decoupling & Refactoring (`page.tsx`) ✅
+
+### 實裝成果
+- **極致瘦身**：將 `src/app/page.tsx` 從 3,400+ 行縮減至約 220 行，消除 "God Object"。
+- **模組化抽離**：
+  - **Hooks**: 建立 `useFeatureBuilders.ts` (幾何特徵構建) 與 `useAppIntegrations.ts` (Electron/快捷鍵/系統整合)。
+  - **Components**: 建立 `TopMenu.tsx`, `RibbonController.tsx`, `MassPropertiesModal.tsx`, `TranslatorModal.tsx`。
+- **清理技術債**：徹底移除廢棄的 `sketchPoints` 舊版狀態及其關聯的 2000 多行無用幾何運算邏輯，全面轉向 Graph-based 拓樸模型。
+- **確效通過**：`npx tsc --noEmit` 零錯誤，系統啟動速度與開發響應力顯著提升。
+
+### RCA & CAPA
+- **Issue**: `page.tsx` 過於龐大導致 `useEffect` 依賴鏈斷裂、變數宣告順序錯誤（見 Phase 54 回歸修復），且維護難度極高。
+- **CAPA**: 採用 React Hooks 模式進行「外科手術式拆解」，將副作用 (Side Effects) 與渲染邏輯分離。未來所有新功能（如 Mirror Feature）應優先考慮在獨立 Hook 中開發。
+
+---
+
+## [2026-05-30] Phase 54: ShortcutBox Professionalization (S-Key UX Optimization) ✅
+
+### 實裝成果
+- **UI 優化**：重構 `ShortcutBox.tsx`，引進磨砂玻璃 (Backdrop-blur) 質感與圓角卡片設計，對標 SolidWorks S-Key 菜單。
+- **新增圖示**：補齊 Revolve, Fillet, Chamfer, Shell, Hole Wizard, Arc, Centerline 等專業 CAD 圖示。
+- **功能實作**：
+  - **草圖模式**：實作 `Save Sketch` 與 `Exit Sketch` (取消並回退)，並新增 `Arc` 與 `Centerline` 快速工具。
+  - **零件模式**：實作 `Measure` (切換量測模式) 與 `Section View` (切換剖面視圖) 快速開關。
+- **架構優化**：在 `page.tsx` 中將關鍵回調 (`handleRevolve`, `resetSketchSession`, `handleSaveSketchOnly`, `handleExitAndExtrude`) 注入 `window` 對象，解決 UI 組件與主頁面邏輯的通訊隔閡。
+
+### RCA & CAPA
+- **Issue**: S-Key 快捷選單 (ShortcutBox) 原本功能極其簡陋，MEASURE 按鈕無效，且缺乏常用特徵工具，導致使用者必須頻繁回到上方 Ribbon 工具列切換。
+- **CAPA**: 全面翻新 ShortcutBox，對齊 Ribbon 功能，並確保所有快捷操作皆能正確觸發對應的 Store 狀態或 Page 回調。修正了 `page.tsx` 中 `useEffect` 因依賴未宣告變數而導致的編譯錯誤。
 
 ---
 

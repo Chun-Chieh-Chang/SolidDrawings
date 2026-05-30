@@ -1,7 +1,7 @@
 import { SketchNode, SketchEdge } from '../../store/useCadStore';
-import { extractAllClosedLoops, extractAllPaths } from './CycleFinder';
+import { extractAllClosedLoops, extractAllPaths, findDanglingNodes } from './CycleFinder';
 
-export { extractAllClosedLoops, extractAllPaths };
+export { extractAllClosedLoops, extractAllPaths, findDanglingNodes };
 
 /**
  * Traverse the Sketch Graph (Nodes & Edges) and extract the outermost closed loop

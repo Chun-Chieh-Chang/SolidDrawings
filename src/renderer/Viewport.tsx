@@ -125,6 +125,28 @@ const CameraHandler = () => {
   return null;
 };
 
+// Visual feedback for open sketch loops
+const DanglingNodesRenderer = () => {
+  const { danglingNodes, isSketchMode } = useCadStore();
+  if (!isSketchMode || danglingNodes.length === 0) return null;
+
+  return (
+    <group>
+      {danglingNodes.map((pos, idx) => (
+        <mesh key={idx} position={new THREE.Vector3(...pos)}>
+          <sphereGeometry args={[0.8, 16, 16]} />
+          <meshBasicMaterial color="#EF4444" depthTest={false} transparent opacity={0.8} />
+          {/* Outer Pulse */}
+          <mesh scale={[1.5, 1.5, 1.5]}>
+            <sphereGeometry args={[0.8, 16, 16]} />
+            <meshBasicMaterial color="#EF4444" depthTest={false} transparent opacity={0.3} />
+          </mesh>
+        </mesh>
+      ))}
+    </group>
+  );
+};
+
 // Global topology selector instance
 export let topologySelector: TopologySelector | null = null;
 
@@ -729,6 +751,7 @@ export default function Viewport({ children }: ViewportProps) {
           <Stage environment={cadMode === 'RENDER' ? (environmentMap as any) : "city"} intensity={0.5}>
             <DatumPlanes />
             <SketchPreview />
+            <DanglingNodesRenderer />
             <HighlightRenderer />
             <FeatureOutlines />
 

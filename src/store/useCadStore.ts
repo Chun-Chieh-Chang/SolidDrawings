@@ -156,7 +156,6 @@ interface CadState {
   setSketchEdges: (edges: Record<string, SketchEdge> | ((prev: Record<string, SketchEdge>) => Record<string, SketchEdge>)) => void;
   sketchConstraints: Record<string, SketchConstraint>;
   setSketchConstraints: (constraints: Record<string, SketchConstraint> | ((prev: Record<string, SketchConstraint>) => Record<string, SketchConstraint>)) => void;
-  setSketchRelations: (rels: any) => void;
 
   features: CADFeature[];
   setFeatures: (features: CADFeature[]) => void;
@@ -242,6 +241,9 @@ interface CadState {
 
   hint: string;
   setHint: (hint: string) => void;
+
+  danglingNodes: [number, number, number][];
+  setDanglingNodes: (nodes: [number, number, number][]) => void;
 
   toasts: CadToastItem[];
   pushToast: (message: string, type?: CadToastType) => void;
@@ -363,7 +365,6 @@ export const useCadStore = create<CadState>()(
           sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints
         }));
       },
-      setSketchRelations: (rels) => {},
 
       features: [{ id: 'ai_constructed_cylinder', type: 'CYLINDER', name: 'AI Built Cylinder', parameters: { radius: 20, height: 50, x: 0, y: 0, z: 0 } }],
       setFeatures: (features) => {
@@ -586,6 +587,9 @@ export const useCadStore = create<CadState>()(
       setMousePos: (mousePos) => set({ mousePos }),
       hint: 'Ready',
       setHint: (hint) => set({ hint }),
+
+      danglingNodes: [],
+      setDanglingNodes: (danglingNodes) => set({ danglingNodes }),
 
       toasts: [],
       pushToast: (message, type = 'error') => {

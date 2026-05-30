@@ -12,8 +12,45 @@ const ExitIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="non
 const ExtrudeIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
 const MeasureIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.3 15.3l-5-5L19 7.7l-2-2L14.7 8l-5-5-1.4 1.4 1 1-1.5 1.5-1-1L5.4 7.3l1 1-1.5 1.5-1-1-1.4 1.4 5 5-2.3 2.3 2 2 2.3-2.3 5 5 1.4-1.4-1-1 1.5-1.5 1 1 1.4-1.4-1-1 1.5-1.5 1 1z"/></svg>;
 
+const RevolveIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m7.8 16.2-2.9 2.9"/><path d="M2 12h4"/><path d="m7.8 7.8-2.9-2.9"/><circle cx="12" cy="12" r="3"/></svg>
+);
+
+const FilletIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M4 4v16"/><path d="M4 12c4 0 8-4 8-8"/></svg>
+);
+
+const ChamferIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20V4"/><path d="M4 20 16 4"/></svg>
+);
+
+const ShellIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7h10v10H7z"/></svg>
+);
+
+const HoleIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M2 12h4"/><path d="M18 12h4"/></svg>
+);
+
+const SectionIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 3h18v18H3z"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>
+);
+
+const ArcIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 12a8 8 0 0 0-16 0"/><path d="M4 12v4"/><path d="M20 12v4"/></svg>
+);
+
+const CenterLineIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="4 2"><line x1="4" y1="12" x2="20" y2="12"/></svg>
+);
+
 export const ShortcutBox: React.FC = () => {
-  const { shortcutBox, setShortcutBox, isSketchMode, setSketchTool, setSketchMode, setActivePlane, smartDimensionActive, setSmartDimensionActive } = useCadStore();
+  const { 
+    shortcutBox, setShortcutBox, 
+    isSketchMode, setSketchTool, setSketchMode, 
+    setActivePlane, smartDimensionActive, setSmartDimensionActive,
+    setMeasurementMode, measurementMode, features 
+  } = useCadStore();
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -28,21 +65,58 @@ export const ShortcutBox: React.FC = () => {
 
   const tools = isSketchMode ? [
     { id: 'LINE', icon: <LineIcon />, label: 'Line', action: () => setSketchTool('LINE') },
+    { id: 'CENTER_LINE', icon: <CenterLineIcon />, label: 'C-Line', action: () => setSketchTool('CENTER_LINE') },
     { id: 'CIRCLE', icon: <CircleIcon />, label: 'Circle', action: () => setSketchTool('CIRCLE') },
+    { id: 'ARC', icon: <ArcIcon />, label: '3P-Arc', action: () => setSketchTool('ARC') },
     { id: 'RECTANGLE', icon: <RectIcon />, label: 'Rect', action: () => setSketchTool('RECTANGLE') },
     { id: 'SPLINE', icon: <SplineIcon />, label: 'Spline', action: () => setSketchTool('SPLINE') },
     { id: 'SMART_DIM', icon: <DimIcon />, label: 'Dim', action: () => setSmartDimensionActive(true) },
-    { id: 'EXIT', icon: <ExitIcon />, label: 'Exit', action: () => { setShortcutBox(null); } },
+    { id: 'SAVE', icon: <ExitIcon />, label: 'Save', action: () => { (window as any).__handleSaveSketchOnly?.(); } },
+    { id: 'EXIT', icon: <ExitIcon />, label: 'Exit', action: () => { (window as any).__resetSketchSession?.(); } },
   ] : [
     { id: 'EXTRUDE', icon: <ExtrudeIcon />, label: 'Extrude', action: () => { (window as any).__handleExtrude?.(); } },
-    { id: 'MEASURE', icon: <MeasureIcon />, label: 'Measure', action: () => {} },
+    { id: 'REVOLVE', icon: <RevolveIcon />, label: 'Revolve', action: () => { (window as any).__handleRevolve?.(); } },
+    { id: 'FILLET', icon: <FilletIcon />, label: 'Fillet', action: () => { 
+        if (features.length > 0) {
+          useCadStore.setState({ pendingFeatureCommand: 'FILLET' });
+        } else {
+          alert('Create a solid body first!');
+        }
+    } },
+    { id: 'CHAMFER', icon: <ChamferIcon />, label: 'Chamfer', action: () => { 
+        if (features.length > 0) {
+          useCadStore.setState({ pendingFeatureCommand: 'CHAMFER' });
+        } else {
+          alert('Create a solid body first!');
+        }
+    } },
+    { id: 'SHELL', icon: <ShellIcon />, label: 'Shell', action: () => { 
+        useCadStore.setState({ pendingFeatureCommand: 'SHELL' });
+    } },
+    { id: 'HOLE', icon: <HoleIcon />, label: 'Hole', action: () => { 
+        useCadStore.setState({ pendingFeatureCommand: 'HOLE_WIZARD' });
+    } },
+    { id: 'MEASURE', icon: <MeasureIcon />, label: 'Measure', action: () => { setMeasurementMode(measurementMode === 'NONE' ? 'DISTANCE' : 'NONE'); } },
+    { id: 'SECTION', icon: <SectionIcon />, label: 'Section', action: () => { 
+        const newState = !useCadStore.getState().sectionView.isActive;
+        useCadStore.getState().setSectionView({ isActive: newState });
+        useCadStore.getState().setActivePropertyManager(newState ? 'SECTION_VIEW' : null);
+    } },
     { id: 'SKETCH', icon: <LineIcon />, label: 'Sketch', action: () => { setActivePlane('FRONT'); setSketchMode(true); } },
   ];
 
   return (
-    <div ref={boxRef} className="fixed z-[1000] bg-surface border border-white/20 rounded-sm shadow-sm p-2 grid grid-cols-4 gap-2 animate-in fade-in zoom-in duration-200 select-none" style={{ left: shortcutBox.x, top: shortcutBox.y }}>
+    <div 
+      ref={boxRef} 
+      className="fixed z-[1000] bg-surface/90 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl p-3 grid grid-cols-4 gap-2 animate-in fade-in zoom-in duration-200 select-none" 
+      style={{ left: shortcutBox.x, top: shortcutBox.y }}
+    >
       {tools.map((tool) => (
-        <button key={tool.id} onClick={() => { tool.action(); setShortcutBox(null); }} className="w-12 h-12 flex flex-col items-center justify-center rounded-xl hover:bg-background text-slate-700 hover:text-accent transition-all  group">
+        <button 
+          key={tool.id} 
+          onClick={() => { tool.action(); setShortcutBox(null); }} 
+          className="w-14 h-14 flex flex-col items-center justify-center rounded-xl hover:bg-white/50 text-slate-700 hover:text-[#005B9A] transition-all border border-transparent hover:border-slate-200 group"
+        >
           <div className="group-hover:scale-110 transition-transform">{tool.icon}</div>
           <span className="text-[9px] font-black mt-1 uppercase tracking-tighter">{tool.label}</span>
         </button>
