@@ -2,7 +2,7 @@
 
 import React, { Suspense, useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { OrbitControls, Grid, Stage, PerspectiveCamera, Html, Line } from '@react-three/drei';
+import { OrbitControls, Grid, Stage, PerspectiveCamera, Html, Line, TransformControls } from '@react-three/drei';
 import * as THREE from 'three';
 import { gsap } from 'gsap';
 import { useCadStore } from '../store/useCadStore';
@@ -726,6 +726,67 @@ const MouseTracker = () => {
   );
 };
 
+// Section View Controls for 3D dragging
+const SectionViewControls = () => {
+  const { sectionView, setSectionView, controls } = useCadStore();
+  const planeMeshRef = useRef<THREE.Mesh>(null);
+  
+  if (!sectionView.isActive) return null;
+
+  const plane = sectionView.plane;
+  const d = sectionView.offset;
+  
+  let rotation = new THREE.Euler(0, 0, 0);
+  let baseNormal = new THREE.Vector3(0, 1, 0);
+  if (plane === 'FRONT') {
+    rotation.set(0, 0, 0);
+    baseNormal.set(0, 0, 1);
+  } else if (plane === 'TOP') {
+    rotation.set(-Math.PI / 2, 0, 0);
+    baseNormal.set(0, 1, 0);
+  } else if (plane === 'RIGHT') {
+    rotation.set(0, Math.PI / 2, 0);
+    baseNormal.set(1, 0, 0);
+  }
+  
+  const position = new THREE.Vector3().copy(baseNormal).multiplyScalar(d);
+
+  return (
+    <TransformControls 
+      mode="translate"
+      showX={plane === 'RIGHT'}
+      showY={plane === 'TOP'}
+      showZ={plane === 'FRONT'}
+      position={position}
+      onObjectChange={(e: any) => {
+        const target = e?.target as any;
+        if (target && target.object) {
+          const newPos = target.object.position;
+          const val = newPos.dot(baseNormal);
+          setSectionView({ offset: parseFloat(val.toFixed(2)) });
+        }
+      }}
+    >
+      <group rotation={rotation}>
+        <mesh>
+          <planeGeometry args={[150, 150]} />
+          <meshBasicMaterial 
+            color="#EF4444" 
+            transparent 
+            opacity={0.15} 
+            side={THREE.DoubleSide} 
+            depthWrite={false}
+          />
+          <lineSegments>
+            <edgesGeometry args={[new THREE.PlaneGeometry(150, 150)]} />
+            <lineBasicMaterial color="#EF4444" linewidth={2} />
+          </lineSegments>
+        </mesh>
+      </group>
+    </TransformControls>
+  );
+};
+
 export default function Viewport({ children }: ViewportProps) {
   const { isSketchMode, features, setControls, isCameraAnimating, activePropertyManager, setSelectedId, setSelectedSubNodeType, environmentMap, mode: cadMode } = useCadStore();
 
@@ -762,6 +823,7 @@ export default function Viewport({ children }: ViewportProps) {
               </mesh>
             )}
           </Stage>
+          <SectionViewControls />
         </Suspense>
         <Grid
           infiniteGrid

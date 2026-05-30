@@ -50,7 +50,18 @@ src/
 | 58-60 | Patterning, Guidance, TNS 3.0 | ✅ |
 | 61 | STEP Import UI Workflow | ✅ |
 | 62 | Convert & Offset Entities | ✅ |
-| **63** | **Sweep & Loft UX** | ✅ **最新** |
+| 63 | Sweep & Loft UX | ✅ |
+| **65** | **Interactive Section View 3D** | ✅ **最新** |
+
+---
+
+## 🔑 Phase 65 實作細節 (最新完成)
+
+### 新增：Interactive Section View 3D (全互動式 3D 剖面視圖)
+**功能描述**：大幅升級剖面視圖的操作體驗。
+- **3D 互動拖曳**：引入 `@react-three/drei` 的 `TransformControls`，允許使用者直接在 3D 空間中拖曳剖切平面，即時檢視內部結構。
+- **雙向數據綁定**：拖曳 3D 箭頭會同步更新 Zustand Store，並與左側 `SectionViewPropertyManager` 參數面板完美連動。
+- **自動鎖定機制**：在拖曳剖面時自動鎖定 `OrbitControls`，防止視角意外旋轉，確保拖曳的穩定性。
 
 ---
 
@@ -108,10 +119,9 @@ src/
 
 如果您接手本專案，建議從以下任務開始：
 
-1. **健全 TNS 3.0**：支援面與面的父子繼承，處理更複雜的拓撲重映射（例如鏡射後的面選取）。
-2. **動態約束引導 (Dynamic Constraint Guidance)**：在草圖模式下，當滑鼠靠近可建立約束的位置時，顯示虛擬約束圖示（如水平、垂直）。
-3. **手機/平板響應式優化**：針對觸控環境優化 S-Key 菜單與 PropertyManager。
-4. **多特徵陣列 (Multi-feature Pattern)**：比照 Phase 57 的模式，讓 Pattern 也能支援選取多個特徵進行環形或線性陣列。
+1. **進階 TNS 3.0 (Topology Naming System)**：目前已實作 `TopologicalLinker` 記錄演化，但需進一步實作前端的面選取 ID 映射，讓被鏡射或陣列的面也能正確繼承材質或屬性。
+2. **手機/平板響應式優化 (Responsive UX)**：針對觸控環境優化 S-Key 菜單與 PropertyManager，確保在 iPad 等裝置上也能順暢進行草圖繪製。
+3. **父子特徵連帶刪除警告進階版**：目前已實作簡單警告，可進一步強化。
 
 ---
 

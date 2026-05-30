@@ -41,6 +41,19 @@
 
 ---
 
+## [2026-05-30] Phase 65: Interactive Section View 3D (全互動式 3D 剖面視圖) ✅
+
+### 實裝成果
+- **TransformControls 整合**：引入 `@react-three/drei` 的 `TransformControls`，允許使用者直接在 3D 空間中拖曳剖切平面 (Clipping Plane)。
+- **無縫參數綁定**：拖曳動作 (`onObjectChange`) 即時回傳位移並計算內積 (Dot Product)，同步更新 Zustand 的 `sectionView.offset`，使得 3D 視圖與左側 `SectionViewPropertyManager` 參數面板完美連動。
+- **自動鎖定機制**：利用 `makeDefault` 屬性，當使用者點擊並拖曳剖面箭頭時，系統會自動暫停 `OrbitControls` 的旋轉行為，避免視角誤判，提供媲美商用 CAD 軟體的穩定操作體驗。
+
+### RCA & CAPA
+- **Issue**: 之前的剖面視圖僅能依賴左側面板的數值滑桿或輸入框來控制深度，缺乏 3D 空間的直覺回饋。
+- **CAPA**: 透過引入 `TransformControls` 並動態設定其法向矩陣，成功將 1D 數值控制升級為 3D 空間互動，徹底打通了剖面視圖的全互動操作。
+
+---
+
 ## [2026-05-30] Phase 63: Sweep & Loft UX (SW 2000 Parity) ✅
 
 ### 實裝成果
