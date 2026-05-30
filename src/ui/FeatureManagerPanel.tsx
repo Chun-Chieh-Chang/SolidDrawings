@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Fragment, useState } from 'react';
+import React, { Fragment, useState, useMemo } from 'react';
 import type { CADFeature } from '@/store/useCadStore';
 import { getFeatureTreeRelation, getParentsAndChildren, type TreeRelation, type RelationNode } from '@/utils/feature-tree-relations';
 import { useCadStore } from '@/store/useCadStore';
@@ -95,6 +95,8 @@ function SortableFeatureItem({
     ? extrudeFeats.findIndex((x: any) => x.id === feature.id) + 1
     : fIdx + 1;
 
+  const setHoveredChildren = useCadStore(s => s.setHoveredChildren);
+
   return (
     <div 
       ref={setNodeRef} 
@@ -148,74 +150,109 @@ function SortableFeatureItem({
                         ? '📦'
                         : feature.type === 'CYLINDER'
                           ? '🛢️'
-                          : '🛠️'}
+                          : feature.type === 'SPHERE'
+                            ? '🔮'
+                            : feature.type === 'FILLET'
+                              ? '🌈'
+                              : feature.type === 'CHAMFER'
+                                ? '📐'
+                                : feature.type === 'SHELL'
+                                  ? '🐚'
+                                  : feature.type === 'HOLE_WIZARD'
+                                    ? '🕳️'
+                                    : feature.type === 'MIRROR'
+                                      ? '🪞'
+                                      : feature.type === 'PATTERN'
+                                        ? '💠'
+                                        : '🛠️'}
           </span>
           <div className="flex flex-col">
-            <span className="text-[14px] leading-tight">{feature.name}</span>
-            <span className={`text-[13px] font-mono leading-none uppercase ${
-              feature.type === 'SKETCH' ? 'text-blue-500' : 'text-secondary-text'
-            }`}>
-              {feature.type === 'EXTRUDE' ? feature.parameters.operation : feature.type}
-            </span>
-            {editingFeatureId === feature.id && (
-              <span className="mt-0.5 text-[12px] text-emerald-700 font-bold uppercase">
-                編輯草圖中
-              </span>
+            <span className="text-[12px] font-bold truncate max-w-[140px] leading-tight">{feature.name}</span>
+            {isExtrudeOrRevolve && (
+              <span className="text-[9px] text-slate-400 font-mono">[{feature.parameters.plane}]</span>
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            const { children } = getParentsAndChildren(feature, features);
-            if (children.length > 0) {
-              setDeletingFeature({ target: feature, children });
-            } else {
-              removeFeature(feature.id);
-              setSelectedId(null);
-              onRebuild();
-            }
-          }}
-          onDoubleClick={(e) => e.stopPropagation()}
-          className="opacity-30 group-hover:opacity-100 p-1 hover:bg-red-50 rounded text-slate-400 hover:text-red-500 transition-all cursor-default"
-          title="刪除特徵"
-        >
-          🗑️
-        </button>
+
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {feature.type === 'SKETCH' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleSketchVisibility(feature.id);
+              }}
+              className={`w-6 h-6 flex items-center justify-center rounded-md border transition-all ${
+                visibleSketches.includes(feature.id)
+                  ? 'bg-blue-100 border-blue-300 text-blue-700 hover:bg-blue-200'
+                  : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'
+              }`}
+              title={visibleSketches.includes(feature.id) ? '隱藏草圖' : '顯示草圖'}
+            >
+              <span className="text-[10px]">{visibleSketches.includes(feature.id) ? '👁️' : '🕶️'}</span>
+            </button>
+          )}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              const { children } = getParentsAndChildren(feature, features);
+              if (children.length > 0) {
+                setDeletingFeature({ target: feature, children });
+                setHoveredChildren(children.map(c => c.id));
+              } else {
+                removeFeature(feature.id);
+                onRebuild();
+              }
+            }}
+            className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-red-500 hover:text-white transition-all text-slate-400 border border-transparent hover:border-red-600"
+            title="刪除特徵"
+          >
+            <span className="text-[12px] font-bold">×</span>
+          </button>
+        </div>
       </div>
 
       {isExtrudeOrRevolve && (
-        <div
+        <div 
           onClick={(e) => {
             e.stopPropagation();
             setSelectedId(feature.id);
             setSelectedSubNodeType('SKETCH');
           }}
-          onDoubleClick={(e) => {
-            e.stopPropagation();
-            onEditFeatureSketch(feature);
-          }}
           className={`pl-7 pr-2 py-1 flex items-center justify-between gap-1.5 cursor-pointer text-[14px] rounded transition-all cursor-default ${
             selectedId === feature.id && selectedSubNodeType === 'SKETCH'
-              ? 'bg-pink-100/90 border border-pink-300 text-pink-700 font-bold'
-              : 'text-secondary-text hover:text-primary hover:bg-slate-100/50'
+              ? 'bg-blue-100/50 text-blue-700 font-bold border-l-2 border-blue-500'
+              : 'text-slate-500 hover:bg-slate-100/50'
           }`}
         >
-          <span className="italic truncate">草圖 {sketchNum}</span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleSketchVisibility(feature.id);
-            }}
-            className={`p-0.5 rounded ${
-              visibleSketches.includes(feature.id) ? 'text-primary' : 'text-slate-300'
-            }`}
-            title={visibleSketches.includes(feature.id) ? '隱藏草圖' : '顯示草圖'}
-          >
-            👁
-          </button>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px]">📐</span>
+            <span className="text-[11px] font-medium tracking-tight">草圖 {sketchNum}</span>
+          </div>
+          {visibleSketches.includes(feature.id) ? null : <span className="text-[10px] opacity-40">🕶️</span>}
+        </div>
+      )}
+
+      {feature.type === 'SWEEP' && (
+        <div className="pl-7 space-y-0.5 mt-0.5">
+          <div className="text-[10px] text-slate-400 flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+            Profile: {features.find((f: CADFeature) => f.id === feature.parameters.profile_id)?.name || 'None'}
+          </div>
+          <div className="text-[10px] text-slate-400 flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+            Path: {features.find((f: CADFeature) => f.id === feature.parameters.path_id)?.name || 'None'}
+          </div>
+        </div>
+      )}
+
+      {feature.type === 'LOFT' && (
+        <div className="pl-7 space-y-0.5 mt-0.5">
+          {(feature.parameters.profile_ids || []).map((pid: string, idx: number) => (
+            <div key={pid} className="text-[10px] text-slate-400 flex items-center gap-1">
+              <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+              P{idx+1}: {features.find((f: CADFeature) => f.id === pid)?.name || 'None'}
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -242,61 +279,55 @@ export function FeatureManagerPanel({
   onStartPlaneSketch,
   onPlaneContextMenu,
 }: FeatureManagerPanelProps) {
-  const [hoveredTreeId, setHoveredTreeId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const hoveredTreeId = useCadStore(state => state.hoveredTreeId);
+  const setHoveredTreeId = useCadStore(state => state.setHoveredTreeId);
+  const setHoveredChildren = useCadStore(state => state.setHoveredChildren);
+  
   const [deletingFeature, setDeletingFeature] = useState<{ target: CADFeature, children: RelationNode[] } | null>(null);
   const pushToast = useCadStore(state => state.pushToast);
   const reorderFeatures = useCadStore(state => state.reorderFeatures);
 
   const rel = (targetId: string) => getFeatureTreeRelation(features, targetId, hoveredTreeId);
 
-  const planes: { id: 'FRONT' | 'TOP' | 'RIGHT'; label: string }[] = [
-    { id: 'FRONT', label: '前基準面' },
-    { id: 'TOP', label: '上基準面' },
-    { id: 'RIGHT', label: '右基準面' },
+  const planes = [
+    { id: 'FRONT', label: '前基準面 (Front)' },
+    { id: 'TOP', label: '上基準面 (Top)' },
+    { id: 'RIGHT', label: '右基準面 (Right)' },
   ];
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  const rollbackPos = rollbackIndex === null || rollbackIndex === -1 ? features.length : rollbackIndex + 1;
-  const items = [...features.map(f => f.id)];
-  items.splice(rollbackPos, 0, 'ROLLBACK_BAR');
+  const items = useMemo(() => {
+    const ids = features.map(f => f.id);
+    if (rollbackIndex === null) {
+      return [...ids, 'ROLLBACK_BAR'];
+    }
+    const result = [...ids];
+    result.splice(rollbackIndex + 1, 0, 'ROLLBACK_BAR');
+    return result;
+  }, [features, rollbackIndex]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (!over) return;
-    if (active.id === over.id) return;
-
-    const oldIndex = items.indexOf(active.id as string);
-    const newIndex = items.indexOf(over.id as string);
 
     if (active.id === 'ROLLBACK_BAR') {
-      let targetRollbackIndex = newIndex - 1;
-      if (targetRollbackIndex >= features.length - 1) {
-        targetRollbackIndex = -1; // If it's at the very end, conceptually it's null, but we'll use -1 as null equivalent here or just null
-        setRollbackIndex(null);
-      } else {
-        setRollbackIndex(targetRollbackIndex);
-      }
-      onRebuild();
-    } else {
-      const sourceFeature = features.find(f => f.id === active.id);
-      if (!sourceFeature) return;
+      const overIndex = items.indexOf(over.id as string);
+      const itemsWithoutBar = items.filter(id => id !== 'ROLLBACK_BAR');
+      const finalIndex = overIndex > items.indexOf('ROLLBACK_BAR') ? overIndex - 1 : overIndex;
+      setRollbackIndex(finalIndex === itemsWithoutBar.length - 1 ? null : finalIndex);
+      return;
+    }
 
+    if (active.id !== over.id) {
       const itemsWithoutRollback = items.filter(id => id !== 'ROLLBACK_BAR');
-      const sourceIndex = features.findIndex(f => f.id === active.id);
+      const sourceIndex = itemsWithoutRollback.indexOf(active.id as string);
       const destIndex = itemsWithoutRollback.indexOf(over.id as string);
 
-      if (sourceIndex === destIndex) return;
-
+      const sourceFeature = features[sourceIndex];
       // Topology Check
       const { parents, children } = getParentsAndChildren(sourceFeature, features);
       const parentIds = parents.map(p => p.id);
@@ -441,7 +472,10 @@ export function FeatureManagerPanel({
               <div className="flex justify-end gap-3">
                 <button
                   className="px-4 py-2 text-sm font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                  onClick={() => setDeletingFeature(null)}
+                  onClick={() => {
+                    setDeletingFeature(null);
+                    setHoveredChildren([]);
+                  }}
                 >
                   取消
                 </button>
@@ -451,6 +485,7 @@ export function FeatureManagerPanel({
                     removeFeatures([deletingFeature.target.id, ...deletingFeature.children.map(c => c.id)]);
                     setSelectedId(null);
                     setDeletingFeature(null);
+                    setHoveredChildren([]);
                     onRebuild();
                   }}
                 >

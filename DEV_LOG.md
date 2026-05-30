@@ -41,6 +41,19 @@
 
 ---
 
+## [2026-05-30] Phase 64: Advanced Deletion Dependency Warning ✅
+
+### 實裝成果
+- **遞迴相依性追蹤**：重寫 `feature-tree-relations.ts` 中的 `getParentsAndChildren` 邏輯。現在系統能透過遞迴算法，精準識別出「父項-子項-孫項」的完整鏈條（例如：Sketch -> Extrude -> Fillet -> Mirror）。
+- **特徵參照識別**：增強了對 `target_feature_ids`、`profile_id`、`path_id` 等新型參照參數的解析，確保在刪除基礎特徵時，所有衍生的掃掠 (Sweep)、疊層 (Loft) 與陣列 (Pattern) 都能被納入警告列表。
+- **安全刪除機制**：在 `FeatureManagerPanel` 整合此邏輯。當使用者點擊刪除時，若偵測到下游相依特徵，會彈出警告視圖並提供「全部刪除」選項，防止產生孤兒特徵 (Orphan Features) 導致後端 B-Rep 重建失敗。
+
+### RCA & CAPA
+- **Issue**: 原先的相依性檢查僅限於第一層級，且對新型多選特徵（如鏡射 2.0）缺乏識別，這導致刪除底層實體後，上層的陣列或鏡射特徵仍殘留在樹中，造成重建模組崩潰。
+- **CAPA**: 採用遞迴深度優先搜索 (Recursive DFS) 建立完整的相依圖譜。這項改動顯著提昇了「大型特徵樹」的操作穩定性，對標 SolidWorks 2000 的防呆標準。
+
+---
+
 ## [2026-05-30] Phase 68: Standard Mates Maturity (Distance & Angle) ✅
 
 ### 實裝成果

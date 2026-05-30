@@ -14,27 +14,48 @@ export function getParentsAndChildren(targetFeature: CADFeature, allFeatures: CA
   const targetIdx = allFeatures.findIndex((f) => f.id === targetFeature.id);
   if (targetIdx === -1) return { parents, children };
 
-  for (let i = 0; i < targetIdx; i++) {
-    const f = allFeatures[i];
-    if (targetFeature.type === 'EXTRUDE') {
-      if (
-        targetFeature.parameters.operation === 'CUT' &&
-        f.type === 'EXTRUDE' &&
-        f.parameters.operation === 'ADD'
-      ) {
-        parents.push({ id: f.id, name: f.name, type: f.type });
-      }
-    } else if (targetFeature.type === 'FILLET' || targetFeature.type === 'CHAMFER') {
-      if (['EXTRUDE', 'BOX', 'CYLINDER', 'SPHERE', 'REVOLVE'].includes(f.type)) {
-        parents.push({ id: f.id, name: f.name, type: f.type });
-      }
-    } else if (targetFeature.type === 'REVOLVE') {
-      if (f.type === 'EXTRUDE' && f.parameters.operation === 'ADD') {
-        parents.push({ id: f.id, name: f.name, type: f.type });
-      }
-    }
-  }
+  // Helper to check immediate dependency
+  const isDirectChild = (parent: CADFeature, potentialChild: CADFeature): boolean => {
+    const params = potentialChild.parameters || {};
+    
+    // 1. Explicit reference by ID (Mirror, Pattern, Sweep, Loft)
+    if (params.target_feature_id === parent.id) return true;
+    if (params.target_feature_ids?.includes(parent.id)) return true;
+    if (params.profile_id === parent.id || params.path_id === parent.id) return true;
+    if (params.profile_ids?.includes(parent.id)) return true;
 
+    // 2. Topology-based reference (Fillet, Chamfer, Shell, Hole)
+    // If a feature uses edges/faces from a parent body
+    if (['FILLET', 'CHAMFER', 'SHELL', 'HOLE_WIZARD', 'DRAFT'].includes(potentialChild.type)) {
+      // For now, we assume these depend on the solid body state produced by features before them.
+      // A more robust TNS 3.0 check would look at specific topology IDs.
+      // SolidWorks logic: If parent is a solid producer and child is a dress-up feature, it's likely a child.
+      const parentIdx = allFeatures.findIndex(f => f.id === parent.id);
+      const childIdx = allFeatures.findIndex(f => f.id === potentialChild.id);
+      return parentIdx < childIdx && ['EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'MIRROR', 'PATTERN'].includes(parent.type);
+    }
+
+    return false;
+  };
+
+  // Recursive search for all descendants
+  const findDescendants = (parentId: string) => {
+    const parent = allFeatures.find(f => f.id === parentId);
+    if (!parent) return;
+
+    allFeatures.forEach(potentialChild => {
+      if (isDirectChild(parent, potentialChild)) {
+        if (!children.some(c => c.id === potentialChild.id)) {
+          children.push({ id: potentialChild.id, name: potentialChild.name, type: potentialChild.type });
+          findDescendants(potentialChild.id);
+        }
+      }
+    });
+  };
+
+  findDescendants(targetFeature.id);
+
+  // Parents (simplified for now: immediate sketch dependency)
   if (targetFeature.type === 'EXTRUDE' || targetFeature.type === 'REVOLVE') {
     const sketchNum = targetFeature.name.match(/\d+/)?.[0] || '1';
     parents.unshift({
@@ -42,23 +63,6 @@ export function getParentsAndChildren(targetFeature: CADFeature, allFeatures: CA
       name: `草圖 ${sketchNum}`,
       type: 'SKETCH',
     });
-  }
-
-  for (let i = targetIdx + 1; i < allFeatures.length; i++) {
-    const f = allFeatures[i];
-    if (targetFeature.type === 'EXTRUDE' && targetFeature.parameters.operation === 'ADD') {
-      if (['EXTRUDE', 'FILLET', 'CHAMFER', 'REVOLVE'].includes(f.type)) {
-        children.push({ id: f.id, name: f.name, type: f.type });
-      }
-    } else if (targetFeature.type === 'EXTRUDE' && targetFeature.parameters.operation === 'CUT') {
-      if (f.type === 'FILLET' || f.type === 'CHAMFER') {
-        children.push({ id: f.id, name: f.name, type: f.type });
-      }
-    } else if (targetFeature.type === 'BOX' || targetFeature.type === 'CYLINDER' || targetFeature.type === 'SPHERE' || targetFeature.type === 'REVOLVE') {
-      if (f.type === 'FILLET' || f.type === 'CHAMFER' || (f.type === 'EXTRUDE' && f.parameters.operation === 'CUT')) {
-        children.push({ id: f.id, name: f.name, type: f.type });
-      }
-    }
   }
 
   return { parents, children };

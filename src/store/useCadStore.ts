@@ -188,6 +188,11 @@ interface CadState {
   reorderFeatures: (startIndex: number, endIndex: number) => void;
   checkDependencies: () => void;
   
+  hoveredTreeId: string | null;
+  setHoveredTreeId: (id: string | null) => void;
+  hoveredChildren: string[];
+  setHoveredChildren: (ids: string[]) => void;
+
   // Undo/Redo System
   history: {
     past: any[];
@@ -460,6 +465,11 @@ export const useCadStore = create<CadState>()(
            return { ...f, isBroken: false };
         })};
       }),
+
+      hoveredTreeId: null,
+      setHoveredTreeId: (id) => set({ hoveredTreeId: id }),
+      hoveredChildren: [],
+      setHoveredChildren: (ids) => set({ hoveredChildren: ids }),
 
       history: { past: [], future: [] },
       saveSnapshot: () => set((state) => {

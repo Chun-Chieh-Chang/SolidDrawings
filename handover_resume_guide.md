@@ -48,16 +48,27 @@ src/
 | 56 | Sketch Validation UX & Toast System | ✅ |
 | 57 | Advanced 3D Mirror Feature | ✅ |
 | 58-60 | Patterning, Guidance, TNS 3.0 | ✅ |
-| 61 | STEP Import UI Workflow | ✅ |
 | 62 | Convert & Offset Entities | ✅ |
 | 63 | Sweep & Loft UX | ✅ |
 | 65 | Interactive Section View 3D | ✅ |
 | 67 | Auto-Constraint Application | ✅ |
-| **68** | **Standard Mates Maturity (Distance & Angle)** | ✅ **最新** |
+| 68 | Standard Mates Maturity | ✅ |
+| **64** | **Advanced Deletion Warning** | ✅ **最新** |
 
 ---
 
-## 🔑 Phase 68 實作細節 (最新完成)
+## 🔑 Phase 64 實作細節 (最新完成)
+
+### 新增：Advanced Deletion Warning (進階刪除相依性警告)
+**功能描述**：對標 SolidWorks 的防呆機制，防止因刪除父特徵導致系統崩潰。
+- **遞迴相依圖譜**：實作了深度優先搜索 (DFS) 算法，能自動追蹤無限層級的特徵相依鏈（例如：Sketch → Extrude → Fillet → Mirror → Pattern）。
+- **全參數識別**：支援對 `target_feature_ids`、`profile_id` 等現代化參數的掃描，精準鎖定刪除後的「受災範圍」。
+- **安全防禦**：彈出 SolidWorks 風格的確認視窗，列出所有受影響的子特徵名稱，並提供一鍵「連帶刪除」功能。
+
+---
+
+## 🔑 Phase 68 實作細節
+ (最新完成)
 
 ### 新增：Standard Mates Maturity (進階組合件配合)
 **功能描述**：擴展組合件配合能力，支援非零距離與角度定位，對標 SolidWorks 2000 標準。
