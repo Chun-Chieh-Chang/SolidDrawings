@@ -346,7 +346,7 @@ export const SketchPreview = () => {
 
   const geometricConstraints = useMemo(() => {
     return Object.values(sketchConstraints).filter(
-      c => ['HORIZONTAL', 'VERTICAL', 'COINCIDENT', 'EQUAL'].includes(c.type)
+      c => ['HORIZONTAL', 'VERTICAL', 'COINCIDENT', 'EQUAL', 'PARALLEL', 'PERPENDICULAR', 'CONCENTRIC'].includes(c.type)
     );
   }, [sketchConstraints]);
   const angleConstraints = useMemo(() => {
@@ -396,6 +396,21 @@ export const SketchPreview = () => {
           for (let k = 0; k <= 36; k++) {
             const theta = (k / 36) * Math.PI * 2;
             entityPoints.push(get3DPointForPlane(n1.x + R * Math.cos(theta), n1.y + R * Math.sin(theta), activePlane, activeBasis));
+          }
+        } else if (edge.type === 'SPLINE') {
+          // Splines can have >2 nodes
+          for (let k = 0; k < edge.nodeIds.length; k++) {
+            const nd = sketchNodes[edge.nodeIds[k]];
+            if (nd) {
+              entityPoints.push(get3DPointForPlane(nd.x, nd.y, activePlane, activeBasis));
+            }
+          }
+          // Note: In a real renderer, we should use a SplineCurve or CatmullRomCurve3 to interpolate visually
+          // For now, drawing lines between nodes will act as the control polygon / rough spline
+          if (entityPoints.length >= 2) {
+             const curve = new THREE.CatmullRomCurve3(entityPoints.map(p => new THREE.Vector3(...p)));
+             const points = curve.getPoints(50);
+             entityPoints = points.map(p => [p.x, p.y, p.z]);
           }
         }
 
@@ -662,7 +677,7 @@ export const SketchPreview = () => {
         let pos: [number, number, number] | null = null;
         let icon = "";
 
-        if (constraint.type === 'HORIZONTAL' || constraint.type === 'VERTICAL') {
+        if (constraint.type === 'HORIZONTAL' || constraint.type === 'VERTICAL' || constraint.type === 'PARALLEL' || constraint.type === 'PERPENDICULAR' || constraint.type === 'CONCENTRIC') {
           if (!constraint.edgeIds || constraint.edgeIds.length === 0) return null;
           const edge = sketchEdges[constraint.edgeIds[0]];
           if (!edge || edge.nodeIds.length < 2) return null;
@@ -670,7 +685,13 @@ export const SketchPreview = () => {
           const n2 = sketchNodes[edge.nodeIds[1]];
           if (!n1 || !n2) return null;
           pos = get3DPointForPlane((n1.x + n2.x) / 2, (n1.y + n2.y) / 2, activePlane, activeBasis);
-          icon = constraint.type === 'HORIZONTAL' ? "—" : "│";
+          
+          if (constraint.type === 'HORIZONTAL') icon = "—";
+          else if (constraint.type === 'VERTICAL') icon = "│";
+          else if (constraint.type === 'PARALLEL') icon = "∥";
+          else if (constraint.type === 'PERPENDICULAR') icon = "⊥";
+          else if (constraint.type === 'CONCENTRIC') icon = "◎";
+
         } else if (constraint.type === 'COINCIDENT') {
           if (!constraint.nodeIds || constraint.nodeIds.length === 0) return null;
           const n = sketchNodes[constraint.nodeIds[0]];

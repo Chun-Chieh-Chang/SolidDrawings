@@ -111,6 +111,37 @@ def solve_sketch_constraints(nodes_dict, edges_dict, constraints_dict):
                         # Distance between centers should be R1 + R2 or |R1 - R2|
                         res = min(abs(dist_centers - (R1 + R2)), abs(dist_centers - abs(R1 - R2)))
                         residuals.append(res * 5.0)
+            elif ctype == 'CONCENTRIC' and len(c_edge_ids) == 2:
+                e1 = edges_dict.get(c_edge_ids[0]); e2 = edges_dict.get(c_edge_ids[1])
+                if e1 and e2 and e1.get('type') in ['CIRCLE', 'ARC'] and e2.get('type') in ['CIRCLE', 'ARC']:
+                    c1x, c1y = get_node_coords(e1['nodeIds'][0], x_vars)
+                    c2x, c2y = get_node_coords(e2['nodeIds'][0], x_vars)
+                    residuals.extend([(c1x - c2x) * 5.0, (c1y - c2y) * 5.0])
+            elif ctype == 'PARALLEL' and len(c_edge_ids) == 2:
+                e1 = edges_dict.get(c_edge_ids[0]); e2 = edges_dict.get(c_edge_ids[1])
+                if e1 and e2 and e1.get('type') == 'LINE' and e2.get('type') == 'LINE':
+                    p1ax, p1ay = get_node_coords(e1['nodeIds'][0], x_vars); p1bx, p1by = get_node_coords(e1['nodeIds'][1], x_vars)
+                    p2ax, p2ay = get_node_coords(e2['nodeIds'][0], x_vars); p2bx, p2by = get_node_coords(e2['nodeIds'][1], x_vars)
+                    dx1, dy1 = p1bx - p1ax, p1by - p1ay
+                    dx2, dy2 = p2bx - p2ax, p2by - p2ay
+                    # Cross product should be 0
+                    cross_prod = dx1 * dy2 - dy1 * dx2
+                    # Normalize residual by lengths
+                    len1 = math.sqrt(dx1**2 + dy1**2 + 1e-9)
+                    len2 = math.sqrt(dx2**2 + dy2**2 + 1e-9)
+                    residuals.append((cross_prod / (len1 * len2)) * 10.0)
+            elif ctype == 'PERPENDICULAR' and len(c_edge_ids) == 2:
+                e1 = edges_dict.get(c_edge_ids[0]); e2 = edges_dict.get(c_edge_ids[1])
+                if e1 and e2 and e1.get('type') == 'LINE' and e2.get('type') == 'LINE':
+                    p1ax, p1ay = get_node_coords(e1['nodeIds'][0], x_vars); p1bx, p1by = get_node_coords(e1['nodeIds'][1], x_vars)
+                    p2ax, p2ay = get_node_coords(e2['nodeIds'][0], x_vars); p2bx, p2by = get_node_coords(e2['nodeIds'][1], x_vars)
+                    dx1, dy1 = p1bx - p1ax, p1by - p1ay
+                    dx2, dy2 = p2bx - p2ax, p2by - p2ay
+                    # Dot product should be 0
+                    dot_prod = dx1 * dx2 + dy1 * dy2
+                    len1 = math.sqrt(dx1**2 + dy1**2 + 1e-9)
+                    len2 = math.sqrt(dx2**2 + dy2**2 + 1e-9)
+                    residuals.append((dot_prod / (len1 * len2)) * 10.0)
 
         # Estimated DOF = Total Variables - Rank of Jacobian (effectively)
         # For simplicity in this mock-oriented NR, we count constraints
@@ -128,7 +159,7 @@ def solve_sketch_constraints(nodes_dict, edges_dict, constraints_dict):
     res = least_squares(solve_residual, x0, method='lm', ftol=1e-7, xtol=1e-7)
     
     _, constraint_count = residual_func(res.x)
-    estimated_dof = max(0, num_vars - constraint_count)
+    estimated_dof = num_vars - constraint_count
 
     solved_nodes = json.loads(json.dumps(nodes_dict))
     for i, nid in enumerate(variable_nodes):

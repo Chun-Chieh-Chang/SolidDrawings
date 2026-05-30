@@ -112,7 +112,19 @@ export const HeadsUpToolbar: React.FC = () => {
         <StyleIcon wireframe={viewportDisplayMode === 'WIREFRAME'} />
       </button>
 
-      <button className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all opacity-40 cursor-not-allowed border-none bg-transparent" title="Section View (Under Dev)">
+      <button
+        onClick={() => {
+          const newState = !useCadStore.getState().sectionView.isActive;
+          useCadStore.getState().setSectionView({ isActive: newState });
+          useCadStore.getState().setActivePropertyManager(newState ? 'SECTION_VIEW' : null);
+        }}
+        className={`w-9 h-9 flex items-center justify-center rounded-md transition-all border-none cursor-pointer ${
+          useCadStore.getState().sectionView.isActive
+            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700'
+            : 'bg-transparent hover:bg-slate-200/50 text-slate-700'
+        }`}
+        title="Section View"
+      >
         <SectionIcon />
       </button>
 

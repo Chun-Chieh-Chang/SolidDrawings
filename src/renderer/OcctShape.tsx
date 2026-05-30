@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
@@ -11,7 +11,13 @@ export interface FaceMetadata {
   v_count: number;
   curvature?: string;
   index_range: [number, number];
+  surface_type?: string;
+  axis_origin?: [number, number, number];
+  axis_direction?: [number, number, number];
+  radius?: number;
 }
+
+const geometryCache = new WeakMap<MeshData, THREE.BufferGeometry>();
 
 export interface MeshData {
   vertices: number[];
@@ -25,15 +31,20 @@ interface OcctShapeProps {
   color?: string;
   position?: [number, number, number];
   rotation?: [number, number, number];
+  componentId?: string;
 }
 
 export default function OcctShape({ 
   data, 
   color = '#60A5FA',
   position = [0, 0, 0],
-  rotation = [0, 0, 0]
+  rotation = [0, 0, 0],
+  componentId
 }: OcctShapeProps) {
   const {
+    mode: cadMode,
+    mateSelection,
+    addMateSelection,
     isSketchMode,
     activePropertyManager,
     pendingFeatureCommand,
@@ -41,56 +52,90 @@ export default function OcctShape({
     setSelectedId,
     setSelectedSubNodeType,
     viewportDisplayMode,
+    sectionView,
   } = useCadStore();
 
-  const geometry = useMemo(() => {
-    const geo = new THREE.BufferGeometry();
+  const clippingPlanes = useMemo(() => {
+    if (!sectionView.isActive) return [];
     
-    // Convert arrays to Float32Array/Uint32Array for Three.js
-    const positions = new Float32Array(data.vertices);
-    const normals = new Float32Array(data.normals);
-    const indices = new Uint32Array(data.indices);
-
-    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    const plane = sectionView.plane;
+    let normal = new THREE.Vector3();
+    let origNormal = new THREE.Vector3();
     
-    if (normals.length > 0) {
-      geo.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
-    } else {
-      geo.computeVertexNormals();
+    if (plane === 'FRONT') {
+      normal.set(0, 0, 1);
+      origNormal.set(0, 0, 1);
+    } else if (plane === 'TOP') {
+      normal.set(0, 1, 0);
+      origNormal.set(0, 1, 0);
+    } else if (plane === 'RIGHT') {
+      normal.set(1, 0, 0);
+      origNormal.set(1, 0, 0);
     }
+    
+    const d = sectionView.flip ? -sectionView.offset : sectionView.offset;
+    if (sectionView.flip) normal.negate();
+    
+    const p = new THREE.Plane(normal, -d);
+    return [p];
+  }, [sectionView]);
 
-    geo.setIndex(new THREE.BufferAttribute(indices, 1));
-    return geo;
+  const geometry = useMemo(() => {
+    if (geometryCache.has(data)) {
+      return geometryCache.get(data)!;
+    }
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute('position', new THREE.Float32BufferAttribute(data.vertices, 3));
+    if (data.normals && data.normals.length > 0) {
+      geom.setAttribute('normal', new THREE.Float32BufferAttribute(data.normals, 3));
+    }
+    geom.setIndex(data.indices);
+    geometryCache.set(data, geom);
+    return geom;
   }, [data]);
 
-  // P4-3 Performance Audit: Proper resource disposal to prevent memory leaks
+  // We no longer dispose geometry on unmount because it may be shared via geometryCache.
+  // Instead we let the browser GC it when data (the key in WeakMap) goes out of scope.
   React.useEffect(() => {
     return () => {
-      if (geometry) {
-        console.log('[OcctShape] Disposing geometry for performance stabilization');
-        geometry.dispose();
-      }
+      // Intentionally empty: Geometry is cached.
     };
-  }, [geometry]);
+  }, []);
 
   const handleMeshClick = (e: any) => {
-    // Only process Left Click
-    if (e.button !== 0) return;
-    
     e.stopPropagation();
     
     if (topologySelector) {
       const ndcX = e.pointer ? e.pointer.x : 0;
       const ndcY = e.pointer ? e.pointer.y : 0;
-      const filterType = pendingFeatureCommand
-        ? 'EDGE_ONLY'
-        : (activePropertyManager?.selectionFilter || 'ALL');
+      let filterType = 'ALL';
+      if (pendingFeatureCommand === 'FILLET' || pendingFeatureCommand === 'CHAMFER' || pendingFeatureCommand === 'PATTERN') {
+        filterType = 'EDGE_ONLY';
+      } else if (pendingFeatureCommand === 'DRAFT' || pendingFeatureCommand === 'MIRROR' || pendingFeatureCommand === 'THICKEN' || pendingFeatureCommand === 'SHELL' || pendingFeatureCommand === 'HOLE_WIZARD') {
+        filterType = 'FACE_ONLY';
+      } else if (activePropertyManager?.selectionFilter) {
+        filterType = activePropertyManager.selectionFilter;
+      }
+      
       const preserve = isSketchMode || activePropertyManager !== null;
       
-      const selected = topologySelector.selectAtPosition(ndcX, ndcY, preserve, filterType);
+      const selected = topologySelector.selectAtPosition(ndcX, ndcY, preserve, filterType as any);
       console.log('[OcctShape Topology] Clicked mesh at NDC:', ndcX, ndcY, 'Selected:', selected);
       
-      if (selected && activePropertyManager) {
+      if (selected && cadMode === 'ASSEMBLY' && !isSketchMode) {
+        // Assembly Mate Selection
+        selected.componentId = componentId;
+        
+        // Only allow up to 2 items
+        const currentState = useCadStore.getState().mateSelection;
+        if (currentState.length < 2) {
+            // check if not already selected
+            const alreadyExists = currentState.some((sel: any) => sel.id === selected.id && sel.componentId === componentId);
+            if (!alreadyExists) {
+                addMateSelection(selected);
+            }
+        }
+      } else if (selected && activePropertyManager) {
         const mgr = useCadStore.getState().activePropertyManager;
         if (mgr) {
           const alreadyExists = mgr.refs.some((r: any) => r.id === selected.id);
@@ -101,6 +146,53 @@ export default function OcctShape({
                 refs: [...mgr.refs, selected]
               }
             });
+          }
+        }
+      } else if (selected && pendingFeatureCommand) {
+        // Direct addition of selected topology (edges/faces) to the pending feature's parameters
+        const state = useCadStore.getState();
+        const featId = state.selectedId;
+        if (featId) {
+          const featIndex = state.features.findIndex(f => f.id === featId);
+          if (featIndex !== -1 && state.features[featIndex].type === pendingFeatureCommand) {
+            const params = state.features[featIndex].parameters;
+            
+            if (pendingFeatureCommand === 'DRAFT') {
+              const neutralRefs = params.neutral_plane_refs || [];
+              const faceRefs = params.faces_to_draft_refs || [];
+              if (neutralRefs.length === 0) {
+                state.updateFeatureParams(featId, { neutral_plane_refs: [selected] });
+              } else {
+                if (!faceRefs.some((r: any) => r.id === selected.id) && neutralRefs[0].id !== selected.id) {
+                  state.updateFeatureParams(featId, { faces_to_draft_refs: [...faceRefs, selected] });
+                }
+              }
+            } else if (pendingFeatureCommand === 'MIRROR') {
+              const currentRefs = params.mirror_plane_refs || [];
+              if (currentRefs.length === 0) {
+                state.updateFeatureParams(featId, { mirror_plane_refs: [selected] });
+              }
+            } else if (pendingFeatureCommand === 'PATTERN') {
+              const currentRefs = params.direction_refs || [];
+              if (currentRefs.length === 0) {
+                state.updateFeatureParams(featId, { direction_refs: [selected] });
+              }
+            } else if (pendingFeatureCommand === 'SHELL') {
+              const currentRefs = params.faces_to_remove_refs || [];
+              const alreadyExists = currentRefs.some((r: any) => r.id === selected.id);
+              if (!alreadyExists) {
+                state.updateFeatureParams(featId, { faces_to_remove_refs: [...currentRefs, selected] });
+              }
+            } else if (pendingFeatureCommand === 'HOLE_WIZARD') {
+              // Only keep the latest one
+              state.updateFeatureParams(featId, { hole_placement_refs: [selected] });
+            } else {
+              const currentRefs = params.refs || [];
+              const alreadyExists = currentRefs.some((r: any) => r.id === selected.id);
+              if (!alreadyExists) {
+                state.updateFeatureParams(featId, { refs: [...currentRefs, selected] });
+              }
+            }
           }
         }
       } else if (!activePropertyManager && !isSketchMode) {
@@ -133,7 +225,7 @@ export default function OcctShape({
       geometry={geometry} 
       position={position} 
       rotation={rotation} 
-      userData={{ type: 'B_REP_SHAPE', face_metadata: data.face_metadata }}
+      userData={{ type: 'B_REP_SHAPE', face_metadata: data.face_metadata, componentId }}
       onClick={handleMeshClick}
     >
       <meshStandardMaterial
@@ -143,13 +235,14 @@ export default function OcctShape({
         flatShading={false}
         side={THREE.DoubleSide}
         wireframe={viewportDisplayMode === 'WIREFRAME'}
-        transparent={viewportDisplayMode === 'WIREFRAME'}
-        opacity={viewportDisplayMode === 'WIREFRAME' ? 0.85 : 1}
+        transparent={viewportDisplayMode === 'WIREFRAME' || color === 'red'}
+        opacity={viewportDisplayMode === 'WIREFRAME' ? 0.85 : (color === 'red' ? 0.6 : 1)}
+        clippingPlanes={clippingPlanes}
       />
       {viewportDisplayMode !== 'SHADED' && (
         <lineSegments>
           <edgesGeometry args={[geometry]} />
-          <lineBasicMaterial color="#1E293B" linewidth={1} />
+          <lineBasicMaterial color="#1E293B" linewidth={1} clippingPlanes={clippingPlanes} />
         </lineSegments>
       )}
     </mesh>

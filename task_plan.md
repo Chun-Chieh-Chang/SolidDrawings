@@ -1,30 +1,32 @@
-# Task Plan - Phase 20：M1 Alpha-usable 零件（對標 Usable Parity）
+# Task Plan - Phase 29：裝配體模式與配合 (Assembly & Mates)
 
-> **Plan of Record**：[SOLIDWORKS_USABLE_PARITY_ROADMAP.md](docs/productization/SOLIDWORKS_USABLE_PARITY_ROADMAP.md) · [SOLIDWORKS_GAP_AUDIT.md](docs/productization/SOLIDWORKS_GAP_AUDIT.md)
+> **Plan of Record**：[implementation_plan.md](implementation_plan.md)
 
 ## [P] Plan
-- 目標里程碑：**M1**（工程師可在本產品內完成 6/8 標準測試件，CI Golden 必跑 OCC）。
-- 對標基準：**SolidWorks 2015** 零件模式核心（非 2024+）。
-- Phase 19 已閉環：GAP 查核、`viewportDisplayMode`、`PartFeaturePropertyManager` 拆分。
+- 目標里程碑：**Phase 3 (Public Beta)** — 組立件配合 (Mates)
+- 核心架構：後端 Python 求解器 + Component Registry 快取策略
+- 已核准：2026-05-30 使用者明確批准
 
-## [D] Do — 下一輪 5 項工程優先級（非 Demo 打磨）
+## Phase 29 裝配體模式與配合求解 (Assembly Mode & Mates)
 
-| 優先 | 工作項 | 對應驗收 | 說明 |
-|------|--------|----------|------|
-| **P1** | Golden + pythonocc 進 CI 必跑 | M0-T*, M1-T1 | `run_golden.py` 在無 OCC 時 fail 或標記；禁止 mock 冒充 B-Rep 發佈 |
-| **P2** | 封閉輪廓 + Extrude 可讀錯誤 | M1-T2, M1-T5 | 擠出前檢查；Fillet 半徑過大等後端訊息進 UI toast |
-| **P3** | Fillet/Chamfer 拓撲 + `geometric-signature` | M1-T4, M1-T3 | 重建後邊解析；打通選邊 → 特徵參數鏈 |
-| **P4** | Extrude/Fillet PropertyManager 嚮導式 Rollout | M1-T1 | 取代 raw parameters key 列表 |
-| **P5** | 刪除父特徵 SW 式確認 + 連帶刪除 | M1-T6 | FeatureManager 刪除流 |
-
-**刻意延後（M2/M3）**：STEP 匯入 UI、`.3dbasm`、工程圖標題欄、ShortcutBox 全補（P2  backlog）。
+- [x] **Step 1: 後端裝配體求解服務**
+  - [x] 建立 `backend/app/services/component_registry.py` 以快取 B-Rep
+  - [x] 擴充 `backend/app/routers/geometry.py` 新增 `/api/geometry/register_component` 路由
+- [x] **Step 2: 前端 HeavyEngineClient 擴充**
+  - [x] 在 `HeavyEngineClient.ts` 新增 `registerComponent()` 方法
+  - [x] 完善 `AssemblyService.ts` 新增 `registerComponent()`
+- [x] **Step 3: 狀態管理 (Zustand) 擴充**
+  - [x] 新增 `activeComponentId` 與 `components` 陣列至 `useCadStore.ts`
+- [x] **Step 4: UI/UX 裝配體介面**
+  - [x] 在 Ribbon 新增「ASSEMBLY」分頁與「Insert Comp」按鈕
+  - [x] 左側面板根據 `activeTab` 顯示 Component 樹與 `MatePanel`
 
 ## [C] Check
-- [ ] `python tests/regression/run_golden.py`（需 OCC 全綠）
-- [ ] `npx tsc --noEmit`
-- [ ] 手動：M1-T1 L-Bracket 從零到存檔（檢查清單見 ROADMAP §4 M1）
-- [ ] `npm run pdca:check`（若變更 plan 文件）
+- [x] `npx tsc --noEmit` 無錯誤
+- [x] UI 面板切換與 Component 狀態讀寫正常 (開發日誌紀錄)無迴歸
+- [ ] 後端 pytest 基本 Coincident 約束收斂測試
+- [ ] 手動：掛載兩個組件，套用面對面配合，確認幾何吸附
 
 ## [A] Act
-- 完成 P1–P3 後更新 GAP_AUDIT §2–4 狀態表與 ROADMAP M1 勾選。
-- 未通過 Golden → DEV_LOG RCA/CAPA，不得宣稱 Alpha-usable。
+- 完成後更新 `DEV_LOG.md` 與 `handover_resume_guide.md`。
+- 未通過 Check → DEV_LOG RCA/CAPA，不得宣稱 Assembly 可用。

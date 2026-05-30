@@ -69,7 +69,7 @@ export async function preciseSolve(
   return {
     nodes: solved,
     report: {
-      dof: analysis.hasConflict ? -1 : 0,
+      dof: analysis.dof,
       residual,
       status: 'LOCAL_FALLBACK',
     },

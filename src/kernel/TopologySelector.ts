@@ -11,6 +11,10 @@ export interface FaceSignature {
   area: number;
   curvature?: string;
   v_count: number;
+  surface_type?: string;
+  axis_origin?: [number, number, number];
+  axis_direction?: [number, number, number];
+  radius?: number;
 }
 
 export interface SelectedTopology {
@@ -23,6 +27,7 @@ export interface SelectedTopology {
     start: [number, number, number];
     end: [number, number, number];
   };
+  componentId?: string;
 }
 
 export class TopologySelector {
@@ -115,6 +120,7 @@ export class TopologySelector {
             type: 'VERTEX',
             id: `${mesh.uuid}_v_${idxA}`,
             coordinates: [vA.x, vA.y, vA.z],
+            componentId: mesh.userData.componentId,
           };
           useCadStore.getState().setSelectedTopology(topology);
           return topology;
@@ -124,6 +130,7 @@ export class TopologySelector {
             type: 'VERTEX',
             id: `${mesh.uuid}_v_${idxB}`,
             coordinates: [vB.x, vB.y, vB.z],
+            componentId: mesh.userData.componentId,
           };
           useCadStore.getState().setSelectedTopology(topology);
           return topology;
@@ -133,6 +140,7 @@ export class TopologySelector {
             type: 'VERTEX',
             id: `${mesh.uuid}_v_${idxC}`,
             coordinates: [vC.x, vC.y, vC.z],
+            componentId: mesh.userData.componentId,
           };
           useCadStore.getState().setSelectedTopology(topology);
           return topology;
@@ -181,7 +189,8 @@ export class TopologySelector {
               },
               signature: {
                 length: selectedEdge[0].distanceTo(selectedEdge[1])
-              }
+              },
+              componentId: mesh.userData.componentId,
             };
           useCadStore.getState().setSelectedTopology(topology);
           return topology;
@@ -197,6 +206,9 @@ export class TopologySelector {
       if (filterType === 'ALL' || filterType === 'FACE_ONLY' || filterType === 'FACE_EDGE') {
         const metadata = mesh.userData.face_metadata as any[];
         let signature: FaceSignature | undefined;
+        let isCylinder = false;
+        let finalCoordinates = [hitPoint.x, hitPoint.y, hitPoint.z] as [number, number, number];
+        let finalNormal = hit.face.normal ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z] as [number, number, number] : undefined;
         
         if (metadata && hit.faceIndex !== undefined) {
             // Map Three.js faceIndex to OCC face using index_range
@@ -207,7 +219,36 @@ export class TopologySelector {
             
             const faceMatch = metadata.find(m => vertIdx >= m.index_range[0] && vertIdx < m.index_range[1]);
             if (faceMatch) {
-                signature = { area: faceMatch.area, v_count: faceMatch.v_count, curvature: faceMatch.curvature };
+                signature = { 
+                    area: faceMatch.area, 
+                    v_count: faceMatch.v_count, 
+                    curvature: faceMatch.curvature,
+                    surface_type: faceMatch.surface_type,
+                    axis_origin: faceMatch.axis_origin,
+                    axis_direction: faceMatch.axis_direction,
+                    radius: faceMatch.radius
+                };
+
+                if (faceMatch.surface_type === 'CYLINDER' && faceMatch.axis_origin && faceMatch.axis_direction) {
+                    isCylinder = true;
+                    // Transform the local axis from face_metadata to world space using mesh matrix
+                    const localOrigin = new THREE.Vector3().fromArray(faceMatch.axis_origin);
+                    const localDir = new THREE.Vector3().fromArray(faceMatch.axis_direction);
+                    
+                    const worldOrigin = localOrigin.applyMatrix4(mesh.matrixWorld);
+                    
+                    // Transform direction vector (ignore translation)
+                    const rotMatrix = new THREE.Matrix4().extractRotation(mesh.matrixWorld);
+                    const worldDir = localDir.applyMatrix4(rotMatrix).normalize();
+
+                    // Project the hitPoint onto the world axis to get the precise coordinate on the axis
+                    const originToHit = new THREE.Vector3().subVectors(hitPoint, worldOrigin);
+                    const projectionLength = originToHit.dot(worldDir);
+                    const projectedPoint = new THREE.Vector3().copy(worldOrigin).addScaledVector(worldDir, projectionLength);
+
+                    finalCoordinates = [projectedPoint.x, projectedPoint.y, projectedPoint.z];
+                    finalNormal = [worldDir.x, worldDir.y, worldDir.z];
+                }
             }
         }
 
@@ -215,10 +256,9 @@ export class TopologySelector {
           type: 'FACE',
           id: `${mesh.uuid}_f_${hit.faceIndex}`,
           signature,
-          coordinates: [hitPoint.x, hitPoint.y, hitPoint.z],
-          normal: hit.face.normal
-            ? [hit.face.normal.x, hit.face.normal.y, hit.face.normal.z]
-            : undefined,
+          coordinates: finalCoordinates,
+          normal: finalNormal,
+          componentId: mesh.userData.componentId,
         };
 
         useCadStore.getState().setSelectedTopology(topology);

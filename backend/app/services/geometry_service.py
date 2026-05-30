@@ -37,11 +37,16 @@ def _shape_to_mesh(shape, deflection=0.01):
     vertices = []
     indices = []
     normals = []
+    face_metadata = []
+    
     
     from OCC.Core.TopAbs import TopAbs_REVERSED
     from OCC.Core.TopoDS import topods
     from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
     from OCC.Core.BRepLProp import BRepLProp_SLProps
+    from OCC.Core.GProp import GProp_GProps
+    from OCC.Core.BRepGProp import brepgprop
+    from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane
     
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while explorer.More():
@@ -92,13 +97,48 @@ def _shape_to_mesh(shape, deflection=0.01):
                 # OCCT indices are 1-based
                 indices.extend([idx1 - 1 + node_offset, idx2 - 1 + node_offset, idx3 - 1 + node_offset])
 
+            # Compute basic face properties
+            props = GProp_GProps()
+            brepgprop.SurfaceProperties(face, props)
+            face_area = props.Mass()
+            v_count = triangulation.NbNodes()
+            curvature = "unknown"
+            
+            surface_type = "UNKNOWN"
+            axis_origin = None
+            axis_direction = None
+            radius = None
+            
+            try:
+                adaptor = BRepAdaptor_Surface(face)
+                geom_type = adaptor.GetType()
+                if geom_type == GeomAbs_Cylinder:
+                    surface_type = "CYLINDER"
+                    curvature = "cylindrical"
+                    cyl = adaptor.Cylinder()
+                    ax3 = cyl.Position()
+                    loc = ax3.Location()
+                    dir_vec = ax3.Direction()
+                    axis_origin = [loc.X(), loc.Y(), loc.Z()]
+                    axis_direction = [dir_vec.X(), dir_vec.Y(), dir_vec.Z()]
+                    radius = cyl.Radius()
+                elif geom_type == GeomAbs_Plane:
+                    surface_type = "PLANE"
+                    curvature = "planar"
+            except Exception as e:
+                print(f"[WARNING] Surface type extraction failed: {e}")
+
             # Record face metadata for selection resolution
             face_metadata.append({
                 "id": str(face.HashCode(1000000)), # Transient Hash
                 "area": face_area,
                 "curvature": curvature,
                 "v_count": v_count,
-                "index_range": [node_offset, len(vertices) // 3]
+                "index_range": [node_offset, len(vertices) // 3],
+                "surface_type": surface_type,
+                "axis_origin": axis_origin,
+                "axis_direction": axis_direction,
+                "radius": radius
             })
                 
         explorer.Next()
@@ -161,22 +201,99 @@ def find_matching_edge(shape, target_start, target_end, signature=None):
         return best_edge
     return None
 
+def get_tangent_edges(shape, start_edge, angular_tolerance=0.01):
+    from OCC.Core.TopExp import topexp, TopExp_Explorer
+    from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
+    from OCC.Core.TopAbs import TopAbs_VERTEX, TopAbs_EDGE
+    from OCC.Core.BRep import BRep_Tool
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+    from OCC.Core.TopoDS import topods
+    from OCC.Core.gp import gp_Pnt, gp_Vec
+    import math
 
-def _build_wire_from_points(points):
+    tangent_edges = [start_edge]
+    visited_hashes = set([start_edge.HashCode(2**31 - 1)])
+    
+    # Map vertices to edges
+    v_e_map = TopTools_IndexedDataMapOfShapeListOfShape()
+    topexp.MapShapesAndAncestors(shape, TopAbs_VERTEX, TopAbs_EDGE, v_e_map)
+    
+    queue = [start_edge]
+    while queue:
+        current_edge = queue.pop(0)
+        c_curve = BRepAdaptor_Curve(current_edge)
+        
+        # Get vertices of current edge
+        v_exp = TopExp_Explorer(current_edge, TopAbs_VERTEX)
+        while v_exp.More():
+            v = topods.Vertex(v_exp.Current())
+            v_exp.Next()
+            
+            # evaluate tangent of current_edge at v
+            param_c = BRep_Tool.Parameter(v, current_edge)
+            pt_c = gp_Pnt()
+            vec_c = gp_Vec()
+            c_curve.D1(param_c, pt_c, vec_c)
+            if vec_c.Magnitude() < 1e-7:
+                continue
+            vec_c.Normalize()
+            
+            # Check adjacent edges
+            if v_e_map.Contains(v):
+                edge_list = v_e_map.FindFromKey(v)
+                it = TopTools_ListIteratorOfListOfShape(edge_list)
+                while it.More():
+                    adj_shape = it.Value()
+                    it.Next()
+                    adj_edge = topods.Edge(adj_shape)
+                    ehash = adj_edge.HashCode(2**31 - 1)
+                    if ehash in visited_hashes:
+                        continue
+                        
+                    # Check tangency
+                    adj_curve = BRepAdaptor_Curve(adj_edge)
+                    param_adj = BRep_Tool.Parameter(v, adj_edge)
+                    pt_adj = gp_Pnt()
+                    vec_adj = gp_Vec()
+                    adj_curve.D1(param_adj, pt_adj, vec_adj)
+                    if vec_adj.Magnitude() < 1e-7:
+                        continue
+                    vec_adj.Normalize()
+                    
+                    # Angle between vectors
+                    dot = max(-1.0, min(1.0, vec_c.Dot(vec_adj)))
+                    angle = math.acos(dot)
+                    
+                    # Tangent if angle is ~0 or ~180 degrees
+                    if angle < angular_tolerance or abs(angle - math.pi) < angular_tolerance:
+                        tangent_edges.append(adj_edge)
+                        visited_hashes.add(ehash)
+                        queue.append(adj_edge)
+                        
+    return tangent_edges
+
+def _build_wire_from_points(points, is_closed=True):
     make_wire = BRepBuilderAPI_MakeWire()
     
     def get_gp_pnt(p):
-        u_val = float(p[0])
-        v_val = float(p[1])
-        return gp_Pnt(u_val, v_val, 0.0)
+        x_val = float(p[0])
+        y_val = float(p[1])
+        z_val = float(p[2]) if len(p) >= 3 and isinstance(p[2], (int, float)) else 0.0
+        return gp_Pnt(x_val, y_val, z_val)
+
+    def get_label(p):
+        return p[-1] if len(p) > 2 and isinstance(p[-1], str) else None
 
     i = 0
     n_points = len(points)
-    while i < n_points:
+    limit = n_points if is_closed else n_points - 1
+    
+    while i < limit:
         p_start = points[i]
         p_next = points[(i + 1) % n_points]
+        next_label = get_label(p_next)
 
-        if len(p_next) > 2 and p_next[2] == 'ARC_CONTROL':
+        if next_label == 'ARC_CONTROL':
             p_control = p_next
             p_end = points[(i + 2) % n_points]
 
@@ -188,10 +305,47 @@ def _build_wire_from_points(points):
                 edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
                 make_wire.Add(edge)
             i += 2
+        elif next_label == 'SPLINE_CONTROL':
+            # Gather all spline points until we hit a non-SPLINE_CONTROL point (which is the end point)
+            spline_pts = [p_start]
+            curr_idx = (i + 1) % n_points
+            while get_label(points[curr_idx]) == 'SPLINE_CONTROL':
+                spline_pts.append(points[curr_idx])
+                curr_idx = (curr_idx + 1) % n_points
+                if not is_closed and curr_idx == 0:
+                    break # Reached end of open path
+            
+            p_end = points[curr_idx]
+            spline_pts.append(p_end)
+            
+            from OCC.Core.TColgp import TColgp_HArray1OfPnt
+            from OCC.Core.GeomAPI import GeomAPI_Interpolate
+            
+            h_array = TColgp_HArray1OfPnt(1, len(spline_pts))
+            for idx, pt in enumerate(spline_pts):
+                h_array.SetValue(idx + 1, get_gp_pnt(pt))
+                
+            anInterpolation = GeomAPI_Interpolate(h_array, False, 1.0e-3)
+            anInterpolation.Perform()
+            if anInterpolation.IsDone():
+                spline_curve = anInterpolation.Curve()
+                edge = BRepBuilderAPI_MakeEdge(spline_curve).Edge()
+                make_wire.Add(edge)
+            else:
+                edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_end)).Edge()
+                make_wire.Add(edge)
+                
+            # Advance i past all spline controls, note that p_end is the start of the next edge
+            if curr_idx > i:
+                i = curr_idx
+            else:
+                # Wrap around happened
+                i = n_points
         else:
             edge = BRepBuilderAPI_MakeEdge(get_gp_pnt(p_start), get_gp_pnt(p_next)).Edge()
             make_wire.Add(edge)
             i += 1
+            
     return make_wire.Wire()
 
 def import_step_file(filepath):
@@ -377,18 +531,38 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 wire = _build_wire_from_points(loop)
                 wires.append(wire)
 
-            # Build face with holes (outermost is wires[0], rest are cutouts)
-            make_face = BRepBuilderAPI_MakeFace(wires[0])
-            for inner_wire in wires[1:]:
-                make_face.Add(inner_wire)
-            face = make_face.Face()
+            if params.get('operation') == 'SURFACE':
+                from OCC.Core.TopoDS import TopoDS_Compound
+                from OCC.Core.BRep import BRep_Builder
+                
+                builder = BRep_Builder()
+                comp = TopoDS_Compound()
+                builder.MakeCompound(comp)
+                
+                for w in wires:
+                    trsf = gp_Trsf()
+                    trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
+                    
+                    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+                    transform_api = BRepBuilderAPI_Transform(w, trsf)
+                    moved_wire = transform_api.Shape()
+                    
+                    prism = BRepPrimAPI_MakePrism(moved_wire, vec).Shape()
+                    builder.Add(comp, prism)
+                current_feat_shape = comp
+            else:
+                # Build face with holes (outermost is wires[0], rest are cutouts)
+                make_face = BRepBuilderAPI_MakeFace(wires[0])
+                for inner_wire in wires[1:]:
+                    make_face.Add(inner_wire)
+                face = make_face.Face()
 
-            # Move face to local plane
-            trsf = gp_Trsf()
-            trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
-            face.Move(TopLoc_Location(trsf))
+                # Move face to local plane
+                trsf = gp_Trsf()
+                trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
+                face.Move(TopLoc_Location(trsf))
 
-            current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
+                current_feat_shape = BRepPrimAPI_MakePrism(face, vec).Shape()
         except Exception as sketch_err:
             print(f"[ERROR] Failed to construct sketch/prism wire inside build_feature_shape_in_isolation: {sketch_err}")
             current_feat_shape = None
@@ -537,18 +711,11 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         try:
             from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakePipe
             
-            # Construct profile wire
-            profile_wire = _build_wire_from_points(profile_points)
+            # Construct profile wire (closed)
+            profile_wire = _build_wire_from_points(profile_points, is_closed=True)
             
-            # Construct path wire (typically not closed)
-            # We need a non-closed version of _build_wire_from_points or handle it here
-            make_path = BRepBuilderAPI_MakeWire()
-            for i in range(len(path_points) - 1):
-                p1 = gp_Pnt(float(path_points[i][0]), float(path_points[i][1]), float(path_points[i][2]) if len(path_points[i])>2 else 0.0)
-                p2 = gp_Pnt(float(path_points[i+1][0]), float(path_points[i+1][1]), float(path_points[i+1][2]) if len(path_points[i+1])>2 else 0.0)
-                edge = BRepBuilderAPI_MakeEdge(p1, p2).Edge()
-                make_path.Add(edge)
-            path_wire = make_path.Wire()
+            # Construct path wire (open, supporting SPLINE_CONTROL points)
+            path_wire = _build_wire_from_points(path_points, is_closed=False)
             
             sweep_tool = BRepOffsetAPI_MakePipe(path_wire, profile_wire)
             sweep_tool.Build()
@@ -783,6 +950,28 @@ def process_features(features, deflection=0.01):
                             print(f"[ERROR] Fillet failed: {fillet_err}")
             continue
 
+        elif f_type == 'THICKEN':
+            if final_shape is not None:
+                thickness = float(params.get('thickness', 1.0))
+                try:
+                    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
+                    from OCC.Core.TopTools import TopTools_ListOfShape
+                    from OCC.Core.GeomAbs import GeomAbs_Arc
+                    
+                    # MakeThickSolid requires a solid, but for a surface we can use BRepOffsetAPI_MakeOffsetShape
+                    # Actually BRepOffsetAPI_MakeOffsetShape creates a solid from a face if the offset is non-zero
+                    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
+                    
+                    offset_maker = BRepOffsetAPI_MakeOffsetShape()
+                    # PerformByJoin(Shape, OffsetValue, Tolerance, Mode, Intersection, SelfInter, JoinType)
+                    from OCC.Core.BRepOffset import BRepOffset_Skin
+                    offset_maker.PerformByJoin(final_shape, thickness, 1e-3, BRepOffset_Skin, False, False, GeomAbs_Arc)
+                    if offset_maker.IsDone():
+                        final_shape = offset_maker.Shape()
+                except Exception as thicken_err:
+                    print(f"[ERROR] THICKEN failed: {thicken_err}")
+            continue
+
         elif f_type == 'SHELL':
             if final_shape is not None:
                 thickness = float(params.get('thickness', 2.0))
@@ -832,7 +1021,7 @@ def process_features(features, deflection=0.01):
                             print(f"[ERROR] Chamfer failed: {chamfer_err}")
             continue
 
-        if f_type in ['SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE']:
+        if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
         elif f_type == 'PATTERN':
@@ -1001,12 +1190,24 @@ def build_shape_only(
                 distance = float(params.get('distance', 1.5))
                 edge_start = params.get('edge_start')
                 edge_end = params.get('edge_end')
+                tangent_prop = params.get('tangentPropagation', True)
                 if edge_start and edge_end:
                     matched_edge = find_matching_edge(final_shape, edge_start, edge_end, params.get("signature"))
                     if matched_edge:
                         try:
                             chamfer_tool = BRepFilletAPI_MakeChamfer(final_shape)
-                            chamfer_tool.Add(distance, matched_edge)
+                            
+                            edges_to_chamfer = [matched_edge]
+                            if tangent_prop:
+                                edges_to_chamfer = get_tangent_edges(final_shape, matched_edge)
+                            
+                            visited_hashes = set()
+                            for e in edges_to_chamfer:
+                                ehash = e.HashCode(2**31 - 1)
+                                if ehash not in visited_hashes:
+                                    chamfer_tool.Add(distance, e)
+                                    visited_hashes.add(ehash)
+                                
                             chamfer_tool.Build()
                             if chamfer_tool.IsDone():
                                 final_shape = chamfer_tool.Shape()
@@ -1014,15 +1215,90 @@ def build_shape_only(
                             print(f"[ERROR] Chamfer failed: {chamfer_err}")
             continue
 
-        if f_type in ['SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE']:
+        elif f_type == 'FILLET':
+            if final_shape is not None:
+                r1 = float(params.get('radius', 2.0))
+                r2 = float(params.get('radius2', r1))
+                tangent_prop = params.get('tangentPropagation', True)
+                refs = params.get('refs', [])
+                if not refs:
+                    # Fallback for old tests if they only pass edge_start and edge_end
+                    edge_start = params.get('edge_start')
+                    edge_end = params.get('edge_end')
+                    if edge_start and edge_end:
+                        refs = [{"edgeData": {"start": edge_start, "end": edge_end}, "signature": params.get("signature")}]
+                
+                if refs:
+                    try:
+                        from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet
+                        fillet_tool = BRepFilletAPI_MakeFillet(final_shape)
+                        edges_added = 0
+                        visited_hashes = set()
+                        
+                        for ref in refs:
+                            edge_data = ref.get('edgeData', {})
+                            edge_start = edge_data.get('start')
+                            edge_end = edge_data.get('end')
+                            signature = ref.get('signature')
+                            if edge_start and edge_end:
+                                matched_edge = find_matching_edge(final_shape, edge_start, edge_end, signature)
+                                if matched_edge:
+                                    edges_to_fillet = [matched_edge]
+                                    if tangent_prop:
+                                        edges_to_fillet = get_tangent_edges(final_shape, matched_edge)
+                                        
+                                    for e in edges_to_fillet:
+                                        ehash = e.HashCode(2**31 - 1)
+                                        if ehash not in visited_hashes:
+                                            if abs(r1 - r2) < 1e-4:
+                                                fillet_tool.Add(r1, e)
+                                            else:
+                                                fillet_tool.Add(r1, r2, e)
+                                            visited_hashes.add(ehash)
+                                            edges_added += 1
+                        
+                        if edges_added > 0:
+                            fillet_tool.Build()
+                            if fillet_tool.IsDone():
+                                final_shape = fillet_tool.Shape()
+                    except Exception as fillet_err:
+                        print(f"[ERROR] Fillet failed: {fillet_err}")
+            continue
+
+        if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
         elif f_type == 'PATTERN':
             target_id = params.get('target_feature_id')
             pattern_type = params.get('pattern_type', 'LINEAR')
-            axis = params.get('axis', 'X')
             count = int(params.get('count', 2))
             spacing = float(params.get('spacing', 10.0))
+            direction_refs = params.get('direction_refs', [])
+            
+            dir_vec = gp_Vec(1, 0, 0)
+            dir_pnt = gp_Pnt(0, 0, 0)
+            
+            if direction_refs and len(direction_refs) > 0 and final_shape is not None:
+                ref = direction_refs[0]
+                matched_edge = find_matching_edge(final_shape, ref.get('coordinates'), ref.get('end_coordinates'), ref.get('signature'))
+                if matched_edge:
+                    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+                    curve_adaptor = BRepAdaptor_Curve(matched_edge)
+                    u_min = curve_adaptor.FirstParameter()
+                    pnt = gp_Pnt()
+                    vec = gp_Vec()
+                    curve_adaptor.D1(u_min, pnt, vec)
+                    if vec.Magnitude() > 1e-6:
+                        dir_vec = vec.Normalized()
+                    dir_pnt = pnt
+            else:
+                axis_str = params.get('axis', 'X')
+                if axis_str == 'X':
+                    dir_vec = gp_Vec(1, 0, 0)
+                elif axis_str == 'Y':
+                    dir_vec = gp_Vec(0, 1, 0)
+                else:
+                    dir_vec = gp_Vec(0, 0, 1)
 
             target_feat = None
             for prev_feat in features:
@@ -1042,21 +1318,10 @@ def build_shape_only(
                         trsf = gp_Trsf()
                         if pattern_type == 'LINEAR':
                             val = spacing * i
-                            if axis == 'X':
-                                vec = gp_Vec(val, 0, 0)
-                            elif axis == 'Y':
-                                vec = gp_Vec(0, val, 0)
-                            else:
-                                vec = gp_Vec(0, 0, val)
-                            trsf.SetTranslation(vec)
+                            trsf.SetTranslation(dir_vec.Multiplied(val))
                         else:  # CIRCULAR
                             angle_rad = math.radians(spacing * i)
-                            if axis == 'X':
-                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(1, 0, 0))
-                            elif axis == 'Y':
-                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 1, 0))
-                            else:
-                                ax1 = gp_Ax1(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+                            ax1 = gp_Ax1(dir_pnt, gp_Dir(dir_vec.X(), dir_vec.Y(), dir_vec.Z()))
                             trsf.SetRotation(ax1, angle_rad)
 
                         shape_copy = target_shape.Moved(TopLoc_Location(trsf))
@@ -1071,6 +1336,188 @@ def build_shape_only(
                                 final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
                             elif target_op == 'CUT':
                                 final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+                                
+        elif f_type == 'MIRROR':
+            target_id = params.get('target_feature_id')
+            mirror_plane_refs = params.get('mirror_plane_refs', [])
+            
+            ax2 = gp_Ax2(gp_Pnt(0,0,0), gp_Dir(0,0,1))
+            
+            if mirror_plane_refs and len(mirror_plane_refs) > 0:
+                ref = mirror_plane_refs[0]
+                if ref.get('type') == 'FACE':
+                    face_origin = ref.get('coordinates', [0,0,0])
+                    face_normal = ref.get('normal', [0,0,1])
+                    ax2 = gp_Ax2(gp_Pnt(*face_origin), gp_Dir(*face_normal))
+                elif ref.get('id') in ['FRONT', 'TOP', 'RIGHT']:
+                    plane = ref['id']
+                    if plane == 'FRONT':
+                        ax2 = gp_Ax2(gp_Pnt(0,0,0), gp_Dir(0,0,1), gp_Dir(1,0,0))
+                    elif plane == 'TOP':
+                        ax2 = gp_Ax2(gp_Pnt(0,0,0), gp_Dir(0,1,0), gp_Dir(1,0,0))
+                    elif plane == 'RIGHT':
+                        ax2 = gp_Ax2(gp_Pnt(0,0,0), gp_Dir(1,0,0), gp_Dir(0,0,-1))
+            
+            trsf = gp_Trsf()
+            trsf.SetMirror(ax2)
+            
+            if target_id:
+                target_feat = None
+                for prev_feat in features:
+                    prev_id = prev_feat.id if hasattr(prev_feat, 'id') else prev_feat.get('id')
+                    if prev_id == target_id:
+                        target_feat = prev_feat
+                        break
+                
+                if target_feat:
+                    tf_type = target_feat.type if hasattr(target_feat, 'type') else target_feat.get('type')
+                    tf_params = target_feat.parameters if hasattr(target_feat, 'parameters') else target_feat.get('parameters', {})
+                    target_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, features)
+                    
+                    if target_shape:
+                        copy_shape = target_shape.Moved(TopLoc_Location(trsf))
+                        target_op = tf_params.get('operation', 'ADD')
+                        if target_op == 'ADD':
+                            final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                        elif target_op == 'CUT':
+                            final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+            else:
+                if final_shape:
+                    copy_shape = final_shape.Moved(TopLoc_Location(trsf))
+                    final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+
+        elif f_type == 'DRAFT':
+            angle_deg = float(params.get('angle', 5))
+            angle_rad = math.radians(angle_deg)
+            neutral_refs = params.get('neutral_plane_refs', [])
+            face_refs = params.get('faces_to_draft_refs', [])
+            
+            if final_shape and neutral_refs and face_refs:
+                n_ref = neutral_refs[0]
+                n_origin = n_ref.get('coordinates', [0,0,0])
+                n_normal = n_ref.get('normal', [0,0,1])
+                # Provide a small normalization protection
+                n_norm_vec = gp_Vec(*n_normal)
+                if n_norm_vec.Magnitude() > 1e-6:
+                    n_norm_vec.Normalize()
+                else:
+                    n_norm_vec = gp_Vec(0,0,1)
+                pull_dir = gp_Dir(n_norm_vec.X(), n_norm_vec.Y(), n_norm_vec.Z())
+                
+                from OCC.Core.Geom import Geom_Plane
+                neutral_plane_geom = Geom_Plane(gp_Pnt(*n_origin), pull_dir)
+                
+                from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
+                draft_tool = BRepOffsetAPI_DraftAngle(final_shape)
+                
+                faces_added = 0
+                for f_ref in face_refs:
+                    f_origin = f_ref.get('coordinates', [0,0,0])
+                    f_normal = f_ref.get('normal', [0,0,1])
+                    matched_face = find_matching_face(final_shape, f_origin, f_normal)
+                    if matched_face:
+                        draft_tool.Add(matched_face, pull_dir, angle_rad, neutral_plane_geom)
+                        faces_added += 1
+                
+                if faces_added > 0:
+                    try:
+                        draft_tool.Build()
+                        if draft_tool.IsDone():
+                            final_shape = draft_tool.Shape()
+                    except Exception as e:
+                        print(f"[ERROR] Draft failed: {e}")
+
+        elif f_type == 'SHELL':
+            thickness = float(params.get('thickness', 2))
+            faces_refs = params.get('faces_to_remove_refs', [])
+            
+            if final_shape:
+                from OCC.Core.TopTools import TopTools_ListOfShape
+                from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
+                
+                faces_to_remove = TopTools_ListOfShape()
+                for ref in faces_refs:
+                    origin = ref.get('coordinates', [0,0,0])
+                    normal = ref.get('normal', [0,0,1])
+                    matched_face = find_matching_face(final_shape, origin, normal)
+                    if matched_face:
+                        faces_to_remove.Append(matched_face)
+                
+                try:
+                    shell_maker = BRepOffsetAPI_MakeThickSolid()
+                    shell_maker.MakeThickSolidByJoin(final_shape, faces_to_remove, -thickness, 1e-3)
+                    if shell_maker.IsDone():
+                        final_shape = shell_maker.Shape()
+                except Exception as e:
+                    print(f"[ERROR] Shell failed: {e}")
+                    
+        elif f_type == 'HOLE_WIZARD':
+            hole_type = params.get('hole_type', 'SIMPLE')
+            diameter = float(params.get('diameter', 5))
+            depth = float(params.get('depth', 10))
+            refs = params.get('hole_placement_refs', [])
+            
+            if final_shape and refs:
+                ref = refs[0]
+                origin = ref.get('coordinates', [0,0,0])
+                normal = ref.get('normal', [0,0,1])
+                
+                # Prevent zero normal vector division
+                norm_vec = gp_Vec(*normal)
+                if norm_vec.Magnitude() > 1e-6:
+                    norm_vec.Normalize()
+                else:
+                    norm_vec = gp_Vec(0,0,1)
+                    
+                drill_dir = gp_Dir(-norm_vec.X(), -norm_vec.Y(), -norm_vec.Z())
+                drill_pnt = gp_Pnt(*origin)
+                drill_ax2 = gp_Ax2(drill_pnt, drill_dir)
+                
+                hole_tool_shape = None
+                
+                try:
+                    if hole_type == 'SIMPLE':
+                        hole_tool_shape = BRepPrimAPI_MakeCylinder(drill_ax2, diameter/2.0, depth).Shape()
+                        
+                    elif hole_type == 'COUNTERBORE':
+                        cb_dia = float(params.get('cb_diameter', 10))
+                        cb_depth = float(params.get('cb_depth', 5))
+                        
+                        cb_cyl = BRepPrimAPI_MakeCylinder(drill_ax2, cb_dia/2.0, cb_depth).Shape()
+                        
+                        p2 = gp_Pnt(drill_pnt.X() + drill_dir.X()*cb_depth, 
+                                    drill_pnt.Y() + drill_dir.Y()*cb_depth, 
+                                    drill_pnt.Z() + drill_dir.Z()*cb_depth)
+                        ax2_2 = gp_Ax2(p2, drill_dir)
+                        main_cyl = BRepPrimAPI_MakeCylinder(ax2_2, diameter/2.0, max(0.1, depth - cb_depth)).Shape()
+                        
+                        hole_tool_shape = BRepAlgoAPI_Fuse(cb_cyl, main_cyl).Shape()
+                        
+                    elif hole_type == 'COUNTERSINK':
+                        cs_dia = float(params.get('cs_diameter', 10))
+                        cs_angle = float(params.get('cs_angle', 90))
+                        
+                        angle_rad = math.radians(cs_angle / 2.0)
+                        if angle_rad > 0.01:
+                            cone_depth = (cs_dia - diameter) / (2.0 * math.tan(angle_rad))
+                        else:
+                            cone_depth = 0.1
+                            
+                        # MakeCone takes R1, R2, H
+                        cone = BRepPrimAPI_MakeCone(drill_ax2, cs_dia/2.0, diameter/2.0, cone_depth).Shape()
+                        
+                        p2 = gp_Pnt(drill_pnt.X() + drill_dir.X()*cone_depth, 
+                                    drill_pnt.Y() + drill_dir.Y()*cone_depth, 
+                                    drill_pnt.Z() + drill_dir.Z()*cone_depth)
+                        ax2_2 = gp_Ax2(p2, drill_dir)
+                        main_cyl = BRepPrimAPI_MakeCylinder(ax2_2, diameter/2.0, max(0.1, depth - cone_depth)).Shape()
+                        
+                        hole_tool_shape = BRepAlgoAPI_Fuse(cone, main_cyl).Shape()
+                    
+                    if hole_tool_shape:
+                        final_shape = BRepAlgoAPI_Cut(final_shape, hole_tool_shape).Shape()
+                except Exception as e:
+                    print(f"[ERROR] Hole Wizard failed: {e}")
 
         # Perform the B-Rep boolean combination
         if current_feat_shape:
@@ -1430,8 +1877,11 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
                 v = topods.Vertex(v_exp.Current())
                 pt = BRep_Tool.Pnt(v)
                 if plane_type == 'FRONT': u, v_val = pt.X(), pt.Y()
-                elif plane_type == 'TOP': u, v_val = pt.X(), pt.Z()
-                elif plane_type == 'RIGHT': u, v_val = pt.Y(), pt.Z()
+                elif plane_type == 'TOP': u, v_val = pt.X(), -pt.Z()
+                elif plane_type == 'RIGHT': u, v_val = pt.Z(), pt.Y()
+                elif plane_type == 'ISO': 
+                    u = (pt.X() - pt.Z()) * 0.707106781
+                    v_val = pt.Y() - (pt.X() + pt.Z()) * 0.35355339
                 else: u, v_val = pt.X(), pt.Y()
                 pnts.append([u, v_val])
                 v_exp.Next()
@@ -1447,6 +1897,7 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
     if plane_type == 'FRONT': eye = gp_Dir(0, 0, 1); up = gp_Dir(0, 1, 0)
     elif plane_type == 'TOP': eye = gp_Dir(0, 1, 0); up = gp_Dir(0, 0, -1)
     elif plane_type == 'RIGHT': eye = gp_Dir(1, 0, 0); up = gp_Dir(0, 1, 0)
+    elif plane_type == 'ISO': eye = gp_Dir(1, 1, 1); up = gp_Dir(0, 1, 0)
     else: eye = gp_Dir(0, 0, 1); up = gp_Dir(0, 1, 0)
     
     # Setup HLR Projector
@@ -1474,17 +1925,126 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
                 p = adaptor.Value(adaptor.FirstParameter() + (adaptor.LastParameter()-adaptor.FirstParameter()) * i / n_samples)
                 # Map to 2D view space
                 if plane_type == 'FRONT': u, v_val = p.X(), p.Y()
-                elif plane_type == 'TOP': u, v_val = p.X(), p.Z()
-                elif plane_type == 'RIGHT': u, v_val = p.Y(), p.Z()
+                elif plane_type == 'TOP': u, v_val = p.X(), -p.Z()
+                elif plane_type == 'RIGHT': u, v_val = p.Z(), p.Y()
+                elif plane_type == 'ISO': 
+                    u = (p.X() - p.Z()) * 0.707106781
+                    v_val = p.Y() - (p.X() + p.Z()) * 0.35355339
                 else: u, v_val = p.X(), p.Y()
                 pnts.append([u, v_val])
             output_lines.append({"points": pnts, "visible": is_visible})
             exp.Next()
 
     extract_from_shape(hlr_shapes.VCompound(), True)
-    # Optional: hidden lines (HCompound) - can be disabled or styled dashed in frontend
-    # extract_from_shape(hlr_shapes.HCompound(), False)
+    extract_from_shape(hlr_shapes.OutLineVCompound(), True)
+    # Hidden lines (dashed)
+    extract_from_shape(hlr_shapes.HCompound(), False)
+    extract_from_shape(hlr_shapes.OutLineHCompound(), False)
     
+    return output_lines
+
+def project_assembly_2d(components_data, plane_type='FRONT'):
+    """
+    Project a multi-body assembly into 2D using HLR.
+    """
+    if not HAS_OCC:
+        return []
+    
+    from OCC.Core.TopoDS import TopoDS_Compound
+    from OCC.Core.BRep import BRep_Builder
+    from OCC.Core.TopLoc import TopLoc_Location
+    from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Ax1, gp_Pnt, gp_Dir, gp_Ax2
+    from OCC.Core.TopExp import TopExp_Explorer
+    from OCC.Core.TopAbs import TopAbs_EDGE
+    from OCC.Core.TopoDS import topods
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+    from OCC.Core.HLRAlgo import HLRAlgo_Projector
+
+    builder = BRep_Builder()
+    compound = TopoDS_Compound()
+    builder.MakeCompound(compound)
+    
+    for comp in components_data:
+        features = comp.get('features', [])
+        transform = comp.get('transform', {})
+        shape = build_shape_only(features)
+        
+        if shape and not shape.IsNull():
+            pos = transform.get('position', [0.0, 0.0, 0.0])
+            rot = transform.get('rotation', [0.0, 0.0, 0.0])
+            
+            rx, ry, rz = rot[0], rot[1], rot[2]
+            trsf_x = gp_Trsf()
+            trsf_x.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(1,0,0)), rx)
+            trsf_y = gp_Trsf()
+            trsf_y.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(0,1,0)), ry)
+            trsf_z = gp_Trsf()
+            trsf_z.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(0,0,1)), rz)
+            
+            final_rot = trsf_z.Multiplied(trsf_y).Multiplied(trsf_x)
+            final_trsf = gp_Trsf()
+            final_trsf.SetTranslation(gp_Vec(*pos))
+            final_trsf.Multiply(final_rot)
+            
+            shape.Move(TopLoc_Location(final_trsf))
+            builder.Add(compound, shape)
+            
+    if plane_type == 'FRONT': eye = gp_Dir(0, 0, 1); up = gp_Dir(0, 1, 0)
+    elif plane_type == 'TOP': eye = gp_Dir(0, 1, 0); up = gp_Dir(0, 0, -1)
+    elif plane_type == 'RIGHT': eye = gp_Dir(1, 0, 0); up = gp_Dir(0, 1, 0)
+    elif plane_type == 'ISO': 
+        eye = gp_Dir(1, 1, 1)
+        up = gp_Dir(0, 1, 0)
+    else: eye = gp_Dir(0, 0, 1); up = gp_Dir(0, 1, 0)
+    
+    projector = HLRAlgo_Projector(gp_Ax2(gp_Pnt(0,0,0), eye, up))
+    
+    hlr = HLRBRep_Algo()
+    hlr.Add(compound)
+    hlr.Projector(projector)
+    hlr.Update()
+    hlr.Hide()
+    
+    hlr_shapes = HLRBRep_HLRToShape(hlr)
+    output_lines = []
+    
+    def extract_from_shape(s, is_visible):
+        exp = TopExp_Explorer(s, TopAbs_EDGE)
+        while exp.More():
+            e = topods.Edge(exp.Current())
+            adaptor = BRepAdaptor_Curve(e)
+            pnts = []
+            n_samples = 10
+            # Setup projection coordinates for ISO as well
+            # For ISO, we want isometric projection:
+            # But the projector itself does 3D->2D transform?
+            # Actually, HLRAlgo_Projector transforms points if we use its Project methods.
+            # But we can just use the standard 2D mapping if we rotate the geometry.
+            # Wait, HLRAlgo_Projector DOES NOT rotate the 3D output of HLRBRep_HLRToShape.
+            # The returned VCompound is in the ORIGINAL 3D coordinates!
+            # So if we map to X,Y for FRONT it works because eye is Z.
+            # For ISO we need to project. HLRAlgo_Projector has Project(p3d, p2d) but we don't have python bindings easily accessible.
+            # Let's write a simple matrix projection for ISO view:
+            
+            iso_u = lambda x,y,z: (x - z) * 0.707106781
+            iso_v = lambda x,y,z: y - (x + z) * 0.35355339
+            
+            for i in range(n_samples + 1):
+                p = adaptor.Value(adaptor.FirstParameter() + (adaptor.LastParameter()-adaptor.FirstParameter()) * i / n_samples)
+                if plane_type == 'FRONT': u, v_val = p.X(), p.Y()
+                elif plane_type == 'TOP': u, v_val = p.X(), -p.Z() # Map Top correctly (Z is down in 2D)
+                elif plane_type == 'RIGHT': u, v_val = p.Z(), p.Y() # Map Right correctly (Z is horizontal)
+                elif plane_type == 'ISO': u, v_val = iso_u(p.X(), p.Y(), p.Z()), iso_v(p.X(), p.Y(), p.Z())
+                else: u, v_val = p.X(), p.Y()
+                pnts.append([u, v_val])
+            output_lines.append({"points": pnts, "visible": is_visible})
+            exp.Next()
+
+    extract_from_shape(hlr_shapes.VCompound(), True)
+    extract_from_shape(hlr_shapes.OutLineVCompound(), True)
+    extract_from_shape(hlr_shapes.HCompound(), False)
+    extract_from_shape(hlr_shapes.OutLineHCompound(), False)
     return output_lines
 
 
@@ -2386,4 +2946,100 @@ def export_cad_file(features, format_type, filepath):
 
     except Exception as err:
         print(f"[ERROR] export_cad_file failed for format {format_type}:", err)
+        return False
+
+def export_assembly_step(components_data, filepath):
+    """
+    Exports a multi-body assembly to a single STEP file using TopoDS_Compound.
+    components_data is a list of dicts with 'id', 'features', and 'transform' (position, rotation).
+    """
+    if not HAS_OCC:
+        return False
+
+    try:
+        from OCC.Core.TDocStd import TDocStd_Document
+        from OCC.Core.XCAFApp import XCAFApp_Application
+        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
+        from OCC.Core.TDataStd import TDataStd_Name
+        from OCC.Core.TCollection import TCollection_ExtendedString
+        from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
+        from OCC.Core.TopLoc import TopLoc_Location
+        from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Ax1, gp_Pnt, gp_Dir
+        from OCC.Core.STEPCAFControl import STEPCAFControl_Writer
+        
+        # Initialize XDE application and document
+        app = XCAFApp_Application.GetApplication()
+        doc = TDocStd_Document(TCollection_ExtendedString("MDTV-XCAF"))
+        app.NewDocument(TCollection_ExtendedString("MDTV-XCAF"), doc)
+        
+        # Get XCAF Tools
+        shape_tool = XCAFDoc_DocumentTool.ShapeTool(doc.Main())
+        color_tool = XCAFDoc_DocumentTool.ColorTool(doc.Main())
+        
+        # Create a root label for the assembly
+        assembly_label = shape_tool.NewShape()
+        TDataStd_Name.Set(assembly_label, TCollection_ExtendedString("Assembly"))
+        
+        for idx, comp in enumerate(components_data):
+            features = comp.get('features', [])
+            transform = comp.get('transform', {})
+            name = comp.get('name', f"Part_{idx+1}")
+            color_hex = comp.get('color', "#60A5FA")
+            
+            # Build the base shape for this component
+            shape = build_shape_only(features)
+            if shape and not shape.IsNull():
+                # 1. Add base shape to XDE
+                part_label = shape_tool.AddShape(shape, False)
+                TDataStd_Name.Set(part_label, TCollection_ExtendedString(f"{name}_Def"))
+                
+                # 2. Add Color
+                try:
+                    color_hex = color_hex.lstrip('#')
+                    if len(color_hex) == 6:
+                        r = int(color_hex[0:2], 16) / 255.0
+                        g = int(color_hex[2:4], 16) / 255.0
+                        b = int(color_hex[4:6], 16) / 255.0
+                        q_color = Quantity_Color(r, g, b, Quantity_TOC_RGB)
+                        color_tool.SetColor(part_label, q_color, XCAFDoc_ColorGen)
+                        color_tool.SetColor(part_label, q_color, XCAFDoc_ColorSurf)
+                except Exception as e:
+                    print(f"Color parsing failed for {color_hex}: {e}")
+                
+                # 3. Apply transformation
+                pos = transform.get('position', [0.0, 0.0, 0.0])
+                rot = transform.get('rotation', [0.0, 0.0, 0.0])
+                
+                trsf = gp_Trsf()
+                
+                rx, ry, rz = rot[0], rot[1], rot[2]
+                trsf_x = gp_Trsf()
+                trsf_x.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(1,0,0)), rx)
+                
+                trsf_y = gp_Trsf()
+                trsf_y.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(0,1,0)), ry)
+                
+                trsf_z = gp_Trsf()
+                trsf_z.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(0,0,1)), rz)
+                
+                final_rot = trsf_z.Multiplied(trsf_y).Multiplied(trsf_x)
+                
+                final_trsf = gp_Trsf()
+                final_trsf.SetTranslation(gp_Vec(*pos))
+                final_trsf.Multiply(final_rot)
+                
+                # 4. Create an instance (component) in the assembly label
+                loc = TopLoc_Location(final_trsf)
+                inst_label = shape_tool.AddComponent(assembly_label, part_label, loc)
+                TDataStd_Name.Set(inst_label, TCollection_ExtendedString(name))
+                
+        # Export XDE Document to STEP
+        writer = STEPCAFControl_Writer()
+        writer.Transfer(doc)
+        status = writer.Write(filepath)
+        return status == 1
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print("[ERROR] export_assembly_step failed:", e)
         return False

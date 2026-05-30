@@ -166,6 +166,32 @@ async def export_step(request: ExportStepRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+class AssemblyExportStepRequest(BaseModel):
+    components: List[dict]
+    filename: Optional[str] = "assembly.step"
+
+@router.post("/export_assembly/step")
+async def export_assembly_step(request: AssemblyExportStepRequest):
+    try:
+        import os
+        target_dir = os.path.join(os.path.expanduser("~"), "Downloads")
+        os.makedirs(target_dir, exist_ok=True)
+        filepath = os.path.join(target_dir, request.filename)
+        
+        success = geometry_service.export_assembly_step(request.components, filepath)
+        if not success:
+            raise HTTPException(status_code=500, detail="STEP writer failed to save assembly.")
+            
+        return {
+            "status": "SUCCESS", 
+            "filepath": filepath, 
+            "message": f"Successfully exported assembly to {request.filename}"
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 class ProjectRequest(BaseModel):
@@ -178,6 +204,62 @@ class ProjectRequest(BaseModel):
 async def project_2d(request: ProjectRequest):
     try:
         return geometry_service.project_2d(request.features, request.plane, section_plane=request.sectionPlane)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class AssemblyProjectRequest(BaseModel):
+    components: List[dict]
+    plane: str = 'FRONT'
+
+@router.post("/project_assembly")
+async def project_assembly_2d(request: AssemblyProjectRequest):
+    try:
+        return geometry_service.project_assembly_2d(request.components, request.plane)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class InterferenceRequest(BaseModel):
+    components: List[dict]
+
+@router.post("/detect_interference")
+async def detect_interference(request: InterferenceRequest):
+    try:
+        # Build component shapes
+        comp_shapes = {}
+        for comp in request.components:
+            cid = comp.get('id')
+            features = comp.get('features', [])
+            transform = comp.get('transform')
+            shape, _ = geometry_service.build_feature_chain(features)
+            if shape is not None:
+                if transform:
+                    from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Ax1, gp_Pnt, gp_Dir
+                    import math
+                    pos = transform.get('position', [0, 0, 0])
+                    rot = transform.get('rotation', [0, 0, 0])
+                    trsf = gp_Trsf()
+                    # Apply rotations
+                    trsf_rot_x = gp_Trsf()
+                    trsf_rot_x.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(1, 0, 0)), rot[0])
+                    trsf_rot_y = gp_Trsf()
+                    trsf_rot_y.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(0, 1, 0)), rot[1])
+                    trsf_rot_z = gp_Trsf()
+                    trsf_rot_z.SetRotation(gp_Ax1(gp_Pnt(0,0,0), gp_Dir(0, 0, 1)), rot[2])
+                    
+                    trsf.Multiply(trsf_rot_z)
+                    trsf.Multiply(trsf_rot_y)
+                    trsf.Multiply(trsf_rot_x)
+                    trsf.SetTranslationPart(gp_Vec(*pos))
+                    
+                    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+                    shape = BRepBuilderAPI_Transform(shape, trsf, True).Shape()
+                    
+                comp_shapes[cid] = shape
+        return geometry_service.detect_interference(comp_shapes)
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -359,3 +441,23 @@ async def detect_interference(request: InterferenceRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
+class RegisterComponentRequest(BaseModel):
+    id: str
+    features: List[FeatureDefinition]
+
+@router.post("/register_component")
+async def register_component(request: RegisterComponentRequest):
+    try:
+        from app.services.component_registry import registry
+        
+        # Build shape on backend if possible
+        shape = geometry_service.build_shape_only([f.dict() for f in request.features])
+        registry.register(request.id, [f.dict() for f in request.features], shape=shape)
+        
+        return {"status": "SUCCESS", "message": f"Component {request.id} registered successfully."}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+

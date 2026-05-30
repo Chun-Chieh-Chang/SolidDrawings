@@ -712,6 +712,7 @@ export default function Viewport({ children }: ViewportProps) {
       <Canvas 
         shadows 
         dpr={[1, 2]} 
+        gl={{ localClippingEnabled: true }}
         onPointerMissed={() => {
           // Click empty space: clear selections (SolidWorks behavior)
           console.log('[Selection] Clicked empty space. Resetting selections.');

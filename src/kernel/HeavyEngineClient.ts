@@ -58,6 +58,20 @@ export class HeavyEngineClient {
     }
   }
 
+  public async registerComponent(id: string, features: CADFeature[]): Promise<boolean> {
+    try {
+      const response = await fetch(`${this.baseUrl}/register_component`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, features }),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error('[HeavyEngineClient] Register component error:', error);
+      return false;
+    }
+  }
+
   public async rebuild(
     features: CADFeature[],
     deflection: number = 0.01,
@@ -121,6 +135,21 @@ export class HeavyEngineClient {
       return await response.json();
     } catch (error) {
       console.error('[HeavyEngineClient] Project error:', error);
+      return [];
+    }
+  }
+
+  public async projectAssembly(components: any[], plane: string): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/project_assembly`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ components, plane }),
+      });
+      if (!response.ok) throw new Error('Project assembly failed');
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] Project assembly error:', error);
       return [];
     }
   }

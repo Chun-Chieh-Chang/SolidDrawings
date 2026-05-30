@@ -77,9 +77,9 @@ def solve_assembly_mates(components_dict, mates_list):
                 residuals.extend(dist_vec - np.dot(dist_vec, n1) * n1)
                 residuals.extend(np.cross(n1, n2))
             elif m_type == 'DISTANCE':
-                residuals.append(np.linalg.norm(p2 - p1) - offset)
+                residuals.append(np.dot(p2 - p1, n1) - offset)
             elif m_type == 'PARALLEL':
-                residuals.extend(np.cross(n1, n2))
+                residuals.extend(np.cross(n1, sign * n2))
             elif m_type == 'PERPENDICULAR':
                 residuals.append(np.dot(n1, n2))
             elif m_type == 'TANGENT':

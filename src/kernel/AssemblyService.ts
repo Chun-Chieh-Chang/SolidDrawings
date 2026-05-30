@@ -8,6 +8,14 @@ import {
 
 export class AssemblyService {
   /**
+   * Register a component's B-Rep with the backend to avoid sending full history on every solve.
+   */
+  public async registerComponent(componentId: string, features: any[]): Promise<boolean> {
+    const client = HeavyEngineClient.getInstance();
+    return await client.registerComponent(componentId, features);
+  }
+
+  /**
    * Solve assembly mates using the backend Scipy solver.
    */
   public async solve(

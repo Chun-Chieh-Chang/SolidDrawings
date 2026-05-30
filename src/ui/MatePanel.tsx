@@ -86,9 +86,20 @@ export const MatePanel = () => {
               在視埠中選取兩個面或邊以建立配合
             </div>
           ) : (
-            mateSelection.map((ent, i) => (
-              <div key={i} className="text-[12px] bg-white p-1 rounded border border-slate-200 flex justify-between"> <span className="font-bold text-slate-700">{ent.type}</span> <span className="text-slate-500 font-mono text-[10px]">{ent.id.slice(0, 8)}</span> </div>
-            ))
+            mateSelection.map((ent, i) => {
+              const surfaceType = ent.signature && 'surface_type' in ent.signature ? (ent.signature as any).surface_type : null;
+              return (
+                <div key={i} className="text-[12px] bg-white p-1.5 rounded border border-slate-200 flex justify-between items-center"> 
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-slate-700">{ent.type}</span> 
+                    {surfaceType === 'CYLINDER' && (
+                      <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-mono uppercase">圓柱軸心</span>
+                    )}
+                  </div>
+                  <span className="text-slate-500 font-mono text-[10px]">{ent.id.slice(0, 8)}</span> 
+                </div>
+              );
+            })
           )}
         </div> </div>
 

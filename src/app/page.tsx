@@ -21,6 +21,8 @@ import { SketchHUD } from '@/renderer/SketchHUD';
 import { onFileOpen, onSaveRequest, onNewFile, appAPI, fileAPI } from '../../electron/renderer';
 
 import { MatePanel } from '@/ui/MatePanel';
+import { AssemblyTreePanel } from '@/ui/AssemblyTreePanel';
+import { AssemblyComponent } from '@/renderer/AssemblyComponent';
 
 import { DrawingSheet } from '@/ui/DrawingSheet';
 
@@ -28,7 +30,7 @@ import { SketchPropertyManager } from '@/ui/SketchPropertyManager';
 
 import { v4 as uuidv4 } from 'uuid';
 
-import { extractClosedLoop, extractAllClosedLoops } from '@/utils/geometry/GraphAdapter';
+import { extractClosedLoop, extractAllClosedLoops, extractAllPaths } from '@/utils/geometry/GraphAdapter';
 
 import { analyzeSketchDefinitions } from '@/utils/geometry/ConstraintSolver';
 
@@ -47,7 +49,7 @@ import { usePartRebuild } from '@/hooks/usePartRebuild';
 import { FeatureManagerPanel } from '@/ui/FeatureManagerPanel';
 
 import { PartFeaturePropertyManager } from '@/ui/PartFeaturePropertyManager';
-
+import { SectionViewPropertyManager } from '@/ui/SectionViewPropertyManager';
 
 
 const isSketchPlane = (plane: unknown): plane is 'FRONT' | 'TOP' | 'RIGHT' | 'FACE' => (
@@ -1006,7 +1008,7 @@ export default function Home() {
     const mateEntity = {
       id: clickedTopo.id,
       type: clickedTopo.type,
-      componentId: 'root',
+      componentId: clickedTopo.componentId || 'root',
       coordinates: clickedTopo.coordinates,
       normal: clickedTopo.normal,
     };
@@ -1471,18 +1473,149 @@ export default function Home() {
     setActiveTab('SKETCH');
   }, [setEditingFeatureId, setSketchNodes, setSketchEdges, setSketchConstraints, setSketchRelations, setActivePlane, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId, setSketchMode, setSketchTool, setActiveTab]);
 
-  const handleExitAndExtrude = useCallback((operationOverride?: 'ADD' | 'CUT') => {
+  /** Convert a SKETCH feature's 2D points to 3D world-space coordinates using its plane. */
+  const sketchFeatureTo3DPoints = useCallback((sketchFeat: CADFeature): number[][] => {
+    const points = sketchFeat.parameters.points as any[][] | undefined;
+    if (!points || points.length === 0) return [];
+    const plane = sketchFeat.parameters.plane as string;
+    const faceOrigin = sketchFeat.parameters.faceOrigin as [number,number,number] | undefined;
+    const faceNormal = sketchFeat.parameters.faceNormal as [number,number,number] | undefined;
+
+    const result: number[][] = [];
+    for (const loop of points) {
+      for (const pt of loop) {
+        if (!pt || pt.length < 2) continue;
+        const [u, v] = [Number(pt[0]), Number(pt[1])];
+        let x = 0, y = 0, z = 0;
+        if (plane === 'FRONT')       { x = u; y = v; z = 0; }
+        else if (plane === 'TOP')    { x = u; y = 0; z = v; }
+        else if (plane === 'RIGHT')  { x = 0; y = u; z = v; }
+        else if (plane === 'FACE' && faceOrigin && faceNormal) {
+          // Match OCC gp_Ax2 generation logic precisely:
+          let [nx, ny, nz] = faceNormal;
+          const nLen = Math.sqrt(nx*nx + ny*ny + nz*nz) || 1;
+          nx /= nLen; ny /= nLen; nz /= nLen;
+
+          let xx = 1.0, xy = 0.0, xz = 0.0;
+          if (Math.abs(nx) < 1e-5 && Math.abs(ny) < 1e-5) {
+            xx = 1.0; xy = 0.0; xz = 0.0;
+          } else {
+            xx = -ny; xy = nx; xz = 0.0;
+            const xLen = Math.sqrt(xx*xx + xy*xy);
+            xx /= xLen; xy /= xLen;
+          }
+
+          // Y-axis = Z × X (where Z is normal)
+          let yx = ny * xz - nz * xy;
+          let yy = nz * xx - nx * xz;
+          let yz = nx * xy - ny * xx;
+
+          x = faceOrigin[0] + u * xx + v * yx;
+          y = faceOrigin[1] + u * xy + v * yy;
+          z = faceOrigin[2] + u * xz + v * yz;
+        }
+        result.push([x, y, z]);
+      }
+    }
+    return result;
+  }, []);
+
+  /** Resolve SWEEP/LOFT: converts sketch 2D→3D and injects into feature params. */
+  const handleBuildSweepLoft = useCallback((feat: CADFeature) => {
+    const { updateFeatureParams } = useCadStore.getState();
+    if (feat.type === 'SWEEP') {
+      const profileFeat = features.find(f => f.id === feat.parameters.profile_id);
+      const pathFeat    = features.find(f => f.id === feat.parameters.path_id);
+      if (!profileFeat || !pathFeat) {
+        alert('Sweep: Please select both a Profile and a Path sketch.');
+        return;
+      }
+      updateFeatureParams(feat.id, {
+        ...feat.parameters,
+        profile_points: sketchFeatureTo3DPoints(profileFeat),
+        path_points:    sketchFeatureTo3DPoints(pathFeat),
+      });
+    } else if (feat.type === 'LOFT') {
+      const profileIds: string[] = feat.parameters.profile_ids || [];
+      if (profileIds.filter(Boolean).length < 2) {
+        alert('Loft: Please select at least two Profile sketches.');
+        return;
+      }
+      const profilePts = profileIds
+        .filter(Boolean)
+        .map(id => {
+          const f = features.find(f => f.id === id);
+          return f ? sketchFeatureTo3DPoints(f) : [];
+        });
+      updateFeatureParams(feat.id, { ...feat.parameters, profiles: profilePts });
+    }
+  }, [features, sketchFeatureTo3DPoints]);
+
+
+
+  const handleSaveSketchOnly = useCallback(() => {
+    if (!activePlane) return;
+    
+    // We only save if there are actual points
+    const pointsToExtrude = extractAllPaths(sketchNodes, sketchEdges);
+    if (pointsToExtrude.length === 0) {
+      alert('Invalid Sketch Profile: No paths found.');
+      return;
+    }
+
+    const existingFeature = editingFeatureId ? features.find(f => f.id === editingFeatureId) : null;
+    const existingParams = existingFeature?.parameters ?? {};
+    
+    const nextParams = {
+      ...existingParams,
+      points: pointsToExtrude,
+      sketchNodes: { ...sketchNodes },
+      sketchEdges: { ...sketchEdges },
+      sketchConstraints: { ...sketchConstraints },
+      plane: activePlane,
+      relations: [...sketchRelations],
+      ...(activePlane === 'FACE' ? {
+        faceOrigin: activeFaceOrigin,
+        faceNormal: activeFaceNormal,
+        faceId: activeFaceId
+      } : {})
+    };
+
+    if (editingFeatureId && existingFeature && existingFeature.type === 'SKETCH') {
+      updateFeatureParams(editingFeatureId, nextParams);
+    } else {
+      useCadStore.getState().addFeature({
+        id: `feat_${uuidv4()}`,
+        type: 'SKETCH',
+        name: `Sketch ${features.filter(f => f.type === 'SKETCH').length + 1}`,
+        parameters: nextParams
+      });
+    }
+
+    resetSketchSession();
+    setActiveTab('FEATURES');
+  }, [activePlane, sketchNodes, sketchEdges, editingFeatureId, features, sketchConstraints, sketchRelations, activeFaceOrigin, activeFaceNormal, activeFaceId, updateFeatureParams, resetSketchSession, setActiveTab]);
+
+  const handleExitAndExtrude = useCallback((operationOverride?: 'ADD' | 'CUT' | 'SURFACE') => {
     // Connection Warning (Non-blocking attempt)
     if (engineStatus === 'DISCONNECTED') {
       console.warn('Attempting construction while kernel reports DISCONNECTED...');
     }
 
-    const solidLoops = extractAllClosedLoops(sketchNodes, sketchEdges);
-    
-    // 2. Profile Validation Guard
-    if (solidLoops.length === 0 || solidLoops[0].length < 3) {
-      alert('Invalid Sketch Profile: No closed loop found.\nPlease ensure your sketch forms a single closed boundary without self-intersections.');
-      return;
+    let pointsToExtrude: any[][] = [];
+    if (operationOverride === 'SURFACE') {
+        pointsToExtrude = extractAllPaths(sketchNodes, sketchEdges);
+        if (pointsToExtrude.length === 0) {
+            alert('Invalid Sketch Profile: No paths found for surface extrusion.');
+            return;
+        }
+    } else {
+        pointsToExtrude = extractAllClosedLoops(sketchNodes, sketchEdges);
+        // 2. Profile Validation Guard
+        if (pointsToExtrude.length === 0 || pointsToExtrude[0].length < 3) {
+          alert('Invalid Sketch Profile: No closed loop found.\nPlease ensure your sketch forms a single closed boundary without self-intersections.');
+          return;
+        }
     }
 
     if (!activePlane) return;
@@ -1497,7 +1630,7 @@ export default function Home() {
 
       ...existingParams,
 
-      points: solidLoops,
+      points: pointsToExtrude,
 
       sketchNodes: { ...sketchNodes },
 
@@ -2376,6 +2509,10 @@ ${result.path}`);
             onClick={() => { setActiveTab('EVALUATE'); setMeasurementMode('NONE'); } }
             className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "EVALUATE" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
           >EVALUATE</button>
+          <button
+            onClick={() => { setActiveTab('ASSEMBLY'); setMeasurementMode('NONE'); useCadStore.getState().setMode('ASSEMBLY'); } }
+            className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "ASSEMBLY" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
+          >ASSEMBLY</button>
         </div>
 
         {/* Ribbon Content Panels */}
@@ -2394,6 +2531,12 @@ ${result.path}`);
                 </div>
                 <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Cut</span>
               </button>
+              <button onClick={() => { if (sketchPoints.length >= 2 || solidSketchPointCount >= 2) handleExitAndExtrude('SURFACE'); else { setSketchMode(true); setSketchTool('SELECT'); } }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Surface">
+                <div className="w-10 h-10 flex items-center justify-center text-orange-500 transition-transform group-hover:scale-110">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l9 4-9 4-9-4 9-4z"/><path d="M12 17l9-4-9-4-9 4 9 4z"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Surface</span>
+              </button>
               <div className="w-[1px] h-10 bg-border/50 mx-2" />
               <button
                 onClick={() => {
@@ -2410,7 +2553,62 @@ ${result.path}`);
                 <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Revolve</span>
               </button>
               <button
-                onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); setPendingFeatureCommand('FILLET'); setSelectedTopology(null); }}
+                onClick={() => {
+                  useCadStore.getState().addFeature({
+                    id: `feat_${uuidv4()}`,
+                    type: 'SWEEP',
+                    name: `Sweep ${features.filter(f => f.type === 'SWEEP').length + 1}`,
+                    parameters: { profile_id: '', path_id: '' }
+                  });
+                  setHint('Sweep feature created. Configure in PropertyManager.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+                title="Swept Boss/Base"
+              >
+                <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 22C4 13 14 13 14 4"/><circle cx="14" cy="4" r="2"/><circle cx="4" cy="22" r="2"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Sweep</span>
+              </button>
+              <button
+                onClick={() => {
+                  useCadStore.getState().addFeature({
+                    id: `feat_${uuidv4()}`,
+                    type: 'LOFT',
+                    name: `Loft ${features.filter(f => f.type === 'LOFT').length + 1}`,
+                    parameters: { profile_ids: [] }
+                  });
+                  setHint('Loft feature created. Configure in PropertyManager.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+                title="Lofted Boss/Base"
+              >
+                <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M6 12h12"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Loft</span>
+              </button>
+              <button
+                onClick={() => { 
+                  if (features.length === 0) {
+                    alert('Create a solid body first!');
+                    return;
+                  }
+                  const featId = `feat_${uuidv4()}`;
+                  useCadStore.getState().addFeature({
+                    id: featId,
+                    type: 'FILLET',
+                    name: `Fillet ${features.filter(f => f.type === 'FILLET').length + 1}`,
+                    parameters: { radius: 2, radius2: 2, refs: [] }
+                  });
+                  useCadStore.getState().setSelectedId(featId);
+                  
+                  appliedEdgeFeatureRef.current = null; 
+                  setActiveTab('FEATURES'); 
+                  setPendingFeatureCommand('FILLET'); 
+                  setSelectedTopology(null); 
+                  setHint('Select an edge to fillet, then adjust parameters.');
+                }}
                 className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'FILLET' ? 'border-[#005B9A] bg-white shadow-sm' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
                 title="Fillet"
               >
@@ -2429,10 +2627,155 @@ ${result.path}`);
                 </div>
                 <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Chamfer</span>
               </button>
+              <button
+                onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); setPendingFeatureCommand('THICKEN'); setSelectedTopology(null); }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'THICKEN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Thicken"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'THICKEN' ? 'text-orange-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 12 17.19 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Thicken</span>
+              </button>
+              
+              {/* --- PATTERN, MIRROR, DRAFT --- */}
+              <div className="w-[1px] h-10 bg-border/50 mx-1" />
+
+              <button
+                onClick={() => {
+                  // Direct add PATTERN feature. Pattern selects edge/axis differently (in PropertyManager)
+                  const featId = `feat_${Date.now()}`;
+                  useCadStore.getState().addFeature({
+                    id: featId,
+                    type: 'PATTERN',
+                    name: `Pattern ${features.filter(f => f.type === 'PATTERN').length + 1}`,
+                    parameters: { pattern_type: 'LINEAR', count: 2, spacing: 10, axis: 'X', direction_refs: [] }
+                  });
+                  useCadStore.getState().setSelectedId(featId);
+                  appliedEdgeFeatureRef.current = null;
+                  setActiveTab('FEATURES');
+                  setPendingFeatureCommand('PATTERN');
+                  setSelectedTopology(null);
+                  setHint('Select a target feature, then select a linear edge for direction.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'PATTERN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Pattern"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'PATTERN' ? 'text-indigo-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Pattern</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const featId = `feat_${Date.now()}`;
+                  useCadStore.getState().addFeature({
+                    id: featId,
+                    type: 'MIRROR',
+                    name: `Mirror ${features.filter(f => f.type === 'MIRROR').length + 1}`,
+                    parameters: { mirror_plane_refs: [] }
+                  });
+                  useCadStore.getState().setSelectedId(featId);
+                  appliedEdgeFeatureRef.current = null;
+                  setActiveTab('FEATURES');
+                  setPendingFeatureCommand('MIRROR');
+                  setSelectedTopology(null);
+                  setHint('Select a plane or planar face to mirror about.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'MIRROR' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Mirror"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'MIRROR' ? 'text-indigo-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20"/><path d="M3 7l6 5-6 5V7z"/><path d="M21 7l-6 5 6 5V7z"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Mirror</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const featId = `feat_${Date.now()}`;
+                  useCadStore.getState().addFeature({
+                    id: featId,
+                    type: 'DRAFT',
+                    name: `Draft ${features.filter(f => f.type === 'DRAFT').length + 1}`,
+                    parameters: { angle: 5, neutral_plane_refs: [], faces_to_draft_refs: [] }
+                  });
+                  useCadStore.getState().setSelectedId(featId);
+                  appliedEdgeFeatureRef.current = null;
+                  setActiveTab('FEATURES');
+                  setPendingFeatureCommand('DRAFT');
+                  setSelectedTopology(null);
+                  setHint('Select a neutral plane, then select faces to draft.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'DRAFT' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Draft Angle"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'DRAFT' ? 'text-indigo-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12 2 2 22 22 22"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Draft</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  const featId = `feat_${Date.now()}`;
+                  useCadStore.getState().addFeature({
+                    id: featId,
+                    type: 'SHELL',
+                    name: `Shell ${features.filter(f => f.type === 'SHELL').length + 1}`,
+                    parameters: { thickness: 2, faces_to_remove_refs: [] }
+                  });
+                  useCadStore.getState().setSelectedId(featId);
+                  appliedEdgeFeatureRef.current = null;
+                  setActiveTab('FEATURES');
+                  setPendingFeatureCommand('SHELL');
+                  setSelectedTopology(null);
+                  setHint('Select faces to remove to create a shell.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'SHELL' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Shell"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'SHELL' ? 'text-teal-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7h10v10H7z"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Shell</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  const featId = `feat_${Date.now()}`;
+                  useCadStore.getState().addFeature({
+                    id: featId,
+                    type: 'HOLE_WIZARD',
+                    name: `Hole ${features.filter(f => f.type === 'HOLE_WIZARD').length + 1}`,
+                    parameters: { hole_type: 'SIMPLE', diameter: 5, depth: 10, hole_placement_refs: [] }
+                  });
+                  useCadStore.getState().setSelectedId(featId);
+                  appliedEdgeFeatureRef.current = null;
+                  setActiveTab('FEATURES');
+                  setPendingFeatureCommand('HOLE_WIZARD');
+                  setSelectedTopology(null);
+                  setHint('Click on a face to place the hole.');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'HOLE_WIZARD' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+                title="Hole Wizard"
+              >
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'HOLE_WIZARD' ? 'text-teal-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="M12 2v4"/><path d="M12 18v4"/><path d="M2 12h4"/><path d="M18 12h4"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Hole</span>
+              </button>
             </div>
           ) : activeTab === 'SKETCH' ? (
             <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
-              <button onClick={resetSketchSession} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Exit Sketch">
+              <button onClick={handleSaveSketchOnly} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Save Sketch">
+                <div className="w-10 h-10 flex items-center justify-center text-blue-600 transition-transform group-hover:scale-110">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Save</span>
+              </button>
+              <button onClick={resetSketchSession} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Discard/Exit Sketch">
                 <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
                 </div>
@@ -2453,6 +2796,19 @@ ${result.path}`);
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.3 15.3l-5-5L19 7.7l-2-2L14.7 8l-5-5-1.4 1.4 1 1-1.5 1.5-1-1L5.4 7.3l1 1-1.5 1.5-1-1-1.4 1.4 5 5-2.3 2.3 2 2 2.3-2.3 5 5 1.4-1.4-1-1 1.5-1.5 1 1 1.4-1.4-1-1 1.5-1.5 1 1z"/></svg>
                 </div>
                 <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Measure</span>
+              </button>
+            </div>
+          ) : activeTab === 'ASSEMBLY' ? (
+            <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
+              <button onClick={() => {
+                const id = `comp_${Date.now()}`;
+                const newComp = { id, partId: 'new_part', instanceName: `Component_${useCadStore.getState().components?.length || 0 + 1}`, transform: { position: [0,0,0] as [number, number, number], rotation: [0,0,0] as [number, number, number] }, visible: true };
+                useCadStore.setState(state => ({ components: [...(state.components||[]), newComp] }));
+              }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`} title="Insert Component">
+                <div className={`w-10 h-10 flex items-center justify-center transition-transform text-indigo-600 group-hover:scale-110`}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                </div>
+                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Insert Comp</span>
               </button>
             </div>
           ) : null}
@@ -2497,15 +2853,13 @@ ${result.path}`);
                  <SketchPropertyManager />
               </div>
             ) : activeTab === 'ASSEMBLY' ? (
-
-              <MatePanel />
-
+              <div className="flex-1 flex flex-col p-2 gap-2 bg-[#F8FAFC]">
+                <AssemblyTreePanel />
+                <MatePanel />
+              </div>
             ) : measurementMode !== 'NONE' ? (
-
               <MeasurementPanel />
-
             ) : (
-
               <FeatureManagerPanel
                 features={features}
                 rollbackIndex={rollbackIndex}
@@ -2591,6 +2945,9 @@ ${result.path}`);
 
 
 
+          {/* Section View PropertyManager */}
+          <SectionViewPropertyManager />
+
           {/* PropertyManager */}
           {!isSketchMode && selectedFeature && selectedSubNodeType !== 'SKETCH' && measurementMode === 'NONE' && (!selectedTopology || selectedTopology.type !== 'FACE') && (
             <PartFeaturePropertyManager
@@ -2599,6 +2956,7 @@ ${result.path}`);
               onParamChange={onParamChange}
               onEditSketch={handleEditFeatureSketch}
               onSelectFeature={setSelectedId}
+              onBuildSweepLoft={handleBuildSweepLoft}
             />
           )}
 
@@ -2743,45 +3101,28 @@ ${result.path}`);
           ) : (
 
             <Viewport>
-
               {activeTab === 'ASSEMBLY' && components.length > 0 ? (
-
-              components.map((comp) => (
-
+                <>
+                  {components.map((comp) => (
+                    <AssemblyComponent 
+                      key={comp.id}
+                      comp={comp}
+                      meshes={meshData}
+                      isActive={useCadStore.getState().activeComponentId === comp.id}
+                    />
+                  ))}
+                  {useCadStore.getState().interferenceMeshes.map((mesh: { data: MeshData }, idx: number) => (
+                    <OcctShape key={`inter_${idx}`} data={mesh.data} color="red" />
+                  ))}
+                </>
+              ) : meshData && meshData.length > 0 ? (
                 meshData.map((mesh: { data: MeshData }, idx: number) => (
-
-                  <OcctShape 
-
-                    key={`${comp.id}_${idx}`} 
-
-                    data={mesh.data} 
-
-                    position={comp.transform.position}
-
-                    rotation={comp.transform.rotation}
-
-                  />
-
+                  <OcctShape key={idx} data={mesh.data} />
                 ))
-
-              ))
-
-            ) : meshData && meshData.length > 0 ? (
-
-              meshData.map((mesh: { data: MeshData }, idx: number) => (
-
-                <OcctShape key={idx} data={mesh.data} />
-
-              ))
-
-            ) : (
-
-              <mesh> <sphereGeometry args={[1, 32, 32]} /> <meshStandardMaterial color="#94A3B8" wireframe opacity={0.4} transparent /> </mesh>
-
-            )}
-
-          </Viewport>
-
+              ) : (
+                <mesh> <sphereGeometry args={[1, 32, 32]} /> <meshStandardMaterial color="#94A3B8" wireframe opacity={0.4} transparent /> </mesh>
+              )}
+            </Viewport>
           )}
 
 

@@ -275,6 +275,26 @@ export const DatumPlanes = () => {
             
             nextLastNodeId = nId;
          }
+      } else if (sketchTool === 'SPLINE') {
+         if (sketchNewChain || !lastClickedNodeId) {
+            nextLastNodeId = nId;
+         } else {
+            // Find if there's already an active spline edge ending at lastClickedNodeId
+            let activeSplineEdgeId: string | null = null;
+            for (const edge of Object.values(nextEdges)) {
+               if (edge.type === 'SPLINE' && edge.nodeIds[edge.nodeIds.length - 1] === lastClickedNodeId) {
+                  activeSplineEdgeId = edge.id;
+                  break;
+               }
+            }
+            if (activeSplineEdgeId) {
+               nextEdges[activeSplineEdgeId].nodeIds.push(nId);
+            } else {
+               const eId = uuidv4();
+               nextEdges[eId] = { id: eId, type: 'SPLINE', nodeIds: [lastClickedNodeId, nId] };
+            }
+            nextLastNodeId = nId;
+         }
       } else if (sketchTool === 'CIRCLE') {
          if (sketchNewChain || !lastClickedNodeId) {
             nextLastNodeId = nId;

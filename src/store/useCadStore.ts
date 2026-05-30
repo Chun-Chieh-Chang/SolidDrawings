@@ -43,14 +43,14 @@ export interface SketchNode {
 
 export interface SketchEdge {
   id: string;
-  type: 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE';
+  type: 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE' | 'SPLINE';
   nodeIds: string[];
   isConstruction?: boolean;
 }
 
 export interface SketchConstraint {
   id: string;
-  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE';
+  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR';
   nodeIds?: string[];
   edgeIds?: string[];
   value?: number;
@@ -67,12 +67,21 @@ export interface CADComponent {
   };
   visible: boolean;
   isFixed?: boolean;
+  color?: string;
+  materialId?: string;
 }
 
 export interface CADShortcutBox {
   visible: boolean;
   x: number;
   y: number;
+}
+
+export interface SectionViewState {
+  isActive: boolean;
+  plane: 'FRONT' | 'TOP' | 'RIGHT';
+  offset: number;
+  flip: boolean;
 }
 
 export type CadToastType = 'error' | 'warning' | 'info';
@@ -117,6 +126,8 @@ interface CadState {
 
   mode: CadMode;
   setMode: (mode: CadMode) => void;
+  activeComponentId: string | null;
+  setActiveComponentId: (id: string | null) => void;
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
   smartDimensionActive: boolean;
@@ -199,9 +210,14 @@ interface CadState {
   components: CADComponent[];
   setComponents: (components: CADComponent[]) => void;
   addComponent: (component: CADComponent) => void;
+  removeComponent: (id: string) => void;
+  updateComponentTransform: (id: string, position: [number, number, number], rotation: [number, number, number]) => void;
+  updateComponentColor: (id: string, color: string) => void;
+  toggleComponentFixed: (id: string) => void;
   mates: CADMate[];
   setMates: (mates: CADMate[]) => void;
   addMate: (mate: CADMate) => void;
+  removeMate: (id: string) => void;
 
   mateSelection: any[];
   setMateSelection: (selection: any[]) => void;
@@ -210,6 +226,8 @@ interface CadState {
 
   meshData: any[];
   setMeshData: (data: any[]) => void;
+  interferenceMeshes: any[];
+  setInterferenceMeshes: (data: any[]) => void;
   solverReport: { dof: number; residual: number } | null;
   setSolverReport: (report: { dof: number; residual: number } | null) => void;
   computedRefGeometry: any[];
@@ -230,8 +248,8 @@ interface CadState {
   dismissToast: (id: string) => void;
 
   /** SolidWorks-style applied-feature placement: pick edges after ribbon command. */
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   
@@ -254,6 +272,9 @@ interface CadState {
   setControls: (controls: any) => void;
   isCameraAnimating: boolean;
   setIsCameraAnimating: (active: boolean) => void;
+  
+  sectionView: SectionViewState;
+  setSectionView: (view: Partial<SectionViewState>) => void;
 }
 
 export const useCadStore = create<CadState>()(
@@ -270,6 +291,8 @@ export const useCadStore = create<CadState>()(
 
       mode: 'PART',
       setMode: (mode) => set({ mode }),
+      activeComponentId: null,
+      setActiveComponentId: (activeComponentId) => set({ activeComponentId }),
       isSketchMode: false,
       setSketchMode: (isSketchMode) => set({ isSketchMode }),
       smartDimensionActive: false,
@@ -476,11 +499,46 @@ export const useCadStore = create<CadState>()(
 
       components: [],
       setComponents: (components) => set({ components }),
-      addComponent: (component) => { get().saveSnapshot(); set((state) => ({ components: [...state.components, component] })); },
-      mates: [],
-      setMates: (mates) => { get().saveSnapshot(); set({ mates }); },
-      addMate: (mate) => { get().saveSnapshot(); set((state) => ({ mates: [...state.mates, mate] })); },
+      addComponent: (component) => set((state) => ({ components: [...state.components, component] })),
+      removeComponent: (id) => set((state) => ({
+        components: state.components.filter(c => c.id !== id),
+        mates: state.mates.filter(m => m.entity1.componentId !== id && m.entity2.componentId !== id)
+      })),
+      updateComponentTransform: (id, position, rotation) => set((state) => {
+        get().saveSnapshot();
+        return {
+          components: state.components.map(c => 
+            c.id === id ? { ...c, transform: { position, rotation } } : c
+          )
+        };
+      }),
+      updateComponentColor: (id, color) => set((state) => {
+        get().saveSnapshot();
+        return {
+          components: state.components.map(c => 
+            c.id === id ? { ...c, color } : c
+          )
+        };
+      }),
+      toggleComponentFixed: (id) => set((state) => {
+        get().saveSnapshot();
+        return {
+          components: state.components.map(c =>
+            c.id === id ? { ...c, isFixed: !c.isFixed } : c
+          )
+        };
+      }),
 
+      mates: [],
+      setMates: (mates) => set({ mates }),
+      addMate: (mate) => set((state) => {
+        get().saveSnapshot();
+        return { mates: [...state.mates, mate] };
+      }),
+      removeMate: (id) => set((state) => {
+        get().saveSnapshot();
+        return { mates: state.mates.filter(m => m.id !== id) };
+      }),
       mateSelection: [],
       setMateSelection: (mateSelection) => set({ mateSelection }),
       addMateSelection: (entity) => set((state) => ({ mateSelection: [...state.mateSelection, entity] })),
@@ -488,6 +546,8 @@ export const useCadStore = create<CadState>()(
 
       meshData: [],
       setMeshData: (meshData) => set({ meshData }),
+      interferenceMeshes: [],
+      setInterferenceMeshes: (interferenceMeshes) => set({ interferenceMeshes }),
       solverReport: null,
       setSolverReport: (solverReport) => set({ solverReport }),
       computedRefGeometry: [],
@@ -546,6 +606,9 @@ export const useCadStore = create<CadState>()(
       setControls: (controls) => set({ controls }),
       isCameraAnimating: false,
       setIsCameraAnimating: (isCameraAnimating) => set({ isCameraAnimating }),
+
+      sectionView: { isActive: false, plane: 'FRONT', offset: 0, flip: false },
+      setSectionView: (view) => set((state) => ({ sectionView: { ...state.sectionView, ...view } })),
     }),
     {
       name: 'cad-storage',

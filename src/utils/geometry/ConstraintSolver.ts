@@ -324,6 +324,28 @@ export interface SketchDefinitionReport {
   nodes: Record<string, 'UNDER' | 'FULLY' | 'CONFLICT'>;
   edges: Record<string, 'UNDER' | 'FULLY' | 'CONFLICT'>;
   hasConflict: boolean;
+  dof: number;
+}
+
+export function calculateDOF(
+  nodes: Record<string, SketchNode>,
+  constraints: Record<string, SketchConstraint>
+): number {
+  let nonFixedCount = 0;
+  for (const n of Object.values(nodes)) {
+    if (!n.isFixed) nonFixedCount++;
+  }
+  let dof = nonFixedCount * 2;
+
+  for (const c of Object.values(constraints)) {
+    if (c.type === 'COINCIDENT' || c.type === 'CONCENTRIC') {
+      dof -= 2;
+    } else {
+      // HORIZONTAL, VERTICAL, DISTANCE, EQUAL, TANGENT, ANGLE, PARALLEL, PERPENDICULAR
+      dof -= 1; 
+    }
+  }
+  return dof;
 }
 
 export function analyzeSketchDefinitions(
@@ -544,5 +566,6 @@ export function analyzeSketchDefinitions(
     }
   }
 
-  return { nodes: nodeStatus, edges: edgeStatus, hasConflict };
+  const dof = calculateDOF(nodes, constraints);
+  return { nodes: nodeStatus, edges: edgeStatus, hasConflict, dof };
 }

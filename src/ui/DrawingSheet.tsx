@@ -13,21 +13,14 @@ import { HeavyEngineClient } from '../kernel/HeavyEngineClient';
 interface DrawingViewProps {
 
   title: string;
-
   type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO';
-
   lines: number[][][];
-
+  showDimensions: boolean;
 }
 
-
-
-const DrawingView = ({ title, type, lines }: DrawingViewProps) => {
-
-  const [editingDim, setEditingDim] = useState<'NONE' | 'HORIZ' | 'VERT'>('NONE');
-
+const DrawingView = ({ title, type, lines, showDimensions }: DrawingViewProps) => {
+  const [editingDim, setEditingDim] = useState<{id: string, type: string, param: string} | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-
 
 
   const features = useCadStore(state => state.features);
@@ -102,115 +95,57 @@ const DrawingView = ({ title, type, lines }: DrawingViewProps) => {
 
 
 
-  const saveDimensionEdit = (dimType: 'HORIZ' | 'VERT') => {
+  const saveDimensionEdit = () => {
+    if (!editingDim) return;
+    let newValue = parseFloat(editValue);
+    if (isNaN(newValue) || newValue <= 0) return;
 
-    const newValue = parseFloat(editValue);
-
-    setEditingDim('NONE');
-
-    
-
-    if (isNaN(newValue) || newValue <= 0) {
-
-      return;
-
+    if (editingDim.param === 'radius') {
+        newValue = newValue / 2;
     }
 
-
-
-    // Prioritize selected feature, fall back to first primary solid/sketch feature
-
-    const primaryFeature = features.find(f => f.id === selectedId) || features.find(f => 
-
-      f.type === 'BOX' || 
-
-      f.type === 'CYLINDER' || 
-
-      f.type === 'SPHERE' || 
-
-      f.type === 'EXTRUDE'
-
-    );
-
-
-
-    if (!primaryFeature) {
-
-      return;
-
-    }
-
-
-
-    const paramUpdates: Record<string, number> = {};
-
-    const viewType = type;
-
-
-
-    if (primaryFeature.type === 'BOX' || primaryFeature.type === 'EXTRUDE') {
-
-      if (dimType === 'HORIZ') {
-
-        if (viewType === 'FRONT' || viewType === 'TOP') {
-
-          paramUpdates.width = newValue;
-
-        } else if (viewType === 'RIGHT') {
-
-          paramUpdates.depth = newValue;
-
-        }
-
-      } else if (dimType === 'VERT') {
-
-        if (viewType === 'FRONT' || viewType === 'RIGHT') {
-
-          paramUpdates.height = newValue;
-
-        } else if (viewType === 'TOP') {
-
-          paramUpdates.depth = newValue;
-
-        }
-
-      }
-
-    } else if (primaryFeature.type === 'CYLINDER') {
-
-      if (dimType === 'HORIZ') {
-
-        paramUpdates.radius = newValue / 2;
-
-      } else if (dimType === 'VERT') {
-
-        if (viewType === 'FRONT' || viewType === 'RIGHT') {
-
-          paramUpdates.height = newValue;
-
-        } else if (viewType === 'TOP') {
-
-          paramUpdates.radius = newValue / 2;
-
-        }
-
-      }
-
-    } else if (primaryFeature.type === 'SPHERE') {
-
-      paramUpdates.radius = newValue / 2;
-
-    }
-
-
-
-    if (Object.keys(paramUpdates).length > 0) {
-
-      updateFeatureParams(primaryFeature.id, paramUpdates);
-
-    }
-
+    const paramUpdates: Record<string, number> = { [editingDim.param]: newValue };
+    updateFeatureParams(editingDim.id, paramUpdates);
+    setEditingDim(null);
   };
+  
+  const smartDims: any[] = [];
+  if (showDimensions && type !== 'ISO') {
+    features.forEach(feat => {
+      const p = feat.parameters || {};
+      const x = p.x || 0;
+      const y = p.y || 0;
+      const z = p.z || 0;
+      
+      if (feat.type === 'BOX' || feat.type === 'EXTRUDE') {
+        const w = p.width || 10;
+        const h = p.height || 10;
+        const d = p.depth || 10;
+        
+        if (type === 'FRONT') {
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: w, u: x, v: y, length: w, param: 'width' });
+           smartDims.push({ id: feat.id, type: 'VERT', value: h, u: x, v: y, length: h, param: 'height' });
+        } else if (type === 'TOP') {
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: w, u: x, v: -z-d, length: w, param: 'width' });
+           smartDims.push({ id: feat.id, type: 'VERT', value: d, u: x, v: -z-d, length: d, param: 'depth' });
+        } else if (type === 'RIGHT') {
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: d, u: z, v: y, length: d, param: 'depth' });
+           smartDims.push({ id: feat.id, type: 'VERT', value: h, u: z, v: y, length: h, param: 'height' });
+        }
+      } else if (feat.type === 'CYLINDER' || feat.type === 'SPHERE' || feat.type === 'HOLE') {
+        const r = p.radius || 5;
+        const h = p.height || (p.depth || 10);
+        if (type === 'TOP') {
+           smartDims.push({ id: feat.id, type: 'RADIAL', value: r*2, u: x, v: -z, radius: r, param: 'radius' });
+        } else if (type === 'FRONT' && feat.type !== 'SPHERE') {
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: r*2, u: x-r, v: y, length: r*2, param: 'radius' });
+           smartDims.push({ id: feat.id, type: 'VERT', value: h, u: x-r, v: y, length: h, param: 'height' });
+        } else if (type === 'FRONT' && feat.type === 'SPHERE') {
+           smartDims.push({ id: feat.id, type: 'RADIAL', value: r*2, u: x, v: y, radius: r, param: 'radius' });
+        }
+      }
+    });
+  }
 
 
 
@@ -258,389 +193,73 @@ const DrawingView = ({ title, type, lines }: DrawingViewProps) => {
 
 
 
-          {hasBounds && type !== 'ISO' && (
-
-            <>
-
-              {/* Horizontal Dimension */}
-
-              <line
-
-                x1={minU}
-
-                y1={minV}
-
-                x2={minU}
-
-                y2={minV - extOffset}
-
-                stroke="#64748B"
-
-                strokeWidth={dimStrokeWidth}
-
-                strokeDasharray={`${dimStrokeWidth * 2},${dimStrokeWidth}`}
-
-              /> <line
-
-                x1={maxU}
-
-                y1={minV}
-
-                x2={maxU}
-
-                y2={minV - extOffset}
-
-                stroke="#64748B"
-
-                strokeWidth={dimStrokeWidth}
-
-                strokeDasharray={`${dimStrokeWidth * 2},${dimStrokeWidth}`}
-
-              /> <line
-
-                x1={minU}
-
-                y1={minV - dimOffset}
-
-                x2={maxU}
-
-                y2={minV - dimOffset}
-
-                stroke="#3B82F6"
-
-                strokeWidth={dimStrokeWidth}
-
-                markerStart={`url(#arrow-start-${type})`}
-
-                markerEnd={`url(#arrow-end-${type})`}
-
-              /> <g 
-
-                transform={`translate(${midU}, ${minV - dimOffset}) scale(1, -1)`}
-
-                className="cursor-pointer select-none"
-
-                onDoubleClick={(e) => {
-
-                  e.stopPropagation();
-
-                  setEditingDim('HORIZ');
-
-                  setEditValue(widthVal.toFixed(1));
-
-                }}
-
-              >
-
-                <rect
-
-                  x={-rectW / 2}
-
-                  y={-rectH / 2}
-
-                  width={rectW}
-
-                  height={rectH}
-
-                  fill="white"
-
-                  stroke={editingDim === 'HORIZ' ? '#3B82F6' : '#E2E8F0'}
-
-                  strokeWidth={editingDim === 'HORIZ' ? dimStrokeWidth : dimStrokeWidth / 2}
-
-                  rx={rectH * 0.2}
-
-                  className="hover:stroke-blue-500 hover:fill-blue-50/50 transition-all duration-200"
-
-                />
-
-                {editingDim === 'HORIZ' ? (
-
-                  <foreignObject
-
-                    x={-rectW / 2}
-
-                    y={-rectH / 2}
-
-                    width={rectW}
-
-                    height={rectH}
-
-                  > <input
-
-                      type="number"
-
-                      step="any"
-
-                      value={editValue}
-
-                      onChange={(e) => setEditValue(e.target.value)}
-
-                      onKeyDown={(e) => {
-
-                        e.stopPropagation();
-
-                        if (e.key === 'Enter') {
-
-                          saveDimensionEdit('HORIZ');
-
-                        } else if (e.key === 'Escape') {
-
-                          setEditingDim('NONE');
-
-                        }
-
-                      }}
-
-                      onBlur={() => saveDimensionEdit('HORIZ')}
-
-                      onDoubleClick={(e) => e.stopPropagation()}
-
-                      autoFocus
-
-                      className="w-full h-full text-center font-mono font-bold text-slate-900 bg-white border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 select-all"
-
-                      style={{
-
-                        fontSize: `${textSize}px`,
-
-                        padding: 0,
-
-                        margin: 0,
-
-                        border: 'none',
-
-                        outline: 'none',
-
-                        background: 'transparent'
-
-                      }}
-
-                    />
-
-                  </foreignObject>
-
-                ) : (
-
-                  <text
-
-                    x="0"
-
-                    y={rectH * 0.18}
-
-                    textAnchor="middle"
-
-                    fontSize={textSize}
-
-                    fontWeight="bold"
-
-                    fill="#1E293B"
-
-                    fontFamily="monospace"
-
-                    className="pointer-events-none hover:fill-blue-600"
-
-                  >
-
-                    {widthVal.toFixed(1)}
-
-                  </text>
-
-                )}
-
-              </g>
-
-
-
-              {/* Vertical Dimension */}
-
-              <line
-
-                x1={minU}
-
-                y1={minV}
-
-                x2={minU - extOffset}
-
-                y2={minV}
-
-                stroke="#64748B"
-
-                strokeWidth={dimStrokeWidth}
-
-                strokeDasharray={`${dimStrokeWidth * 2},${dimStrokeWidth}`}
-
-              /> <line
-
-                x1={minU}
-
-                y1={maxV}
-
-                x2={minU - extOffset}
-
-                y2={maxV}
-
-                stroke="#64748B"
-
-                strokeWidth={dimStrokeWidth}
-
-                strokeDasharray={`${dimStrokeWidth * 2},${dimStrokeWidth}`}
-
-              /> <line
-
-                x1={minU - dimOffset}
-
-                y1={minV}
-
-                x2={minU - dimOffset}
-
-                y2={maxV}
-
-                stroke="#3B82F6"
-
-                strokeWidth={dimStrokeWidth}
-
-                markerStart={`url(#arrow-start-${type})`}
-
-                markerEnd={`url(#arrow-end-${type})`}
-
-              /> <g 
-
-                transform={`translate(${minU - dimOffset}, ${midV}) scale(1, -1)`}
-
-                className="cursor-pointer select-none"
-
-                onDoubleClick={(e) => {
-
-                  e.stopPropagation();
-
-                  setEditingDim('VERT');
-
-                  setEditValue(heightVal.toFixed(1));
-
-                }}
-
-              >
-
-                <rect
-
-                  x={-rectW / 2}
-
-                  y={-rectH / 2}
-
-                  width={rectW}
-
-                  height={rectH}
-
-                  fill="white"
-
-                  stroke={editingDim === 'VERT' ? '#3B82F6' : '#E2E8F0'}
-
-                  strokeWidth={editingDim === 'VERT' ? dimStrokeWidth : dimStrokeWidth / 2}
-
-                  rx={rectH * 0.2}
-
-                  className="hover:stroke-blue-500 hover:fill-blue-50/50 transition-all duration-200"
-
-                />
-
-                {editingDim === 'VERT' ? (
-
-                  <foreignObject
-
-                    x={-rectW / 2}
-
-                    y={-rectH / 2}
-
-                    width={rectW}
-
-                    height={rectH}
-
-                  > <input
-
-                      type="number"
-
-                      step="any"
-
-                      value={editValue}
-
-                      onChange={(e) => setEditValue(e.target.value)}
-
-                      onKeyDown={(e) => {
-
-                        e.stopPropagation();
-
-                        if (e.key === 'Enter') {
-
-                          saveDimensionEdit('VERT');
-
-                        } else if (e.key === 'Escape') {
-
-                          setEditingDim('NONE');
-
-                        }
-
-                      }}
-
-                      onBlur={() => saveDimensionEdit('VERT')}
-
-                      onDoubleClick={(e) => e.stopPropagation()}
-
-                      autoFocus
-
-                      className="w-full h-full text-center font-mono font-bold text-slate-900 bg-white border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 select-all"
-
-                      style={{
-
-                        fontSize: `${textSize}px`,
-
-                        padding: 0,
-
-                        margin: 0,
-
-                        border: 'none',
-
-                        outline: 'none',
-
-                        background: 'transparent'
-
-                      }}
-
-                    />
-
-                  </foreignObject>
-
-                ) : (
-
-                  <text
-
-                    x="0"
-
-                    y={rectH * 0.18}
-
-                    textAnchor="middle"
-
-                    fontSize={textSize}
-
-                    fontWeight="bold"
-
-                    fill="#1E293B"
-
-                    fontFamily="monospace"
-
-                    className="pointer-events-none hover:fill-blue-600"
-
-                  >
-
-                    {heightVal.toFixed(1)}
-
-                  </text>
-
-                )}
-
-              </g> </>
-
-          )}
+          {/* Feature-Aware Smart Dimensions */}
+          {smartDims.filter(d => d.type === 'HORIZ').map((dim, idx) => {
+              const isEditing = editingDim?.id === dim.id && editingDim?.type === dim.type;
+              const dimY = dim.v - dimOffset - (idx * extOffset * 0.5);
+              return (
+                <g key={`horiz-${dim.id}-${idx}`}>
+                  <line x1={dim.u} y1={dim.v} x2={dim.u} y2={dimY} stroke="#64748B" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dim.u + dim.length} y1={dim.v} x2={dim.u + dim.length} y2={dimY} stroke="#64748B" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dim.u} y1={dimY} x2={dim.u + dim.length} y2={dimY} stroke="#3B82F6" strokeWidth={dimStrokeWidth} markerStart={`url(#arrow-start-${type})`} markerEnd={`url(#arrow-end-${type})`} />
+                  <g transform={`translate(${dim.u + dim.length/2}, ${dimY}) scale(1, -1)`} className="cursor-pointer select-none" onDoubleClick={(e) => { e.stopPropagation(); setEditingDim({id: dim.id, type: dim.type, param: dim.param}); setEditValue(dim.value.toString()); }}>
+                    <rect x={-rectW/2} y={-rectH/2} width={rectW} height={rectH} fill="white" stroke={isEditing ? '#3B82F6' : '#E2E8F0'} strokeWidth={isEditing ? dimStrokeWidth : dimStrokeWidth/2} rx={rectH*0.2} className="hover:stroke-blue-500 hover:fill-blue-50/50 transition-all duration-200" />
+                    {isEditing ? (
+                      <foreignObject x={-rectW/2} y={-rectH/2} width={rectW} height={rectH}>
+                        <input type="number" step="any" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') saveDimensionEdit(); else if (e.key === 'Escape') setEditingDim(null); }} onBlur={saveDimensionEdit} onDoubleClick={(e) => e.stopPropagation()} autoFocus className="w-full h-full text-center font-mono font-bold text-slate-900 bg-white border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 select-all" style={{ fontSize: `${textSize}px`, padding: 0, margin: 0, border: 'none', outline: 'none', background: 'transparent' }} />
+                      </foreignObject>
+                    ) : (
+                      <text x="0" y={rectH * 0.18} textAnchor="middle" fontSize={textSize} fontWeight="bold" fill="#1E293B" fontFamily="monospace" className="pointer-events-none hover:fill-blue-600">{dim.value.toFixed(1)}</text>
+                    )}
+                  </g>
+                </g>
+              );
+          })}
+
+          {smartDims.filter(d => d.type === 'VERT').map((dim, idx) => {
+              const isEditing = editingDim?.id === dim.id && editingDim?.type === dim.type;
+              const dimX = dim.u - dimOffset - (idx * extOffset * 0.5);
+              return (
+                <g key={`vert-${dim.id}-${idx}`}>
+                  <line x1={dim.u} y1={dim.v} x2={dimX} y2={dim.v} stroke="#64748B" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dim.u} y1={dim.v + dim.length} x2={dimX} y2={dim.v + dim.length} stroke="#64748B" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dimX} y1={dim.v} x2={dimX} y2={dim.v + dim.length} stroke="#3B82F6" strokeWidth={dimStrokeWidth} markerStart={`url(#arrow-start-${type})`} markerEnd={`url(#arrow-end-${type})`} />
+                  <g transform={`translate(${dimX}, ${dim.v + dim.length/2}) scale(1, -1)`} className="cursor-pointer select-none" onDoubleClick={(e) => { e.stopPropagation(); setEditingDim({id: dim.id, type: dim.type, param: dim.param}); setEditValue(dim.value.toString()); }}>
+                    <rect x={-rectW/2} y={-rectH/2} width={rectW} height={rectH} fill="white" stroke={isEditing ? '#3B82F6' : '#E2E8F0'} strokeWidth={isEditing ? dimStrokeWidth : dimStrokeWidth/2} rx={rectH*0.2} className="hover:stroke-blue-500 hover:fill-blue-50/50 transition-all duration-200" transform="rotate(-90)" />
+                    {isEditing ? (
+                      <foreignObject x={-rectH/2} y={-rectW/2} width={rectH} height={rectW} style={{ transform: 'rotate(-90deg)', transformOrigin: 'center' }}>
+                        <input type="number" step="any" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') saveDimensionEdit(); else if (e.key === 'Escape') setEditingDim(null); }} onBlur={saveDimensionEdit} onDoubleClick={(e) => e.stopPropagation()} autoFocus className="w-full h-full text-center font-mono font-bold text-slate-900 bg-white border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 select-all" style={{ fontSize: `${textSize}px`, padding: 0, margin: 0, border: 'none', outline: 'none', background: 'transparent' }} />
+                      </foreignObject>
+                    ) : (
+                      <text x="0" y={rectH * 0.18} textAnchor="middle" fontSize={textSize} fontWeight="bold" fill="#1E293B" fontFamily="monospace" className="pointer-events-none hover:fill-blue-600" transform="rotate(-90)">{dim.value.toFixed(1)}</text>
+                    )}
+                  </g>
+                </g>
+              );
+          })}
+
+          {smartDims.filter(d => d.type === 'RADIAL').map((dim, idx) => {
+              const isEditing = editingDim?.id === dim.id && editingDim?.type === dim.type;
+              const angle = Math.PI / 4 + (idx * 0.2); // slight offset for multiple
+              const ex = dim.u + Math.cos(angle) * (dim.radius + dimOffset);
+              const ey = dim.v + Math.sin(angle) * (dim.radius + dimOffset);
+              return (
+                <g key={`rad-${dim.id}-${idx}`}>
+                  <line x1={dim.u} y1={dim.v} x2={ex} y2={ey} stroke="#3B82F6" strokeWidth={dimStrokeWidth} markerEnd={`url(#arrow-end-${type})`} />
+                  <line x1={ex} y1={ey} x2={ex + dimOffset} y2={ey} stroke="#3B82F6" strokeWidth={dimStrokeWidth} />
+                  <g transform={`translate(${ex + dimOffset + rectW/2}, ${ey}) scale(1, -1)`} className="cursor-pointer select-none" onDoubleClick={(e) => { e.stopPropagation(); setEditingDim({id: dim.id, type: dim.type, param: dim.param}); setEditValue((dim.value).toString()); }}>
+                    <rect x={-rectW/2} y={-rectH/2} width={rectW} height={rectH} fill="white" stroke={isEditing ? '#3B82F6' : '#E2E8F0'} strokeWidth={isEditing ? dimStrokeWidth : dimStrokeWidth/2} rx={rectH*0.2} className="hover:stroke-blue-500 hover:fill-blue-50/50 transition-all duration-200" />
+                    {isEditing ? (
+                      <foreignObject x={-rectW/2} y={-rectH/2} width={rectW} height={rectH}>
+                        <input type="number" step="any" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Enter') saveDimensionEdit(); else if (e.key === 'Escape') setEditingDim(null); }} onBlur={saveDimensionEdit} onDoubleClick={(e) => e.stopPropagation()} autoFocus className="w-full h-full text-center font-mono font-bold text-slate-900 bg-white border border-blue-500 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 select-all" style={{ fontSize: `${textSize}px`, padding: 0, margin: 0, border: 'none', outline: 'none', background: 'transparent' }} />
+                      </foreignObject>
+                    ) : (
+                      <text x="0" y={rectH * 0.18} textAnchor="middle" fontSize={textSize} fontWeight="bold" fill="#1E293B" fontFamily="monospace" className="pointer-events-none hover:fill-blue-600">Ø{dim.value.toFixed(1)}</text>
+                    )}
+                  </g>
+                </g>
+              );
+          })}
 
         </svg> </div> </div>
 
@@ -666,6 +285,7 @@ export const DrawingSheet = () => {
 
   });
 
+  const [showDimensions, setShowDimensions] = useState<boolean>(true);
   const [isRebuilding, setIsRebuilding] = useState<boolean>(false);
 
 
@@ -734,7 +354,7 @@ export const DrawingSheet = () => {
 
 
 
-        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-2"> <div className="flex flex-col"> <span className="text-2xl font-black tracking-tighter text-slate-900 uppercase">Engineering Drawing</span> <span className="text-sm font-bold text-slate-500">PROJECT: {projectName || 'Professional CAD Project'}</span> </div> <div className="text-right flex flex-col"> <span className="text-xs font-bold text-slate-400 uppercase">Standard</span> <span className="text-sm font-bold text-slate-900">ISO 128 (GPS)</span> </div> </div> <div className="grid grid-cols-2 gap-6 flex-1 min-h-0"> <DrawingView title="Front Elevation" type="FRONT" lines={projections.FRONT} /> <DrawingView title="Top Plan" type="TOP" lines={projections.TOP} /> <DrawingView title="Right Profile" type="RIGHT" lines={projections.RIGHT} /> <DrawingView title="Isometric View" type="ISO" lines={projections.ISO} /> </div>
+        <div className="flex justify-between items-start border-b-2 border-slate-900 pb-2"> <div className="flex flex-col"> <span className="text-2xl font-black tracking-tighter text-slate-900 uppercase">Engineering Drawing</span> <span className="text-sm font-bold text-slate-500">PROJECT: {projectName || 'Professional CAD Project'}</span> </div> <div className="flex gap-4"> <button onClick={() => setShowDimensions(!showDimensions)} className={`px-3 py-1 text-xs font-bold uppercase rounded border transition-colors ${showDimensions ? 'bg-blue-100 border-blue-500 text-blue-700' : 'bg-slate-100 border-slate-300 text-slate-500 hover:bg-slate-200'}`}> {showDimensions ? 'Hide Dimensions' : 'Show Dimensions'} </button> <div className="text-right flex flex-col"> <span className="text-xs font-bold text-slate-400 uppercase">Standard</span> <span className="text-sm font-bold text-slate-900">ISO 128 (GPS)</span> </div> </div> </div> <div className="grid grid-cols-2 gap-6 flex-1 min-h-0"> <DrawingView title="Front Elevation" type="FRONT" lines={projections.FRONT} showDimensions={showDimensions} /> <DrawingView title="Top Plan" type="TOP" lines={projections.TOP} showDimensions={showDimensions} /> <DrawingView title="Right Profile" type="RIGHT" lines={projections.RIGHT} showDimensions={showDimensions} /> <DrawingView title="Isometric View" type="ISO" lines={projections.ISO} showDimensions={showDimensions} /> </div>
 
 
 

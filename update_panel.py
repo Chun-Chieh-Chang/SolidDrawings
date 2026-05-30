@@ -1,4 +1,12 @@
-'use client';
+import re
+
+with open('src/ui/FeatureManagerPanel.tsx', 'r', encoding='utf-8') as f:
+    content = f.read()
+
+# We need to completely rewrite the component to use dnd-kit.
+# Because the file is complex, I will write the complete file content.
+
+new_content = """'use client';
 
 import React, { Fragment, useState } from 'react';
 import type { CADFeature } from '@/store/useCadStore';
@@ -464,3 +472,7 @@ export function FeatureManagerPanel({
     </div>
   );
 }
+"""
+
+with open('src/ui/FeatureManagerPanel.tsx', 'w', encoding='utf-8') as f:
+    f.write(new_content)

@@ -13,7 +13,8 @@ export const SketchPropertyManager: React.FC = () => {
     sketchEdges,
     setSketchEdges,
     sketchConstraints,
-    setSketchConstraints
+    setSketchConstraints,
+    solverReport
   } = useCadStore();
 
   const selectedNodes = useMemo(() => {
@@ -120,6 +121,12 @@ export const SketchPropertyManager: React.FC = () => {
       } else {
         return;
       }
+    } else if (type === 'PARALLEL' || type === 'PERPENDICULAR') {
+      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'LINE')) {
+        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+      } else {
+        return;
+      }
     }
 
     const nextConstraints = { ...sketchConstraints, [cid]: newConstraint };
@@ -144,15 +151,31 @@ export const SketchPropertyManager: React.FC = () => {
     if (rebuildHook) rebuildHook();
   };
 
+  const definitionStatus = useMemo(() => {
+    const nodeIds = Object.keys(sketchNodes);
+    if (nodeIds.length === 0) return { text: 'Empty Sketch', color: 'text-slate-400', bg: 'bg-slate-100' };
+
+    if (!solverReport) return { text: 'Under Defined', color: 'text-blue-600', bg: 'bg-blue-100' };
+
+    if (solverReport.dof < 0) {
+      return { text: `Over Defined (${solverReport.dof} DOF)`, color: 'text-red-700', bg: 'bg-red-100' };
+    }
+
+    if (solverReport.dof === 0) {
+      return { text: 'Fully Defined (0 DOF)', color: 'text-emerald-700', bg: 'bg-emerald-100' };
+    } else {
+      return { text: `Under Defined (${solverReport.dof} DOF)`, color: 'text-blue-700', bg: 'bg-blue-100' };
+    }
+  }, [sketchNodes, solverReport]);
+
   return (
     <div className="flex flex-col h-full bg-[#F5F6F9] select-none font-sans">
       {/* PropertyManager Header */}
       <div className="p-3 bg-white border-b border-slate-300 shadow-sm">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center justify-between mb-2">
           <h2 className="text-[13px] font-black text-slate-800 uppercase tracking-tight">PropertyManager</h2>
-          <div className="flex gap-1">
-            <button className="w-5 h-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-400 border-none bg-transparent">?</button>
-            <button className="w-5 h-5 rounded hover:bg-slate-100 flex items-center justify-center text-slate-400 border-none bg-transparent">×</button>
+          <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${definitionStatus.bg} ${definitionStatus.color}`}>
+            {definitionStatus.text}
           </div>
         </div>
         <div className="text-[11px] text-slate-500 font-medium">
@@ -198,7 +221,9 @@ export const SketchPropertyManager: React.FC = () => {
               { type: 'EQUAL', label: 'Equal', icon: '=' },
               { type: 'CONCENTRIC', label: 'Concentric', icon: '◎' },
               { type: 'TANGENT', label: 'Tangent', icon: '○' },
-              { type: 'ANGLE', label: 'Angle', icon: '∠' }
+              { type: 'ANGLE', label: 'Angle', icon: '∠' },
+              { type: 'PARALLEL', label: 'Parallel', icon: '∥' },
+              { type: 'PERPENDICULAR', label: 'Perpend.', icon: '⊥' }
             ].map(c => (
               <button
                 key={c.type}
