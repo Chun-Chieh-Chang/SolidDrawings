@@ -44,6 +44,14 @@ const CenterLineIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeDasharray="4 2"><line x1="4" y1="12" x2="20" y2="12"/></svg>
 );
 
+const ConvertIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M12 12 3.5 7.5"/><path d="M12 12l8.5-4.5"/></svg>
+);
+
+const OffsetIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 12A10 10 0 0 0 12 2v0"/><path d="M22 12A10 10 0 0 1 12 22v0"/><path d="M12 22a10 10 0 0 1-10-10v0"/><path d="M12 2a10 10 0 0 0-10 10v0"/><path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
+);
+
 export const ShortcutBox: React.FC = () => {
   const { 
     shortcutBox, setShortcutBox, 
@@ -71,6 +79,8 @@ export const ShortcutBox: React.FC = () => {
     { id: 'RECTANGLE', icon: <RectIcon />, label: 'Rect', action: () => setSketchTool('RECTANGLE') },
     { id: 'SPLINE', icon: <SplineIcon />, label: 'Spline', action: () => setSketchTool('SPLINE') },
     { id: 'SMART_DIM', icon: <DimIcon />, label: 'Dim', action: () => setSmartDimensionActive(true) },
+    { id: 'CONVERT', icon: <ConvertIcon />, label: 'Convert', action: () => { (window as any).__handleConvertEntities?.(); } },
+    { id: 'OFFSET', icon: <OffsetIcon />, label: 'Offset', action: () => { (window as any).__handleOffsetEntities?.(); } },
     { id: 'SAVE', icon: <ExitIcon />, label: 'Save', action: () => { (window as any).__handleSaveSketchOnly?.(); } },
     { id: 'EXIT', icon: <ExitIcon />, label: 'Exit', action: () => { (window as any).__resetSketchSession?.(); } },
   ] : [

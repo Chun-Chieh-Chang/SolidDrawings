@@ -16,6 +16,23 @@
 
 ---
 
+## [2026-05-30] Phase 62: Convert & Offset Entities (SW 2000 Parity) ✅
+
+### 實裝成果
+- **轉換實體 (Convert Entities)**：
+  - 實作了 `HeavyEngineClient.convertEntities`，支援選取 3D 面或邊緣，將其精準投影並轉換為當前草圖平面的 Graph 節點與線段 (`sketchNodes`/`sketchEdges`)。
+  - 在 `useFeatureBuilders` 內封裝 `handleConvertEntities` 回調，並加入了對無效選取的保護提示。
+- **偏移實體 (Offset Entities)**：
+  - 實作了 `HeavyEngineClient.offsetEntities`，支援自動提取草圖內的所有封閉路徑，並依照使用者輸入的距離生成等距偏移線段。
+  - 在 `RibbonController` 與 `ShortcutBox` 的 SKETCH 面板中新增專屬的 CAD 圖示按鈕。
+- **全端對接**：打通了從前端 UI、Zustand Store (`selectedTopology`) 到後端 FastAPI `/convert_entities` 與 `/offset_entities` 的完整資料流。
+
+### RCA & CAPA
+- **Issue**: 缺乏轉換與偏移實體功能，導致使用者在繪製依賴於現有 3D 結構的草圖時，必須重新手動繪製一次輪廓，完全不符合 SolidWorks 2000 時代的參數化基準。
+- **CAPA**: 將這兩個核心草圖工具納入 `useFeatureBuilders`。未來我們還可以進一步實作「關聯性 (Associativity)」，讓轉換實體能在原始 3D 邊界改變時自動更新。
+
+---
+
 ## [2026-05-30] Phase 61: Frontend STEP Import Workflow (SW 2000 Parity) ✅
 
 ### 實裝成果

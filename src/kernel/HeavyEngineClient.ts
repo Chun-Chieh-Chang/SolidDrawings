@@ -229,4 +229,36 @@ export class HeavyEngineClient {
       throw error;
     }
   }
+
+  public async convertEntities(features: CADFeature[], topology: any, planeType: string, faceOrigin?: number[], faceNormal?: number[]): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/convert_entities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features, topology, planeType, faceOrigin, faceNormal }),
+      });
+      if (!response.ok) throw new Error('Convert entities failed');
+      const data = await response.json();
+      return data.points || [];
+    } catch (error) {
+      console.error('[HeavyEngineClient] Convert entities error:', error);
+      throw error;
+    }
+  }
+
+  public async offsetEntities(points2D: number[][], distance: number, planeType: string, faceOrigin?: number[], faceNormal?: number[]): Promise<any[]> {
+    try {
+      const response = await fetch(`${this.baseUrl}/offset_entities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ points2D, distance, planeType, faceOrigin, faceNormal }),
+      });
+      if (!response.ok) throw new Error('Offset entities failed');
+      const data = await response.json();
+      return data.points || [];
+    } catch (error) {
+      console.error('[HeavyEngineClient] Offset entities error:', error);
+      throw error;
+    }
+  }
 }

@@ -78,6 +78,8 @@ export default function Home() {
     handleExitAndExtrude,
     handleRevolveFromSketch,
     handleBuildSweepLoft,
+    handleConvertEntities,
+    handleOffsetEntities,
   } = useFeatureBuilders(handleRebuild);
 
   const handlePrintToPDF = useCallback(async () => {
@@ -233,8 +235,10 @@ export default function Home() {
       (window as any).__handleRevolve = handleRevolveFromSketch;
       (window as any).__resetSketchSession = resetSketchSession;
       (window as any).__handleSaveSketchOnly = handleSaveSketchOnly;
+      (window as any).__handleConvertEntities = handleConvertEntities;
+      (window as any).__handleOffsetEntities = handleOffsetEntities;
     }
-  }, [handleRebuild, handleExitAndExtrude, handleRevolveFromSketch, resetSketchSession, handleSaveSketchOnly]);
+  }, [handleRebuild, handleExitAndExtrude, handleRevolveFromSketch, resetSketchSession, handleSaveSketchOnly, handleConvertEntities, handleOffsetEntities]);
 
   return (
     <main className="flex flex-col h-screen w-screen overflow-hidden bg-background text-primary-text font-sans">

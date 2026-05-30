@@ -46,7 +46,27 @@ src/
 | 1–54  | 建模、渲染、S-Key、TNS、工程圖等 | ✅ 完成 |
 | 55 | Architecture Decoupling (page.tsx Refactoring) | ✅ |
 | 56 | Sketch Validation UX & Toast System | ✅ |
-| **57** | **Advanced 3D Mirror Feature** | ✅ **最新** |
+| 57 | Advanced 3D Mirror Feature | ✅ |
+| 58-60 | Patterning, Guidance, TNS 3.0 | ✅ |
+| 61 | STEP Import UI Workflow | ✅ |
+| **62** | **Convert & Offset Entities** | ✅ **最新** |
+
+---
+
+## 🔑 Phase 62 實作細節 (最新完成)
+
+### 新增：Convert & Offset Entities (轉換與偏移實體)
+**功能描述**：對標 SolidWorks 2000 的核心草圖工具，允許復用現有 3D 幾何或草圖輪廓。
+- **Convert Entities (轉換實體)**：支援選取 3D 面或邊界，一鍵投影至當前草圖平面，並自動生成 `sketchNodes` 與 `sketchEdges`。
+- **Offset Entities (偏移實體)**：自動識別草圖中的閉合/開放路徑，根據使用者輸入的距離等距偏移生成新線段。
+- **全端對接**：打通了前端 `ShortcutBox` UI 到後端 `HeavyEngineClient` 的 HTTP API 呼叫，並完成 Graph 拓樸的動態註入。
+
+---
+
+## 🔑 Phase 61 實作細節
+
+### 新增：Frontend STEP Import Workflow (前端 STEP 匯入工作流)
+**功能描述**：補齊後端 `import_step_file` API 的前端 UI 入口，支援標準件/外購件的直接匯入，並作為 `DUMB_SOLID` 掛載於特徵樹中，完成 CAD 生態系的閉環。
 
 ---
 

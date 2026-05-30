@@ -398,6 +398,19 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Smart Dim</span>
             </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { (window as any).__handleConvertEntities?.(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Convert Entities">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M12 12 3.5 7.5"/><path d="M12 12l8.5-4.5"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Convert</span>
+            </button>
+            <button onClick={() => { (window as any).__handleOffsetEntities?.(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Offset Entities">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 12A10 10 0 0 0 12 2v0"/><path d="M22 12A10 10 0 0 1 12 22v0"/><path d="M12 22a10 10 0 0 1-10-10v0"/><path d="M12 2a10 10 0 0 0-10 10v0"/><path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Offset</span>
+            </button>
           </div>
         ) : activeTab === 'EVALUATE' ? (
           <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
