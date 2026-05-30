@@ -608,7 +608,7 @@ export default function Home() {
 
   const { loadCadData: loadPartDocument, handleSaveProject } = usePartDocument(features);
 
-  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING'>('FEATURES');
+  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER'>('FEATURES');
 
   const [massProps, setMassProps] = useState<{
 
@@ -2513,6 +2513,10 @@ ${result.path}`);
             onClick={() => { setActiveTab('ASSEMBLY'); setMeasurementMode('NONE'); useCadStore.getState().setMode('ASSEMBLY'); } }
             className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "ASSEMBLY" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
           >ASSEMBLY</button>
+          <button
+            onClick={() => { setActiveTab('RENDER'); setMeasurementMode('NONE'); useCadStore.getState().setMode('RENDER'); } }
+            className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "RENDER" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
+          >RENDER</button>
         </div>
 
         {/* Ribbon Content Panels */}
@@ -2791,11 +2795,76 @@ ${result.path}`);
             </div>
           ) : activeTab === 'EVALUATE' ? (
             <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
-              <button onClick={() => setMeasurementMode(measurementMode === 'NONE' ? 'DISTANCE' : 'NONE')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${measurementMode !== 'NONE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Measure">
-                <div className={`w-10 h-10 flex items-center justify-center transition-transform ${measurementMode !== 'NONE' ? 'text-indigo-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21.3 15.3l-5-5L19 7.7l-2-2L14.7 8l-5-5-1.4 1.4 1 1-1.5 1.5-1-1L5.4 7.3l1 1-1.5 1.5-1-1-1.4 1.4 5 5-2.3 2.3 2 2 2.3-2.3 5 5 1.4-1.4-1-1 1.5-1.5 1 1 1.4-1.4-1-1 1.5-1.5 1 1z"/></svg>
+              <button onClick={() => setMeasurementMode(measurementMode === 'DISTANCE' ? 'NONE' : 'DISTANCE')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border rounded-md ${measurementMode === 'DISTANCE' ? 'bg-[#005B9A]/10 border-[#005B9A]' : 'border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100'} group`} title="Measure Distance">
+                <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 4h6v6" /><path d="M20 4L4 20" /><path d="M10 20H4v-6" /></svg>
                 </div>
-                <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Measure</span>
+                <span className="text-[11px] font-semibold text-slate-800 leading-tight">Measure<br />Distance</span>
+              </button>
+
+
+
+              <button
+                onClick={() => {
+                  useCadStore.getState().setSectionView({ isActive: !useCadStore.getState().sectionView.isActive });
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 rounded-md group ${useCadStore.getState().sectionView.isActive ? 'bg-[#005B9A]/10 border-[#005B9A]' : ''}`}
+                title="Section View"
+              >
+                <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 12h16M12 4v16M3 9h18M3 15h18" /></svg>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-800 leading-tight">Section<br />View</span>
+              </button>
+
+            </div>
+          ) : activeTab === 'RENDER' ? (
+            <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
+              <div className="flex flex-col gap-1 px-3 py-1 border border-[#A0A0A0] rounded bg-white">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">材質 (Material)</label>
+                <select 
+                  className="text-[12px] bg-slate-100 border border-slate-300 rounded px-2 py-1 outline-none font-bold text-slate-800"
+                  value={useCadStore.getState().partMaterial}
+                  onChange={(e) => useCadStore.getState().setPartMaterial(e.target.value)}
+                >
+                  {Object.keys(require('@/store/useCadStore').MATERIAL_PRESETS || {}).map(m => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="w-px h-[60%] bg-slate-300 mx-1"></div>
+
+              <div className="flex flex-col gap-1 px-3 py-1 border border-[#A0A0A0] rounded bg-white">
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">環境光 (Environment)</label>
+                <select 
+                  className="text-[12px] bg-slate-100 border border-slate-300 rounded px-2 py-1 outline-none font-bold text-slate-800"
+                  value={useCadStore.getState().environmentMap}
+                  onChange={(e) => useCadStore.getState().setEnvironmentMap(e.target.value)}
+                >
+                  <option value="studio">Studio (攝影棚)</option>
+                  <option value="city">City (城市)</option>
+                  <option value="forest">Forest (森林)</option>
+                  <option value="sunset">Sunset (日落)</option>
+                  <option value="dawn">Dawn (黎明)</option>
+                  <option value="night">Night (夜晚)</option>
+                </select>
+              </div>
+
+              <div className="w-px h-[60%] bg-slate-300 mx-1"></div>
+
+              <button
+                onClick={() => {
+                  const currentMode = useCadStore.getState().viewportDisplayMode;
+                  useCadStore.getState().setViewportDisplayMode(currentMode === 'SHADED' ? 'SHADED_EDGES' : 'SHADED');
+                }}
+                className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 rounded-md group`}
+                title="純淨彩現模式 (切換線框)"
+              >
+                <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 12h3v8h14v-8h3L12 2z" /></svg>
+                </div>
+                <span className="text-[11px] font-semibold text-slate-800 leading-tight">Toggle<br />Wireframe</span>
               </button>
             </div>
           ) : activeTab === 'ASSEMBLY' ? (

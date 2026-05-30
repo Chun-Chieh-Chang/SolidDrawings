@@ -705,7 +705,7 @@ const MouseTracker = () => {
 };
 
 export default function Viewport({ children }: ViewportProps) {
-  const { isSketchMode, features, setControls, isCameraAnimating, activePropertyManager, setSelectedId, setSelectedSubNodeType } = useCadStore();
+  const { isSketchMode, features, setControls, isCameraAnimating, activePropertyManager, setSelectedId, setSelectedSubNodeType, environmentMap, mode: cadMode } = useCadStore();
 
   return (
     <div className="w-full h-full bg-linear-to-b from-[#FFFFFF] to-[#C8D2DF] relative">
@@ -726,7 +726,7 @@ export default function Viewport({ children }: ViewportProps) {
         <SceneSelector />
         <PerspectiveCamera makeDefault position={[100, 100, 100]} fov={45} />
         <Suspense fallback={null}>
-          <Stage environment="city" intensity={0.5}>
+          <Stage environment={cadMode === 'RENDER' ? (environmentMap as any) : "city"} intensity={0.5}>
             <DatumPlanes />
             <SketchPreview />
             <HighlightRenderer />

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 
-export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING';
+export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING' | 'RENDER';
 export type MeasurementMode = 'NONE' | 'DISTANCE' | 'ANGLE' | 'AREA' | 'VOLUME';
 export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT';
 
@@ -275,7 +275,32 @@ interface CadState {
   
   sectionView: SectionViewState;
   setSectionView: (view: Partial<SectionViewState>) => void;
+
+  // Render & Appearance
+  partMaterial: string;
+  setPartMaterial: (material: string) => void;
+  environmentMap: string;
+  setEnvironmentMap: (env: string) => void;
 }
+
+export const MATERIAL_PRESETS: Record<string, {
+  color: string;
+  roughness: number;
+  metalness: number;
+  clearcoat?: number;
+  clearcoatRoughness?: number;
+  transmission?: number;
+  ior?: number;
+  thickness?: number;
+}> = {
+  Steel: { color: '#8c929c', roughness: 0.3, metalness: 0.8, clearcoat: 0.1 },
+  Aluminum: { color: '#d5d7db', roughness: 0.4, metalness: 0.9 },
+  Gold: { color: '#f0ce4a', roughness: 0.1, metalness: 1.0, clearcoat: 0.2 },
+  Copper: { color: '#b87333', roughness: 0.2, metalness: 0.95 },
+  'Glossy Plastic': { color: '#e74c3c', roughness: 0.05, metalness: 0.05, clearcoat: 1.0, clearcoatRoughness: 0.1 },
+  'Matte Plastic': { color: '#2c3e50', roughness: 0.8, metalness: 0.0 },
+  Glass: { color: '#ffffff', roughness: 0.0, metalness: 0.0, transmission: 1.0, ior: 1.5, thickness: 2.0, clearcoat: 1.0 },
+};
 
 export const useCadStore = create<CadState>()(
   persist(
@@ -578,7 +603,7 @@ export const useCadStore = create<CadState>()(
       dismissToast: (id) =>
         set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
       pendingFeatureCommand: null,
-      setPendingFeatureCommand: (pendingFeatureCommand) => set({ pendingFeatureCommand }),
+      setPendingFeatureCommand: (cmd) => set({ pendingFeatureCommand: cmd }),
       defaultFilletRadius: 2,
       defaultChamferDistance: 1.5,
       referencePlanes: [],
@@ -609,6 +634,11 @@ export const useCadStore = create<CadState>()(
 
       sectionView: { isActive: false, plane: 'FRONT', offset: 0, flip: false },
       setSectionView: (view) => set((state) => ({ sectionView: { ...state.sectionView, ...view } })),
+
+      partMaterial: 'Steel',
+      setPartMaterial: (m) => set({ partMaterial: m }),
+      environmentMap: 'studio',
+      setEnvironmentMap: (env) => set({ environmentMap: env }),
     }),
     {
       name: 'cad-storage',
@@ -631,6 +661,8 @@ export const useCadStore = create<CadState>()(
         drawingScale: state.drawingScale,
         drawnBy: state.drawnBy,
         approvedBy: state.approvedBy,
+        partMaterial: state.partMaterial,
+        environmentMap: state.environmentMap,
       }),
     }
   )

@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import * as THREE from 'three';
-import { useCadStore } from '../store/useCadStore';
+import { useCadStore, MATERIAL_PRESETS } from '../store/useCadStore';
 import { topologySelector, getFeatureDistance } from './Viewport';
 
 export interface FaceMetadata {
@@ -53,6 +53,7 @@ export default function OcctShape({
     setSelectedSubNodeType,
     viewportDisplayMode,
     sectionView,
+    partMaterial,
   } = useCadStore();
 
   const clippingPlanes = useMemo(() => {
@@ -228,14 +229,19 @@ export default function OcctShape({
       userData={{ type: 'B_REP_SHAPE', face_metadata: data.face_metadata, componentId }}
       onClick={handleMeshClick}
     >
-      <meshStandardMaterial
-        color={color}
-        roughness={0.3}
-        metalness={0.2}
+      <meshPhysicalMaterial
+        color={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.color || color : color}
+        roughness={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.roughness ?? 0.3 : 0.3}
+        metalness={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.metalness ?? 0.2 : 0.2}
+        clearcoat={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.clearcoat ?? 0 : 0}
+        clearcoatRoughness={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.clearcoatRoughness ?? 0 : 0}
+        transmission={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.transmission ?? 0 : 0}
+        ior={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.ior ?? 1.5 : 1.5}
+        thickness={cadMode === 'RENDER' ? MATERIAL_PRESETS[partMaterial]?.thickness ?? 0 : 0}
         flatShading={false}
         side={THREE.DoubleSide}
         wireframe={viewportDisplayMode === 'WIREFRAME'}
-        transparent={viewportDisplayMode === 'WIREFRAME' || color === 'red'}
+        transparent={viewportDisplayMode === 'WIREFRAME' || color === 'red' || (cadMode === 'RENDER' && (MATERIAL_PRESETS[partMaterial]?.transmission ?? 0) > 0)}
         opacity={viewportDisplayMode === 'WIREFRAME' ? 0.85 : (color === 'red' ? 0.6 : 1)}
         clippingPlanes={clippingPlanes}
       />
