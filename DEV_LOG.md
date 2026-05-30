@@ -48,6 +48,37 @@
 
 ---
 
+## [2026-05-30] Phase 53: PBR Physical Rendering & Material System (物理渲染與材質系統) ✅
+
+### 實裝成果
+- **RENDER (彩現) 分頁**：在 Ribbon 加入了全新標籤，並包含材質 (Material) 與環境光 (Environment) 下拉選單。
+- **實體材質升級**：將 `OcctShape` 底層材質從 `meshStandardMaterial` 升級為 `meshPhysicalMaterial`，支援 IOR (折射率)、Transmission (透射率)、Clearcoat (清漆) 等屬性，完美模擬玻璃與高級烤漆。
+- **環境光映射**：引入 `@react-three/drei` 的 `<Environment>`，使表面反光能真實映射出 Studio、City 或 Sunset 等光影氛圍。
+- **狀態綁定**：在 `useCadStore` 內定義了 `MATERIAL_PRESETS` 字典庫，無縫對接 3D 渲染與 UI 控制，並支援純淨預覽模式 (隱藏線框)。
+
+### RCA & CAPA
+- **Issue**: 先前只能使用寫死的單一顏色與粗糙度，欠缺專業感，且無法呈現穿透性。
+- **CAPA**: 實作了 PBR 渲染管線，替換材質與加入環境光。同時也解決了 `EVALUATE` 面板中誤植的函數錯誤 (透過 TypeScript 強制檢查抓出)。
+
+---
+
+## [2026-05-30] Phase 52: Feature Tree Reordering & Rollback (特徵樹拖曳重排與歷史回退) ✅
+
+### 實裝成果
+- **拖曳重排 (Drag and Drop)**：引進 `@dnd-kit/core` 取代原生的 HTML5 Drag and Drop，帶來媲美 Figma 般的微動畫與流暢讓位體驗。
+- **拓樸防呆 (Topology Validation)**：在拖曳結束時，執行相依性檢查，嚴禁子特徵 (如 Fillet) 移動到父特徵 (如 Extrude) 之前，防止圖形運算崩潰。
+- **回退棒 (Rollback Bar)**：在特徵樹加入了一根藍色控制棒，拖曳它即可隱藏其下方的特徵，實現 CAD 軟體的時光旅行機制，並與後端的漸進式重建綁定。
+
+---
+
+## [2026-05-30] Phase 51: Auto-Dimensioning (工程圖自動標註) ✅
+
+### 實裝成果
+- 實作了草圖特徵感知的尺寸標註機制。在 DRAWING 工程圖中，能夠智慧提取特徵參數 (如深度、半徑) 以及草圖邊線約束，自動生成對應的標註線條。
+- 加入了顯示/隱藏的 Toggle 開關，讓畫面保持整潔。
+
+---
+
 ## [2026-05-30] Phase 46: Sketch DOF Counter (草圖自由度計數器) ✅
 
 ### 實裝成果

@@ -73,11 +73,42 @@ backend/app/
 | 46 | 草圖自由度 (DOF) 計數器 | ✅ |
 | 47 | Fillet/Chamfer Tangent Propagation (相切傳遞) | ✅ |
 | 48 | 實體操作 (Pattern 邊緣參考, Mirror, Draft) | ✅ |
-| **49** | **薄殼 (Shell) 與異型孔精靈 (Hole Wizard)** | ✅ **最新** |
+| 49 | 薄殼 (Shell) 與異型孔精靈 (Hole Wizard) | ✅ |
+| 50 | 2D Engineering Drawings (HLR) | ✅ |
+| 51 | Auto-Dimensioning (工程圖自動標註) | ✅ |
+| 52 | Feature Tree Reordering & Rollback | ✅ |
+| **53** | **PBR Physical Rendering & Material System** | ✅ **最新** |
 
 ---
 
-## 🔑 Phase 49 實作細節 (最新完成)
+## 🔑 Phase 53 實作細節 (最新完成)
+
+### 新增：PBR Physical Rendering & Material System (物理渲染與材質系統)
+**功能描述**：大幅升級實體的材質與光影表現。從基礎的標準材質替換為基於物理的 `meshPhysicalMaterial`，並實作 HDRI 環境光映射，讓模型具有工業級渲染質感。
+
+**實作亮點**：
+- **RENDER (彩現) 分頁**：在 Ribbon 加入了全新標籤，並包含材質 (Material) 與環境光 (Environment) 下拉選單。
+- **實體材質升級**：支援 IOR (折射率)、Transmission (透射率)、Clearcoat (清漆) 等屬性，完美模擬玻璃與高級烤漆。
+- **環境光映射**：引入 `@react-three/drei` 的 `<Environment>`，使表面反光能真實映射出 Studio、City 或 Sunset 等光影氛圍。
+
+---
+
+## 🔑 Phase 52 實作細節
+
+### 新增：Feature Tree Reordering & Rollback (特徵樹拖曳重排與歷史回退)
+**功能描述**：引進 `@dnd-kit/core` 取代原生的 HTML5 Drag and Drop，帶來媲美 Figma 般的微動畫與流暢讓位體驗。支援拖曳特徵重新排序，並具備拓樸防呆，禁止子特徵移動到父特徵之前。
+- **回退棒 (Rollback Bar)**：在特徵樹加入了一根藍色控制棒，拖曳它即可隱藏其下方的特徵，實現 CAD 軟體的時光旅行機制，並與後端的漸進式重建綁定。
+
+---
+
+## 🔑 Phase 51 實作細節
+
+### 新增：Auto-Dimensioning (工程圖自動標註)
+**功能描述**：實作了草圖特徵感知的尺寸標註機制。在 DRAWING 工程圖中，能夠智慧提取特徵參數 (如深度、半徑) 以及草圖邊線約束，自動生成對應的標註線條。加入顯示/隱藏的 Toggle 開關。
+
+---
+
+## 🔑 Phase 49 實作細節
 
 ### 新增：薄殼 (Shell) 與異型孔精靈 (Hole Wizard)
 **功能描述**：大幅升級實體的進階編修能力。薄殼用於掏空實體並維持特定壁厚；異型孔精靈則允許使用者直接在模型表面點擊打出符合加工標準的孔洞。
@@ -160,15 +191,12 @@ backend/app/
 
 ---
 
-## 🚧 下一步建議開發方向
+## 🚧 下一步建議開發方向 (Next Agent Actions)
 
-### 優先 A：Fillet/Chamfer 的連續邊緣偵測 (Tangent Propagation)
-- 在現有 Fillet/Chamfer 選擇 Edge 後，增加「相切傳遞」選項，自動將與該 Edge 相切的連續邊緣全部納入 `refs`。
-- 有助於建立完整的工業級倒角功能。
-
-### 優先 B：實體鏡射與複製排列 (Mirror & Pattern)
-- 在 Feature 樹支援更完整的 Pattern (環形/線性) 編輯。
-- 引入 Mirror Feature。
+### 優先 A：Phase 54: 其他後續完善 (Other Polish & Refinements)
+- 修復目前系統中累積的小瑕疵或不一致之處 (Bug fixes & UX Polish)。
+- 優化手機版/平板版的響應式 (Responsive Design) 體驗，確保在小螢幕下依然能順暢繪圖。
+- 檢查並增強後端幾何求解的錯誤處理機制，防止在給予錯誤參數時後端崩潰而無法回傳結果。
 
 ---
 
@@ -222,4 +250,3 @@ c:\Users\3kids\Downloads\3D-Builder\
 ├── backend/app/services/geometry_service.py     ← OCC 幾何核
 └── backend/app/services/assembly_solver.py      ← Scipy 裝配求解
 ```
-- **Phase 50**: 2D Engineering Drawings (HLR). 修復了前後端之間的型別衝突，實作等角透視 (ISO) 以及 FRONT/TOP/RIGHT 投影，並成功提取 OpenCASCADE 的 Hidden Lines (隱藏線) 至前端渲染為工程圖虛線，包含工程圖框標題。
