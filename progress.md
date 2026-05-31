@@ -35,3 +35,9 @@
 - [x] Inject planeNormal into sketch loop metadata.
 - [x] Update PythonOCC gp_Circ vector resolution.
 - [x] Run static syntax and compilation validations.
+
+### Phase 105: Cylinder UI Workflow Verification
+- [x] Analyze \solidSketchPointCount\ limitation in Ribbon.
+- [x] Relax point count limit for Extrude to >=2 (supports Circle).
+- [x] Relax point count limit for Cut to >=2.
+- [x] Delegate true closed-loop validation to \handleExitAndExtrude\.

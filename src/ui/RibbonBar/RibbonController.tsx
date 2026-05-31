@@ -160,14 +160,14 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Extrude</span>
             </button>
-            <button onClick={() => { 
-              if (solidSketchPointCount >= 3) {
-                handleExitAndExtrude('CUT'); 
-              } else { 
-                setSketchMode(true); 
-                setSketchTool('SELECT'); 
-                if (solidSketchPointCount > 0) pushToast('點數不足：切除至少需要 3 個草圖點。', 'info');
-              } 
+            <button onClick={() => {
+              if (solidSketchPointCount >= 2) {
+                handleExitAndExtrude('CUT');
+              } else {
+                setSketchMode(true);
+                setSketchTool('SELECT');
+                if (solidSketchPointCount > 0) pushToast('點數不足：切除至少需要 2 個草圖點。', 'info');
+              }
             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Cut">
               <div className="w-10 h-10 flex items-center justify-center text-red-600 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M3 8l9 4 9-4"/></svg>
@@ -584,6 +584,44 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Exit</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-2" />
+
+            {/* Basic Sketch Primitives */}
+            <button onClick={() => setSketchTool('LINE')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'LINE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Line">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'LINE' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="19" x2="19" y2="5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="5" r="1.5"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Line</span>
+            </button>
+
+            <button onClick={() => setSketchTool('RECTANGLE')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'RECTANGLE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Rectangle">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'RECTANGLE' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Rect</span>
+            </button>
+
+            <button onClick={() => setSketchTool('CIRCLE')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'CIRCLE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Circle">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'CIRCLE' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Circle</span>
+            </button>
+
+            <button onClick={() => setSketchTool('ARC')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'ARC' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="3 Point Arc">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'ARC' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 12a8 8 0 0 0-16 0"/><path d="M4 12v4"/><path d="M20 12v4"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Arc</span>
+            </button>
+
+            <button onClick={() => setSketchTool('SPLINE')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'SPLINE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Spline">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'SPLINE' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19c4 0 6-8 10-8s6 8 10 8" /></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Spline</span>
+            </button>
+
+            <div className="w-[1px] h-10 bg-border/50 mx-2" />
             <button onClick={() => useCadStore.setState(s => ({ smartDimensionActive: !s.smartDimensionActive }))} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${useCadStore.getState().smartDimensionActive ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Smart Dimension">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${useCadStore.getState().smartDimensionActive ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m18 8 3 3-3 3"/><path d="m6 8-3 3 3 3"/><path d="M2 11h20"/><path d="M2 4v14"/><path d="M22 4v14"/></svg>
@@ -784,3 +822,4 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
     </div>
   );
 };
+
