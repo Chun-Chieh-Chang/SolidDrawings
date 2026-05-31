@@ -819,6 +819,104 @@ const InterferenceRenderer = () => {
   );
 };
 
+const FeatureCallouts = () => {
+  const { selectedId, features, updateFeatureParams, isSketchMode } = useCadStore();
+  const [localVal, setLocalVal] = useState<string>("");
+  const [activeFeatId, setActiveFeatId] = useState<string | null>(null);
+
+  const feat = useMemo(() => features.find(f => f.id === selectedId), [features, selectedId]);
+
+  useEffect(() => {
+    if (feat && feat.id !== activeFeatId) {
+      const mainParam = feat.type === 'EXTRUDE' ? 'depth' : 
+                        feat.type === 'FILLET' ? 'radius' : 
+                        feat.type === 'CHAMFER' ? 'distance' : 
+                        feat.type === 'SHELL' ? 'thickness' : 
+                        feat.type === 'HOLE_WIZARD' ? 'diameter' : null;
+      if (mainParam) {
+        setLocalVal(String(feat.parameters[mainParam] || 0));
+        setActiveFeatId(feat.id);
+      }
+    }
+  }, [feat, activeFeatId]);
+
+  if (!feat || isSketchMode) return null;
+
+  let anchor = new THREE.Vector3(0, 0, 0);
+  let label = "D1";
+  let paramKey = "";
+
+  if (feat.type === 'EXTRUDE') {
+    const { points, depth = 20, plane = 'TOP' } = feat.parameters;
+    if (points && points.length > 0) {
+      const p = points[0];
+      if (plane === 'FRONT') anchor.set(p[0], p[1], depth);
+      else if (plane === 'TOP') anchor.set(p[0], depth, p[1]);
+      else if (plane === 'RIGHT') anchor.set(depth, p[0], p[1]);
+      label = "Depth";
+      paramKey = "depth";
+    }
+  } else if (feat.type === 'FILLET' || feat.type === 'CHAMFER') {
+    const { edge_start, edge_end } = feat.parameters;
+    if (edge_start && edge_end) {
+      anchor.set((edge_start[0] + edge_end[0])/2, (edge_start[1] + edge_end[1])/2, (edge_start[2] + edge_end[2])/2);
+      label = feat.type === 'FILLET' ? "R" : "D";
+      paramKey = feat.type === 'FILLET' ? "radius" : "distance";
+    }
+  } else if (feat.type === 'SHELL') {
+    const refs = feat.parameters.faces_to_remove_refs;
+    if (refs && refs.length > 0 && refs[0].coordinates) {
+      anchor.fromArray(refs[0].coordinates);
+      label = "T";
+      paramKey = "thickness";
+    }
+  } else if (feat.type === 'HOLE_WIZARD') {
+    const refs = feat.parameters.hole_placement_refs;
+    if (refs && refs.length > 0 && refs[0].coordinates) {
+      anchor.fromArray(refs[0].coordinates);
+      label = "Ø";
+      paramKey = "diameter";
+    }
+  }
+
+  if (!paramKey) return null;
+
+  const handleCommit = () => {
+    const val = parseFloat(localVal);
+    if (!isNaN(val)) {
+      updateFeatureParams(feat.id, { [paramKey]: val });
+      const rebuildHook = (window as any).__handleRebuild;
+      if (rebuildHook) setTimeout(rebuildHook, 10);
+    }
+  };
+
+  return (
+    <Html position={anchor} center distanceFactor={15}>
+      <div className="glass-effect p-2 rounded-lg border border-white/40 shadow-2xl flex flex-col gap-1 min-w-[100px] animate-in zoom-in duration-200 pointer-events-auto">
+        <div className="flex items-center justify-between gap-4">
+           <span className="text-[10px] font-black text-[#005B9A] uppercase tracking-tighter">{label}</span>
+           <div className="flex items-center gap-1">
+              <input 
+                type="text"
+                value={localVal}
+                onChange={(e) => setLocalVal(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCommit()}
+                className="w-14 bg-white/50 border border-slate-300 rounded px-1 py-0.5 text-[11px] font-mono font-bold text-slate-800 outline-none focus:border-[#005B9A]"
+              />
+              <span className="text-[9px] text-slate-400 font-bold">mm</span>
+           </div>
+        </div>
+        <button 
+          onClick={handleCommit}
+          className="w-full mt-1 bg-[#005B9A] text-white text-[9px] font-bold py-1 rounded hover:bg-[#004a7c] transition-colors uppercase tracking-widest shadow-sm"
+        >
+          Update
+        </button>
+      </div>
+    </Html>
+  );
+};
+
 export default function Viewport({ children }: ViewportProps) {
   const { isSketchMode, features, setControls, isCameraAnimating, activePropertyManager, setSelectedId, setSelectedSubNodeType, environmentMap, mode: cadMode } = useCadStore();
 
@@ -847,6 +945,7 @@ export default function Viewport({ children }: ViewportProps) {
             <DanglingNodesRenderer />
             <HighlightRenderer />
             <InterferenceRenderer />
+            <FeatureCallouts />
             <FeatureOutlines />
 
             {children || (

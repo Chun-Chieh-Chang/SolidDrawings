@@ -64,22 +64,23 @@ src/
 | 79 | Draft Feature (Mold Design Essentials) | ✅ |
 | 80 | Property Propagation (Color & Material Inheritance) | ✅ |
 | 81 | Assembly Interference Detection | ✅ |
-| **82** | **2D Sketch Patterns (Linear & Circular)** | ✅ **最新** |
+| 82 | 2D Sketch Patterns (Linear & Circular) | ✅ |
+| **83** | **3D Dimension Callouts (Viewport HUD Editing)** | ✅ **最新** |
 
 ---
 
-## 🔑 Phase 82 實作細節 (最新完成)
+## 🔑 Phase 83 實作細節 (最新完成)
 
-### 新增：2D Sketch Patterns (草圖陣列)
-**功能描述**：實現 2D 草圖實體的線性與圓形陣列，大幅提升重複幾何的繪製效率。
-- **線性陣列 (Linear Pattern)**：基於選取的參考線段（方向）進行平移複製，支援個數與間距設定。
-- **圓形陣列 (Circular Pattern)**：基於選取的中心點進行旋轉複製，支援執行個數與總角度設定。
-- **自動參數化 (Auto-EQUAL)**：陣列生成時自動在源幾何與複製品間建立 `EQUAL` 長度/半徑約束，確保修改原始幾何時陣列同步聯動。
-- **引導式 UI**：在 `SketchPropertyManager` 實作了專用的 Pattern Rollout，與 SolidWorks 操作邏輯 100% 對標。
+### 新增：3D Dimension Callouts (3D 數值懸浮編輯)
+**功能描述**：實作了 3D 視埠內的動態懸浮標籤，允許使用者直接在模型旁邊修改特徵參數，大幅提升交互流暢度。
+- **動態 HUD 渲染**：利用 `@react-three/drei` 的 `Html` 元件，在 3D 空間中精確定位編輯標籤。
+- **智慧錨定系統**：系統自動根據特徵類型計算最佳顯示位置（如長料頂面、圓角邊線中點），確保標籤不遮擋幾何。
+- **即時參數驅動**：雙擊標籤輸入框即可修改數值，按下 Enter 鍵立即觸發後端重建，達成「沈浸式」的建模體驗。
+- **對標 SolidWorks**：UI 風格與交互邏輯 1:1 對齊工業軟體標準，徹底消滅了「UI 乒乓球」效應。
 
 ---
 
-## 🔑 Phase 81 實作細節 (最新完成)
+## 🔑 Phase 82 實作細節
 
 ### 新增：Assembly Interference Detection (干涉檢查)
 **功能描述**：實現裝配體物理衝突偵測，對標 SolidWorks Evaluate 標籤。
@@ -217,9 +218,9 @@ src/
 
 如果您接手本專案，建議從以下任務開始：
 
-1. **[交互] 尺寸即時驅動 (Callout Editing)**：在 3D 視埠中直接雙擊尺寸數值進行修改，取代面板輸入，達到最極致的建模手感。
-2. **[建模] 3D 螺旋掃掠 (Helical Sweep)**：實作對標 SolidWorks 的螺旋線功能，用於建模螺紋、彈簧等複雜幾何。
-3. **[工程] 裝配體運動模擬 (Motion Study)**：利用配合關係 (Mates) 驅動組件運動，實作簡單的機構連桿動畫。
+1. **[建模] 3D 螺旋掃掠 (Helical Sweep)**：實作對標 SolidWorks 的螺旋線功能，用於建模螺紋、彈簧等複雜幾何。
+2. **[工程] 裝配體運動模擬 (Motion Study)**：利用配合關係 (Mates) 驅動組件運動，實作簡單的機構連桿動畫。
+3. **[性能] 大型組件輕量化 (Large Assembly Mode)**：實作組件的「輕量化 (Lightweight)」讀取模式，透過快取網格取代即時幾何運算。
 
 ---
 
