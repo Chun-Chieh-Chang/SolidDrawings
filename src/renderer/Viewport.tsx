@@ -939,7 +939,7 @@ export default function Viewport({ children }: ViewportProps) {
         <SceneSelector />
         <PerspectiveCamera makeDefault position={[100, 100, 100]} fov={45} />
         <Suspense fallback={null}>
-          <Stage environment={cadMode === 'RENDER' ? (environmentMap as any) : "city"} intensity={0.5}>
+          <Stage adjustCamera={false} environment={cadMode === 'RENDER' ? (environmentMap as any) : "city"} intensity={0.5}>
             <DatumPlanes />
             <SketchPreview />
             <DanglingNodesRenderer />

@@ -169,7 +169,7 @@ async def export_step(request: ExportStepRequest):
 class AssemblyInterferenceRequest(BaseModel):
     components: List[dict]
 
-@router.post(\"/check_interferences\")
+@router.post("/check_interferences")
 async def check_interferences(request: AssemblyInterferenceRequest):
     try:
         results = geometry_service.check_interferences(request.components)

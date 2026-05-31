@@ -391,6 +391,26 @@ export const SketchPreview = () => {
 
         if (edge.type === 'LINE' || edge.type === 'CENTER_LINE') {
           entityPoints = [get3DPointForPlane(n1.x, n1.y, activePlane, activeBasis), get3DPointForPlane(n2.x, n2.y, activePlane, activeBasis)];
+        } else if (edge.type === 'ARC') {
+          const p1 = get3DPointForPlane(n1.x, n1.y, activePlane, activeBasis);
+          const p2 = get3DPointForPlane(n2.x, n2.y, activePlane, activeBasis);
+          
+          if (edge.nodeIds.length === 3) {
+            const n3 = sketchNodes[edge.nodeIds[2]];
+            if (n3) {
+              const p3 = get3DPointForPlane(n3.x, n3.y, activePlane, activeBasis);
+              // Use quadratic bezier as a high-quality visual approximation for 3-point arc
+              const curve = new THREE.QuadraticBezierCurve3(
+                new THREE.Vector3(...p1),
+                new THREE.Vector3(...p2), // In a 3-point arc, usually p2 is the middle/apex point
+                new THREE.Vector3(...p3)
+              );
+              entityPoints = curve.getPoints(32).map(p => [p.x, p.y, p.z]);
+            }
+          } else {
+            // Preview/2-point arc: straight line
+            entityPoints = [p1, p2];
+          }
         } else if (edge.type === 'CIRCLE') {
           const R = Math.hypot(n2.x - n1.x, n2.y - n1.y);
           for (let k = 0; k <= 36; k++) {
@@ -740,6 +760,19 @@ export const SketchPreview = () => {
                     get3DPointForPlane(n1.x, n1.y, sketch.plane, basis),
                     get3DPointForPlane(n2.x, n2.y, sketch.plane, basis)
                   ];
+                } else if (edge.type === 'ARC') {
+                  const p1 = get3DPointForPlane(n1.x, n1.y, sketch.plane, basis);
+                  const p2 = get3DPointForPlane(n2.x, n2.y, sketch.plane, basis);
+                  if (edge.nodeIds.length === 3) {
+                    const n3 = sketch.sketchNodes![edge.nodeIds[2]];
+                    if (n3) {
+                      const p3 = get3DPointForPlane(n3.x, n3.y, sketch.plane, basis);
+                      const curve = new THREE.QuadraticBezierCurve3(new THREE.Vector3(...p1), new THREE.Vector3(...p2), new THREE.Vector3(...p3));
+                      entityPoints = curve.getPoints(32).map(p => [p.x, p.y, p.z]);
+                    }
+                  } else {
+                    entityPoints = [p1, p2];
+                  }
                 } else if (edge.type === 'CIRCLE') {
                   const R = Math.hypot(n2.x - n1.x, n2.y - n1.y);
                   for (let k = 0; k <= 36; k++) {
