@@ -208,57 +208,98 @@ function applyConstraint(
       const e1 = edges[constraint.edgeIds[0]];
       const e2 = edges[constraint.edgeIds[1]];
       if (!e1 || !e2) return;
+      
       const lineEdge = e1.type === 'LINE' ? e1 : (e2.type === 'LINE' ? e2 : null);
       const circleEdge = e1.type === 'CIRCLE' ? e1 : (e2.type === 'CIRCLE' ? e2 : null);
-      if (!lineEdge || !circleEdge || lineEdge.nodeIds.length < 2 || circleEdge.nodeIds.length < 2) return;
       
-      const p1 = nodes[lineEdge.nodeIds[0]];
-      const p2 = nodes[lineEdge.nodeIds[1]];
-      const pc = nodes[circleEdge.nodeIds[0]]; 
-      const pr = nodes[circleEdge.nodeIds[1]]; 
-      if (!p1 || !p2 || !pc || !pr) return;
+      if (lineEdge && circleEdge && lineEdge.nodeIds.length >= 2 && circleEdge.nodeIds.length >= 2) {
+        const p1 = nodes[lineEdge.nodeIds[0]];
+        const p2 = nodes[lineEdge.nodeIds[1]];
+        const pc = nodes[circleEdge.nodeIds[0]]; 
+        const pr = nodes[circleEdge.nodeIds[1]]; 
+        if (!p1 || !p2 || !pc || !pr) return;
 
-      const R = Math.hypot(pr.x - pc.x, pr.y - pc.y);
-      if (R < 1e-4) return;
+        const R = Math.hypot(pr.x - pc.x, pr.y - pc.y);
+        if (R < 1e-4) return;
 
-      const dx = p2.x - p1.x;
-      const dy = p2.y - p1.y;
-      const lenSq = dx * dx + dy * dy;
-      if (lenSq < 1e-6) return;
+        const dx = p2.x - p1.x;
+        const dy = p2.y - p1.y;
+        const lenSq = dx * dx + dy * dy;
+        if (lenSq < 1e-6) return;
 
-      const t = ((pc.x - p1.x) * dx + (pc.y - p1.y) * dy) / lenSq;
-      const projX = p1.x + t * dx;
-      const projY = p1.y + t * dy;
+        const t = ((pc.x - p1.x) * dx + (pc.y - p1.y) * dy) / lenSq;
+        const projX = p1.x + t * dx;
+        const projY = p1.y + t * dy;
 
-      const dist = Math.hypot(projX - pc.x, projY - pc.y);
-      if (dist < 1e-6) return;
+        const dist = Math.hypot(projX - pc.x, projY - pc.y);
+        if (dist < 1e-6) return;
 
-      const err = dist - R;
-      const nx = (projX - pc.x) / dist;
-      const ny = (projY - pc.y) / dist;
+        const err = dist - R;
+        const nx = (projX - pc.x) / dist;
+        const ny = (projY - pc.y) / dist;
 
-      const w_c = pc.isFixed ? 0 : 0.5;
-      const w_line = 1 - w_c;
+        const w_c = pc.isFixed ? 0 : 0.5;
+        const w_line = 1 - w_c;
 
-      if (w_c > 0) {
-        pc.x += nx * err * w_c;
-        pc.y += ny * err * w_c;
-      }
-
-      if (w_line > 0) {
-        const p1_w = p1.isFixed ? 0 : (p2.isFixed ? 1 : 0.5);
-        const p2_w = p2.isFixed ? 0 : (p1.isFixed ? 1 : 0.5);
-        
-        const corrX = -nx * err * w_line;
-        const corrY = -ny * err * w_line;
-
-        if (p1_w > 0) {
-          p1.x += corrX * (1 - t) * p1_w;
-          p1.y += corrY * (1 - t) * p1_w;
+        if (w_c > 0) {
+          pc.x += nx * err * w_c;
+          pc.y += ny * err * w_c;
         }
-        if (p2_w > 0) {
-          p2.x += corrX * t * p2_w;
-          p2.y += corrY * t * p2_w;
+
+        if (w_line > 0) {
+          const p1_w = p1.isFixed ? 0 : (p2.isFixed ? 1 : 0.5);
+          const p2_w = p2.isFixed ? 0 : (p1.isFixed ? 1 : 0.5);
+          
+          const corrX = -nx * err * w_line;
+          const corrY = -ny * err * w_line;
+
+          if (p1_w > 0) {
+            p1.x += corrX * (1 - t) * p1_w;
+            p1.y += corrY * (1 - t) * p1_w;
+          }
+          if (p2_w > 0) {
+            p2.x += corrX * t * p2_w;
+            p2.y += corrY * t * p2_w;
+          }
+        }
+      } else {
+        const is_c1 = e1.type === 'CIRCLE' || e1.type === 'ARC';
+        const is_c2 = e2.type === 'CIRCLE' || e2.type === 'ARC';
+        if (is_c1 && is_c2) {
+          // Circle-Circle Tangency
+          const c1 = nodes[e1.nodeIds[0]];
+          const r1_node = nodes[e1.nodeIds[1]];
+          const c2 = nodes[e2.nodeIds[0]];
+          const r2_node = nodes[e2.nodeIds[1]];
+          if (!c1 || !r1_node || !c2 || !r2_node) return;
+
+          const R1 = Math.hypot(r1_node.x - c1.x, r1_node.y - c1.y);
+          const R2 = Math.hypot(r2_node.x - c2.x, r2_node.y - c2.y);
+          const dx = c2.x - c1.x;
+          const dy = c2.y - c1.y;
+          const dist = Math.hypot(dx, dy);
+          if (dist < 1e-6) return;
+
+          // Target is either R1+R2 (External) or |R1-R2| (Internal)
+          const target = Math.abs(dist - (R1 + R2)) < Math.abs(dist - Math.abs(R1 - R2)) 
+            ? (R1 + R2) 
+            : Math.abs(R1 - R2);
+          
+          const diff = dist - target;
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          const w1 = c1.isFixed ? 0 : (c2.isFixed ? 1 : 0.5);
+          const w2 = c2.isFixed ? 0 : (c1.isFixed ? 1 : 0.5);
+
+          if (w1 > 0) {
+            c1.x += nx * diff * w1;
+            c1.y += ny * diff * w1;
+          }
+          if (w2 > 0) {
+            c2.x -= nx * diff * w2;
+            c2.y -= ny * diff * w2;
+          }
         }
       }
       break;
@@ -315,6 +356,93 @@ function applyConstraint(
 
       rotatePoint(p2a, m2x, m2y, err / 2);
       rotatePoint(p2b, m2x, m2y, err / 2);
+      break;
+    }
+
+    case 'MIDPOINT': {
+      if (!constraint.nodeIds || constraint.nodeIds.length !== 1 || !constraint.edgeIds || constraint.edgeIds.length !== 1) return;
+      const targetNode = nodes[constraint.nodeIds[0]];
+      const edge = edges[constraint.edgeIds[0]];
+      if (!targetNode || !edge || edge.nodeIds.length < 2) return;
+      const n1 = nodes[edge.nodeIds[0]];
+      const n2 = nodes[edge.nodeIds[1]];
+      if (!n1 || !n2) return;
+
+      const midX = (n1.x + n2.x) / 2;
+      const midY = (n1.y + n2.y) / 2;
+
+      const dx = midX - targetNode.x;
+      const dy = midY - targetNode.y;
+
+      // targetNode moves towards mid, or mid elements move towards target
+      const w_target = targetNode.isFixed ? 0 : 1.0;
+      const w_edge = (n1.isFixed && n2.isFixed) ? 0 : 0.5;
+
+      if (w_target > 0) {
+        targetNode.x += dx * w_target;
+        targetNode.y += dy * w_target;
+      } else if (w_edge > 0) {
+        const moveX = -dx * w_edge;
+        const moveY = -dy * w_edge;
+        if (!n1.isFixed) { n1.x += moveX; n1.y += moveY; }
+        if (!n2.isFixed) { n2.x += moveX; n2.y += moveY; }
+      }
+      break;
+    }
+
+    case 'SYMMETRIC': {
+      if (!constraint.nodeIds || constraint.nodeIds.length !== 2 || !constraint.edgeIds || constraint.edgeIds.length !== 1) return;
+      const p1 = nodes[constraint.nodeIds[0]];
+      const p2 = nodes[constraint.nodeIds[1]];
+      const axis = edges[constraint.edgeIds[0]];
+      if (!p1 || !p2 || !axis || axis.nodeIds.length < 2) return;
+      const a1 = nodes[axis.nodeIds[0]];
+      const a2 = nodes[axis.nodeIds[1]];
+      if (!a1 || !a2) return;
+
+      const dx = a2.x - a1.x;
+      const dy = a2.y - a1.y;
+      const lenSq = dx * dx + dy * dy;
+      if (lenSq < 1e-6) return;
+
+      // Project p1 and p2 onto axis
+      const getProj = (p: SketchNode) => {
+        const t = ((p.x - a1.x) * dx + (p.y - a1.y) * dy) / lenSq;
+        return { x: a1.x + t * dx, y: a1.y + t * dy };
+      };
+
+      const proj1 = getProj(p1);
+      const proj2 = getProj(p2);
+
+      // 1. Force both to share the same projection point (symmetry)
+      const avgProjX = (proj1.x + proj2.x) / 2;
+      const avgProjY = (proj1.y + proj2.y) / 2;
+
+      // 2. Force distances to projection to be equal
+      const dist1 = Math.hypot(p1.x - proj1.x, p1.y - proj1.y);
+      const dist2 = Math.hypot(p2.x - proj2.x, p2.y - proj2.y);
+      const avgDist = (dist1 + dist2) / 2;
+
+      const relaxPoint = (p: SketchNode, proj: {x: number, y: number}, targetDist: number) => {
+        if (p.isFixed) return;
+        const vx = p.x - proj.x;
+        const vy = p.y - proj.y;
+        const curDist = Math.hypot(vx, vy);
+        if (curDist < 1e-6) {
+          // If point is on axis, push it slightly out based on normal
+          const nx = -dy / Math.sqrt(lenSq);
+          const ny = dx / Math.sqrt(lenSq);
+          p.x = avgProjX + nx * targetDist;
+          p.y = avgProjY + ny * targetDist;
+        } else {
+          const ratio = targetDist / curDist;
+          p.x = avgProjX + vx * ratio;
+          p.y = avgProjY + vy * ratio;
+        }
+      };
+
+      relaxPoint(p1, proj1, avgDist);
+      relaxPoint(p2, proj2, avgDist);
       break;
     }
   }

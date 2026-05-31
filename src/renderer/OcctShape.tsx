@@ -54,6 +54,9 @@ export default function OcctShape({
     viewportDisplayMode,
     sectionView,
     partMaterial,
+    measurementMode,
+    measurementPoints,
+    setMeasurementPoints,
   } = useCadStore();
 
   const clippingPlanes = useMemo(() => {
@@ -112,7 +115,7 @@ export default function OcctShape({
       let filterType = 'ALL';
       if (pendingFeatureCommand === 'FILLET' || pendingFeatureCommand === 'CHAMFER' || pendingFeatureCommand === 'PATTERN') {
         filterType = 'EDGE_ONLY';
-      } else if (pendingFeatureCommand === 'DRAFT' || pendingFeatureCommand === 'MIRROR' || pendingFeatureCommand === 'THICKEN' || pendingFeatureCommand === 'SHELL' || pendingFeatureCommand === 'HOLE_WIZARD') {
+      } else if (pendingFeatureCommand === 'DRAFT' || pendingFeatureCommand === 'MIRROR' || pendingFeatureCommand === 'THICKEN' || pendingFeatureCommand === 'SHELL' || pendingFeatureCommand === 'HOLE_WIZARD' || pendingFeatureCommand === 'PLANE') {
         filterType = 'FACE_ONLY';
       } else if (activePropertyManager?.selectionFilter) {
         filterType = activePropertyManager.selectionFilter;
@@ -123,6 +126,15 @@ export default function OcctShape({
       const selected = topologySelector.selectAtPosition(ndcX, ndcY, preserve, filterType as any);
       console.log('[OcctShape Topology] Clicked mesh at NDC:', ndcX, ndcY, 'Selected:', selected);
       
+      if (selected && measurementMode !== 'NONE') {
+        if (measurementPoints.length < 2) {
+          setMeasurementPoints([...measurementPoints, selected]);
+        } else {
+          setMeasurementPoints([measurementPoints[0], selected]);
+        }
+        return;
+      }
+
       if (selected && cadMode === 'ASSEMBLY' && !isSketchMode) {
         // Assembly Mate Selection
         selected.componentId = componentId;
@@ -187,6 +199,8 @@ export default function OcctShape({
             } else if (pendingFeatureCommand === 'HOLE_WIZARD') {
               // Only keep the latest one
               state.updateFeatureParams(featId, { hole_placement_refs: [selected] });
+            } else if (pendingFeatureCommand === 'PLANE') {
+              state.updateFeatureParams(featId, { reference_refs: [selected] });
             } else {
               const currentRefs = params.refs || [];
               const alreadyExists = currentRefs.some((r: any) => r.id === selected.id);

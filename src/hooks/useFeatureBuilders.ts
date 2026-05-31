@@ -36,6 +36,7 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     setDanglingNodes,
     selectedTopology,
     setSelectedTopology,
+    referencePlanes,
   } = useCadStore();
 
   const handleConvertEntities = useCallback(async () => {
@@ -147,6 +148,20 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     if (activePlane === 'FRONT') return [u, v, 0];
     if (activePlane === 'TOP') return [u, 0, v];
     if (activePlane === 'RIGHT') return [0, u, v];
+    
+    // Check if custom reference plane
+    const customPlane = referencePlanes.find(p => p.id === activePlane);
+    if (customPlane) {
+      const [ox, oy, oz] = customPlane.origin;
+      const [xx, xy, xz] = customPlane.xDir;
+      const [yx, yy, yz] = customPlane.yDir;
+      return [
+        ox + u * xx + v * yx,
+        oy + u * xy + v * yy,
+        oz + u * xz + v * yz
+      ];
+    }
+
     if (activePlane === 'FACE' && activeFaceOrigin && activeFaceNormal) {
       let [nx, ny, nz] = activeFaceNormal;
       const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
@@ -172,7 +187,7 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
       ];
     }
     return [0, 0, 0];
-  }, [activePlane, activeFaceOrigin, activeFaceNormal]);
+  }, [activePlane, activeFaceOrigin, activeFaceNormal, referencePlanes]);
 
   const resetSketchSession = useCallback(() => {
     setSketchNodes({});

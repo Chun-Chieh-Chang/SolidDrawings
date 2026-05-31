@@ -20,7 +20,11 @@ export const DatumPlanes = () => {
     activeFaceNormal,
     activeFaceId, computedRefGeometry,
     referencePlanes,
-    referenceAxes
+    referenceAxes,
+    pendingFeatureCommand,
+    selectedId,
+    measurementMode,
+    setMeasurementPoints,
   } = useCadStore();
   
   const [hovered, setHovered] = useState<string | null>(null);
@@ -35,6 +39,7 @@ export const DatumPlanes = () => {
   const [cursorState, setCursorState] = useState<{u: number, v: number, type: string | null} | null>(null);
   const [inferenceLines, setInferenceLines] = useState<{ p1: [number, number], p2: [number, number] }[]>([]);
   const [trimPath, setTrimPath] = useState<THREE.Vector3[]>([]);
+  const [activeDim, setActiveDim] = useState<{ length: number, angle: number } | null>(null);
 
   const faceBasis = useMemo(() => {
     if (activePlane !== 'FACE' || !activeFaceOrigin || !activeFaceNormal) {
@@ -180,6 +185,16 @@ export const DatumPlanes = () => {
       setHasMovedAway(true);
     }
 
+    if (lastClickedUV && (sketchTool === 'LINE' || sketchTool === 'CENTER_LINE' || sketchTool === 'RECTANGLE')) {
+      const du = u - lastClickedUV.u;
+      const dv = v - lastClickedUV.v;
+      const len = Math.hypot(du, dv);
+      const ang = Math.atan2(dv, du) * (180 / Math.PI);
+      setActiveDim({ length: len, angle: ang });
+    } else {
+      if (activeDim) setActiveDim(null);
+    }
+
     if (isDragging) {
       if (sketchTool === 'TRIM') {
         const currentPnt = new THREE.Vector3().copy(e.point);
@@ -241,6 +256,75 @@ export const DatumPlanes = () => {
     }
   };
 
+  const distToSegment = (px: number, py: number, x1: number, y1: number, x2: number, y2: number) => {
+    const l2 = (x2-x1)**2 + (y2-y1)**2;
+    if (l2 === 0) return Math.hypot(px-x1, py-y1);
+    let t = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
+  };
+
+  const nodes_to_be_extended_find = (targetId: string, clickU: number, clickV: number, nodes: any, edges: any) => {
+    const edge = edges[targetId];
+    if (!edge || edge.type !== 'LINE') return null;
+    const n1 = nodes[edge.nodeIds[0]];
+    const n2 = nodes[edge.nodeIds[1]];
+    if (!n1 || !n2) return null;
+
+    // Determine direction: which end is closer to click?
+    const d1 = Math.hypot(clickU - n1.x, clickV - n1.y);
+    const d2 = Math.hypot(clickU - n2.x, clickV - n2.y);
+    
+    const extendNodeId = d1 < d2 ? n1.id : n2.id;
+    const baseNodeId = d1 < d2 ? n2.id : n1.id;
+    const extN = nodes[extendNodeId];
+    const baseN = nodes[baseNodeId];
+
+    // Ray: origin = base, dir = base -> ext
+    const dx = extN.x - baseN.x;
+    const dy = extN.y - baseN.y;
+    const mag = Math.hypot(dx, dy);
+    if (mag < 1e-6) return null;
+    const ux = dx / mag;
+    const uy = dy / mag;
+
+    let bestT = Infinity;
+    let bestP = null;
+
+    // Check intersection with all other edges
+    for (const other of Object.values(edges) as any[]) {
+      if (other.id === targetId) continue;
+      if (other.type === 'LINE') {
+        const o1 = nodes[other.nodeIds[0]];
+        const o2 = nodes[other.nodeIds[1]];
+        if (!o1 || !o2) continue;
+        
+        // Ray-Line intersection
+        const x1 = baseN.x, y1 = baseN.y, x2 = baseN.x + ux * 1000, y2 = baseN.y + uy * 1000;
+        const x3 = o1.x, y3 = o1.y, x4 = o2.x, y4 = o2.y;
+        const den = (y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1);
+        if (Math.abs(den) < 1e-6) continue;
+        const ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / den;
+        const ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / den;
+        
+        if (ua > 1.0 && ub >= 0 && ub <= 1) { // ua > 1.0 means past the extend node
+           const tx = x1 + ua * (x2 - x1);
+           const ty = y1 + ua * (y2 - y1);
+           const dist = Math.hypot(tx - extN.x, ty - extN.y);
+           if (dist < bestT) {
+             bestT = dist;
+             bestP = { x: tx, y: ty };
+           }
+        }
+      }
+    }
+
+    if (bestP) {
+      return { nodeId: extendNodeId, newX: bestP.x, newY: bestP.y };
+    }
+    return null;
+  };
+
   const handlePlaneClick = (plane: string, event: any) => {
     if (event.button !== 0) return;
     if (contextMenu) {
@@ -248,10 +332,49 @@ export const DatumPlanes = () => {
       return;
     }
     if (!isSketchMode) {
-      setActivePlane(plane);
-      if (['FRONT', 'TOP', 'RIGHT'].includes(plane)) {
-        setSketchMode(true);
+      if (measurementMode !== 'NONE') {
+         const planeRef = referencePlanes.find(p => p.id === plane);
+         const selected = planeRef ? { 
+            type: 'FACE' as const,
+            id: planeRef.id, 
+            coordinates: planeRef.origin as [number, number, number], 
+            normal: planeRef.normal as [number, number, number],
+            componentId: 'root'
+         } : { 
+            type: 'FACE' as const,
+            id: plane, 
+            coordinates: [0,0,0] as [number, number, number], 
+            normal: (plane === 'FRONT' ? [0,0,1] : plane === 'TOP' ? [0,1,0] : [1,0,0]) as [number, number, number],
+            componentId: 'root'
+         };
+
+         const currentPoints = useCadStore.getState().measurementPoints;
+         if (currentPoints.length < 2) {
+           useCadStore.getState().setMeasurementPoints([...currentPoints, selected]);
+         } else {
+           useCadStore.getState().setMeasurementPoints([currentPoints[0], selected]);
+         }
+         return;
       }
+      
+      if (pendingFeatureCommand === 'PLANE' && selectedId) {
+         const planeRef = referencePlanes.find(p => p.id === plane);
+         const refData = planeRef ? { 
+            id: planeRef.id, 
+            type: 'PLANE', 
+            coordinates: planeRef.origin, 
+            normal: planeRef.normal 
+         } : { 
+            id: plane, 
+            type: 'PLANE', 
+            coordinates: [0,0,0], 
+            normal: plane === 'FRONT' ? [0,0,1] : plane === 'TOP' ? [0,1,0] : [1,0,0] 
+         };
+         useCadStore.getState().updateFeatureParams(selectedId, { refs: [refData] });
+         return;
+      }
+      setActivePlane(plane);
+      setSketchMode(true);
       return;
     }
     if (activePlane !== plane) return;
@@ -271,6 +394,36 @@ export const DatumPlanes = () => {
     const u = snapped.u;
     const v = snapped.v;
     const activeSnapType = cursorState?.type;
+
+    if (sketchTool === 'EXTEND') {
+       const edges = Object.values(useCadStore.getState().sketchEdges);
+       const nodes = useCadStore.getState().sketchNodes;
+       let targetEdgeId = null;
+       let minDist = 5.0;
+
+       for (const edge of edges) {
+         if (edge.type === 'LINE') {
+           const n1 = nodes[edge.nodeIds[0]];
+           const n2 = nodes[edge.nodeIds[1]];
+           if (!n1 || !n2) continue;
+           const d = distToSegment(rawU, rawV, n1.x, n1.y, n2.x, n2.y);
+           if (d < minDist) { minDist = d; targetEdgeId = edge.id; }
+         }
+       }
+
+       if (targetEdgeId) {
+         const edge = nodes_to_be_extended_find(targetEdgeId, rawU, rawV, nodes, edges);
+         if (edge) {
+            useCadStore.setState(state => {
+              const nextNodes = { ...state.sketchNodes };
+              nextNodes[edge.nodeId] = { ...nextNodes[edge.nodeId], x: edge.newX, y: edge.newY };
+              return { sketchNodes: nextNodes };
+            });
+            commitPreciseSketchSolve();
+         }
+       }
+       return;
+    }
 
     const nId = snapped.id || uuidv4();
     const isOrigin = Math.abs(u) < 1e-5 && Math.abs(v) < 1e-5;
@@ -562,6 +715,23 @@ export const DatumPlanes = () => {
           color="#EF4444"
           lineWidth={2}
         />
+      )}
+
+      {activeDim && cursorState && (
+        <Html position={get3DPnt(cursorState.u, cursorState.v)} center distanceFactor={10}>
+          <div className="ml-10 -mt-10 glass-effect px-2 py-1 rounded-md border border-white/40 shadow-xl pointer-events-none whitespace-nowrap">
+            <div className="flex flex-col gap-0.5 font-mono text-[10px] font-bold">
+              <div className="flex items-center gap-1.5">
+                <span className="text-blue-600">L:</span>
+                <span className="text-slate-800">{activeDim.length.toFixed(2)} mm</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-emerald-600">A:</span>
+                <span className="text-slate-800">{activeDim.angle.toFixed(2)}°</span>
+              </div>
+            </div>
+          </div>
+        </Html>
       )}
 
       {referencePlanes.map((plane) => {

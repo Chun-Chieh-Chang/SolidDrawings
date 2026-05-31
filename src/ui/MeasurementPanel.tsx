@@ -1,139 +1,165 @@
-/**
- * Measurement Panel
- * 顯示測量結果的 PropertyManager 面板
- * 對標 SolidWorks Evaluate > Measure 
- */
-
-import React from 'react';
-import { useCadStore, type MeasurementMode, type MeasurementResult } from '../store/useCadStore';
-import { MeasurementService } from '../kernel/MeasurementService';
-
-export const MeasurementPanel = () => {
-  const {
-    measurementMode,
-    measurementPoints,
-    measurementResults,
-    setMeasurementMode,
-    setMeasurementPoints,
-    setMeasurementResults,
-  } = useCadStore();
-
-  const measurementService = new MeasurementService();
-
-  // 
-  const handleClearSelection = () => {
-    setMeasurementMode('NONE');
-    setMeasurementPoints([]);
-    setMeasurementResults(null);
-  };
-
-  // 
-  const handleModeChange = (mode: MeasurementMode) => {
-    setMeasurementMode(mode);
-    setMeasurementPoints([]);
-    setMeasurementResults(null);
-  };
-
-  // 
-  const formatPoint = (point: any, index: number) => {
-    if (!point || !point.coordinates) return null;
-    const [x, y, z] = point.coordinates;
-    return (
-      <div key={`point_${index}`} className="flex items-center gap-2 p-1.5 bg-[#F8FAFC] rounded text-[13px]"> <span className="font-bold text-primary">M{index + 1}</span> <span className="font-mono text-slate-600">
-          [{x.toFixed(2)}, {y.toFixed(2)}, {z.toFixed(2)}]
-        </span> </div>
-    );
-  };
-
-  // 
-  const getModeInstructions = () => {
-    switch (measurementMode) {
-      case 'DISTANCE':
-        return '';
-      case 'ANGLE':
-        return '';
-      case 'AREA':
-        return '';
-      case 'VOLUME':
-        return '';
-      default:
-        return '';
-    }
-  };
-
-  return (
-    <div className="p-2.5 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-3">
-      {/* Panel Header */}
-      <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center"> <span className="flex items-center gap-1"> </span> <span className="text-[13px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono">MEASURE</span> </div>
-
-      {/* Mode Selection */}
-      <div className="grid grid-cols-2 gap-1.5"> <button
-          onClick={() => handleModeChange('DISTANCE')}
-          className={`flex items-center justify-center gap-1.5 p-1.5 rounded border text-[13px] font-bold transition-all ${
-            measurementMode === 'DISTANCE'
-              ? 'bg-primary/10 border-primary text-primary shadow-sm'
-              : 'bg-[#F8FAFC] border-slate-200 text-slate-700 hover:bg-slate-100'
-          }`}
-        >
-          <span> </span> <span>Distance</span> </button> <button
-          onClick={() => handleModeChange('ANGLE')}
-          className={`flex items-center justify-center gap-1.5 p-1.5 rounded border text-[13px] font-bold transition-all ${
-            measurementMode === 'ANGLE'
-              ? 'bg-primary/10 border-primary text-primary shadow-sm'
-              : 'bg-[#F8FAFC] border-slate-200 text-slate-700 hover:bg-slate-100'
-          }`}
-        >
-          <span> </span> <span> </span> </button> <button
-          onClick={() => handleModeChange('AREA')}
-          className={`flex items-center justify-center gap-1.5 p-1.5 rounded border text-[13px] font-bold transition-all ${
-            measurementMode === 'AREA'
-              ? 'bg-primary/10 border-primary text-primary shadow-sm'
-              : 'bg-[#F8FAFC] border-slate-200 text-slate-700 hover:bg-slate-100'
-          }`}
-        >
-          <span> </span> <span> </span> </button> <button
-          onClick={() => handleModeChange('VOLUME')}
-          className={`flex items-center justify-center gap-1.5 p-1.5 rounded border text-[13px] font-bold transition-all ${
-            measurementMode === 'VOLUME'
-              ? 'bg-primary/10 border-primary text-primary shadow-sm'
-              : 'bg-[#F8FAFC] border-slate-200 text-slate-700 hover:bg-slate-100'
-          }`}
-        >
-          <span> </span> <span>Volume</span> </button> </div>
-
-      {/* Instructions */}
-      <div className="p-2 bg-[#F8FAFC] rounded text-[13px] text-slate-600 leading-tight">
-        {getModeInstructions()}
-      </div>
-
-      {/* Selected Points */}
-      {measurementPoints.length > 0 && (
-        <div className="space-y-1.5"> <div className="text-[13px] text-slate-500 font-bold uppercase">:</div>
-          {measurementPoints.map((point, index) => formatPoint(point, index))}
-        </div>
-      )}
-
-      {/* Measurement Results */}
-      {measurementResults && (
-        <div className="p-3 bg-[#ECFDF5] rounded border border-[#10B981]/20 space-y-2"> <div className="text-[13px] text-[#059669] font-bold uppercase">:</div> <div className="flex items-center justify-between"> <span className="text-[13px] text-slate-600 font-bold">:</span> <span className="text-[13px] text-[#059669] font-bold uppercase">{measurementResults.mode}</span> </div> <div className="flex items-center justify-between"> <span className="text-[13px] text-slate-600 font-bold">:</span> <span className="text-[16px] text-[#059669] font-bold font-mono">
-              {(measurementResults.value ?? 0).toFixed(3)} {measurementResults.unit}
-            </span> </div>
-
-          {measurementResults.details && (
-            <div className="text-[12px] text-slate-500 italic">
-              {measurementResults.details}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Clear Button */}
-      {(measurementMode !== 'NONE' || measurementPoints.length > 0) && (
-        <button
-          onClick={handleClearSelection}
-          className="w-full flex items-center justify-center gap-1.5 p-2 bg-[#F8FAFC] hover:bg-[#F1F5F9] text-[#EF4444] rounded border border-[#E2E8F0] text-[13px] font-bold transition-all"
-        > <span> </span> <span> </span> </button>
-      )}
-    </div>
-  );
-};
+/**
+ * Measurement Panel
+ * 顯示測量結果的 PropertyManager 面板
+ * 對標 SolidWorks Evaluate > Measure 
+ */
+
+import React, { useEffect } from 'react';
+import { useCadStore, type MeasurementMode, type MeasurementResult } from '../store/useCadStore';
+import { MeasurementService } from '../kernel/MeasurementService';
+
+export const MeasurementPanel = () => {
+  const {
+    measurementMode,
+    measurementPoints,
+    measurementResults,
+    setMeasurementMode,
+    setMeasurementPoints,
+    setMeasurementResults,
+  } = useCadStore();
+
+  const measurementService = new MeasurementService();
+
+  useEffect(() => {
+    if (measurementPoints.length === 2) {
+      const p1 = measurementPoints[0];
+      const p2 = measurementPoints[1];
+
+      const dist = measurementService.calculateDistance(p1.coordinates, p2.coordinates);
+
+      let angle = 0;
+      if (p1.normal && p2.normal) {
+        angle = measurementService.calculateAngle(p1.normal, p2.normal);
+      }
+
+      setMeasurementResults({
+        mode: measurementMode,
+        value: dist,
+        unit: 'mm',
+        details: angle > 0 ? `角度 (Angle): ${angle.toFixed(2)}°` : undefined
+      });
+    } else if (measurementPoints.length === 1 && (measurementMode === 'AREA' || measurementMode === 'VOLUME')) {
+       // Future: Call backend for precision area/volume
+       const p = measurementPoints[0];
+       if (p.signature && 'area' in p.signature) {
+          setMeasurementResults({
+            mode: 'AREA',
+            value: (p.signature as any).area,
+            unit: 'mm²',
+            details: `面 ID: ${p.id}`
+          });
+       }
+    } else {
+      setMeasurementResults(null);
+    }
+  }, [measurementPoints, measurementMode, setMeasurementResults]);
+
+  const handleClearSelection = () => {
+    setMeasurementPoints([]);
+    setMeasurementResults(null);
+  };
+
+  const handleModeChange = (mode: MeasurementMode) => {
+    setMeasurementMode(mode);
+    setMeasurementPoints([]);
+    setMeasurementResults(null);
+  };
+
+  const formatPoint = (point: any, index: number) => {
+    if (!point || !point.coordinates) return null;
+    const [x, y, z] = point.coordinates;
+    return (
+      <div key={`point_${index}`} className="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded-lg text-[12px] group">
+        <div className="flex items-center gap-2">
+          <span className="w-5 h-5 flex items-center justify-center bg-primary text-white rounded-full font-bold text-[10px]">
+            {index + 1}
+          </span>
+          <div className="flex flex-col">
+            <span className="font-bold text-slate-700 uppercase tracking-tighter">{point.type}</span>
+            <span className="font-mono text-slate-400 text-[10px]">ID: {point.id.slice(0, 8)}</span>
+          </div>
+        </div>
+        <div className="text-right font-mono text-slate-600">
+          [{x.toFixed(1)}, {y.toFixed(1)}, {z.toFixed(1)}]
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="p-3 bg-white rounded-xl border border-slate-300 shadow-lg space-y-4 w-full">
+      {/* Panel Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-emerald-500 text-white rounded flex items-center justify-center">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m11 15.5 2 2 4.5-4.5"/><path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"/></svg>
+          </div>
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-wider">幾何量測 (Measure)</span>
+        </div>
+        <button 
+           onClick={() => setMeasurementMode('NONE')}
+           className="text-slate-400 hover:text-slate-600 transition-colors"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+
+      {/* Mode Selection */}
+      <div className="grid grid-cols-2 gap-1.5">
+        {(['DISTANCE', 'ANGLE', 'AREA', 'VOLUME'] as MeasurementMode[]).map(mode => (
+          <button
+            key={mode}
+            onClick={() => handleModeChange(mode)}
+            className={`flex items-center justify-center gap-2 p-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+              measurementMode === mode
+                ? 'bg-primary text-white border-primary shadow-md'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+          >
+            {mode}
+          </button>
+        ))}
+      </div>
+
+      {/* Selected Entities */}
+      <div className="space-y-1.5">
+        <div className="flex justify-between items-center px-1">
+          <span className="text-[11px] font-bold text-slate-400 uppercase">已選取實體 ({measurementPoints.length})</span>
+          {measurementPoints.length > 0 && (
+            <button onClick={handleClearSelection} className="text-[10px] text-primary font-bold hover:underline">清除</button>
+          )}
+        </div>
+        <div className="space-y-1 max-h-32 overflow-y-auto">
+          {measurementPoints.length === 0 ? (
+             <div className="py-4 text-center border border-dashed border-slate-200 rounded-lg bg-slate-50 text-[11px] text-slate-400 italic">
+               在 3D 視埠中點選面、邊或頂點
+             </div>
+          ) : (
+            measurementPoints.map((point, index) => formatPoint(point, index))
+          )}
+        </div>
+      </div>
+
+      {/* Measurement Results */}
+      {measurementResults && (
+        <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] text-emerald-600 font-bold uppercase tracking-widest">{measurementResults.mode} 結果</span>
+            <div className="flex items-baseline gap-1.5">
+              <span className="text-2xl font-black text-emerald-800 font-mono tracking-tighter">
+                {measurementResults.value?.toFixed(3) ?? '0.000'}
+              </span>
+              <span className="text-[12px] text-emerald-600 font-bold">{measurementResults.unit}</span>
+            </div>
+          </div>
+
+          {measurementResults.details && (
+            <div className="text-[12px] text-slate-600 bg-white/50 p-2 rounded-lg border border-emerald-100/50 font-medium">
+              {measurementResults.details}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};

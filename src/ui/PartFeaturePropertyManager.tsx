@@ -14,6 +14,14 @@ export interface PartFeaturePropertyManagerProps {
 
 import { getParentsAndChildren } from '@/utils/feature-tree-relations';
 
+const HOLE_PRESETS: Record<string, { diameter: number; cb_diameter?: number; cb_depth?: number; cs_diameter?: number; cs_angle?: number }> = {
+  'M3': { diameter: 3.4, cb_diameter: 6.0, cb_depth: 3.3, cs_diameter: 6.6, cs_angle: 90 },
+  'M4': { diameter: 4.5, cb_diameter: 8.0, cb_depth: 4.4, cs_diameter: 8.6, cs_angle: 90 },
+  'M5': { diameter: 5.5, cb_diameter: 10.0, cb_depth: 5.4, cs_diameter: 10.4, cs_angle: 90 },
+  'M6': { diameter: 6.6, cb_diameter: 11.0, cb_depth: 6.5, cs_diameter: 12.6, cs_angle: 90 },
+  'M8': { diameter: 9.0, cb_diameter: 15.0, cb_depth: 8.6, cs_diameter: 16.8, cs_angle: 90 },
+};
+
 export function PartFeaturePropertyManager({
   selectedFeature,
   features,
@@ -221,134 +229,274 @@ export function PartFeaturePropertyManager({
               </div>
             </div>
           </div>
-        ) : selectedFeature.type === 'DRAFT' ? (
-          <div className="bg-surface p-2 rounded border border-border shadow-sm space-y-2 text-[14px]">
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">拔模角 (度)</span>
-              <input
-                type="number"
-                value={selectedFeature.parameters.angle ?? 5}
-                onChange={(e) => onParamChange('angle', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono"
-              />
-            </label>
-            <div className="border-t border-border/50 pt-2 mt-2">
-              <span className="text-[13px] text-secondary-text block mb-1">中立面 (Neutral Plane)</span>
-              <div className="bg-white border border-[#C4C7CE] rounded p-1 min-h-[30px] flex flex-wrap gap-1">
-                {(selectedFeature.parameters.neutral_plane_refs || []).map((ref: any, idx: number) => (
-                  <div key={ref.id} className="bg-indigo-100 text-indigo-700 text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                    Face {idx + 1}
-                    <button onClick={() => onParamChange('neutral_plane_refs', [])} className="hover:text-red-500">×</button>
+        ) : selectedFeature.type === 'PLANE' ? (
+          <div className="bg-surface p-3 rounded-xl border border-slate-200 shadow-sm space-y-4 text-[14px]">
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+                第一參考 (First Reference)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[40px] flex flex-wrap gap-1.5 items-center">
+                {(selectedFeature.parameters.reference_refs || []).map((ref: any, idx: number) => (
+                  <div key={ref.id || idx} className="bg-blue-100 text-blue-700 text-[11px] font-bold px-2 py-1 rounded-md border border-blue-200 flex items-center gap-1.5">
+                    {ref.type || 'Plane'} {ref.id.slice(0, 4)}
+                    <button onClick={() => onParamChange('reference_refs', [])} className="hover:text-red-500 transition-colors">×</button>
                   </div>
                 ))}
-                {(selectedFeature.parameters.neutral_plane_refs || []).length === 0 && (
-                  <span className="text-[11px] text-slate-400 p-1 italic">點選基準面或平面作為拔模基準</span>
+                {(selectedFeature.parameters.reference_refs || []).length === 0 && (
+                  <span className="text-[11px] text-slate-400 italic px-1">選取面或基準面</span>
                 )}
               </div>
             </div>
-            <div className="border-t border-border/50 pt-2 mt-2">
-              <span className="text-[13px] text-secondary-text block mb-1">拔模面 (Faces to Draft)</span>
-              <div className="bg-white border border-[#C4C7CE] rounded p-1 min-h-[50px] flex flex-wrap gap-1 items-start content-start">
+
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">偏移距離 (Offset)</label>
+                <div className="relative w-32">
+                  <input
+                    type="number"
+                    value={selectedFeature.parameters.offset ?? 10}
+                    onChange={(e) => onParamChange('offset', parseFloat(e.target.value))}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A] text-right pr-8 font-mono"
+                  />
+                  <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-bold">mm</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">反轉偏移 (Flip)</label>
+                <button
+                  onClick={() => onParamChange('flip', !selectedFeature.parameters.flip)}
+                  className={`px-3 py-1 rounded text-[11px] font-bold transition-all border ${
+                    selectedFeature.parameters.flip ? 'bg-[#005B9A] text-white border-[#005B9A]' : 'bg-slate-50 text-slate-600 border-slate-300'
+                  }`}
+                >
+                  {selectedFeature.parameters.flip ? '已反轉' : '預設'}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : selectedFeature.type === 'DRAFT' ? (
+          <div className="bg-surface p-3 rounded-xl border border-slate-200 shadow-sm space-y-4 text-[14px]">
+            {/* Neutral Plane Selection */}
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+                中立面 (Neutral Plane)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[40px] flex flex-wrap gap-1.5 items-center">
+                {(selectedFeature.parameters.neutral_plane_refs || []).map((ref: any, idx: number) => (
+                  <div key={ref.id || idx} className="bg-indigo-100 text-indigo-700 text-[11px] font-bold px-2 py-1 rounded-md border border-indigo-200 flex items-center gap-1.5">
+                    {ref.type || 'Plane'} {ref.id.slice(0, 4)}
+                    <button onClick={() => onParamChange('neutral_plane_refs', [])} className="hover:text-red-500 transition-colors">×</button>
+                  </div>
+                ))}
+                {(selectedFeature.parameters.neutral_plane_refs || []).length === 0 && (
+                  <span className="text-[11px] text-slate-400 italic px-1">選取基準面或平面</span>
+                )}
+              </div>
+            </div>
+
+            {/* Target Faces Selection */}
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                拔模面 (Faces to Draft)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[60px] flex flex-wrap gap-1.5 items-start content-start">
                 {(selectedFeature.parameters.faces_to_draft_refs || []).map((ref: any, idx: number) => (
-                  <div key={ref.id} className="bg-orange-100 text-orange-700 text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                    Face {idx + 1}
-                    <button onClick={() => onParamChange('faces_to_draft_refs', selectedFeature.parameters.faces_to_draft_refs.filter((r: any) => r.id !== ref.id))} className="hover:text-red-500">×</button>
+                  <div key={ref.id || idx} className="bg-orange-100 text-orange-700 text-[11px] font-bold px-2 py-1 rounded-md border border-orange-200 flex items-center gap-1.5">
+                    Face {ref.id.slice(0, 4)}
+                    <button onClick={() => onParamChange('faces_to_draft_refs', selectedFeature.parameters.faces_to_draft_refs.filter((r: any) => r.id !== ref.id))} className="hover:text-red-500 transition-colors">×</button>
                   </div>
                 ))}
                 {(selectedFeature.parameters.faces_to_draft_refs || []).length === 0 && (
-                  <span className="text-[11px] text-slate-400 p-1 italic">點選要產生拔模角的側面</span>
+                  <span className="text-[11px] text-slate-400 italic px-1">選取要拔模的側面 (可多選)</span>
                 )}
+              </div>
+            </div>
+
+            {/* Draft Angle */}
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">拔模角度 (Angle)</label>
+                <div className="relative w-32">
+                  <input
+                    type="number"
+                    value={selectedFeature.parameters.angle ?? 5}
+                    onChange={(e) => onParamChange('angle', parseFloat(e.target.value))}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A] text-right pr-8 font-mono"
+                  />
+                  <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-bold">deg</span>
+                </div>
               </div>
             </div>
           </div>
         ) : selectedFeature.type === 'SHELL' ? (
-          <div className="bg-surface p-2 rounded border border-border shadow-sm space-y-2 text-[14px]">
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">厚度 (Thickness)</span>
-              <input
-                type="number"
-                value={selectedFeature.parameters.thickness ?? 2}
-                onChange={(e) => onParamChange('thickness', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono"
-              />
-            </label>
-            <div className="border-t border-border/50 pt-2 mt-2">
-              <span className="text-[13px] text-secondary-text block mb-1">移除的面 (Faces to Remove)</span>
-              <div className="bg-white border border-[#C4C7CE] rounded p-1 min-h-[50px] flex flex-wrap gap-1 items-start content-start">
+          <div className="bg-surface p-3 rounded-xl border border-slate-200 shadow-sm space-y-4 text-[14px]">
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg>
+                移除的面 (Faces to Remove)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[60px] flex flex-wrap gap-1.5 items-start content-start">
                 {(selectedFeature.parameters.faces_to_remove_refs || []).map((ref: any, idx: number) => (
-                  <div key={ref.id} className="bg-teal-100 text-teal-700 text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                    Face {idx + 1}
-                    <button onClick={() => onParamChange('faces_to_remove_refs', selectedFeature.parameters.faces_to_remove_refs.filter((r: any) => r.id !== ref.id))} className="hover:text-red-500">×</button>
+                  <div key={ref.id || idx} className="bg-teal-100 text-teal-700 text-[11px] font-bold px-2 py-1 rounded-md border border-teal-200 flex items-center gap-1.5">
+                    Face {ref.id.slice(0, 4)}
+                    <button onClick={() => onParamChange('faces_to_remove_refs', selectedFeature.parameters.faces_to_remove_refs.filter((r: any) => r.id !== ref.id))} className="hover:text-red-500 transition-colors">×</button>
                   </div>
                 ))}
                 {(selectedFeature.parameters.faces_to_remove_refs || []).length === 0 && (
-                  <span className="text-[11px] text-slate-400 p-1 italic">點選實體表面以將其移除/開口</span>
+                  <span className="text-[11px] text-slate-400 italic px-1">點選表面以開口 (可多選)</span>
                 )}
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">壁厚 (Thickness)</label>
+                <div className="relative w-32">
+                  <input
+                    type="number"
+                    value={selectedFeature.parameters.thickness ?? 2}
+                    onChange={(e) => onParamChange('thickness', parseFloat(e.target.value))}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-[#005B9A] text-right pr-8 font-mono"
+                  />
+                  <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-bold">mm</span>
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">向外偏移 (Flip)</label>
+                <button
+                  onClick={() => onParamChange('flip', !selectedFeature.parameters.flip)}
+                  className={`px-3 py-1 rounded text-[11px] font-bold transition-all border ${
+                    selectedFeature.parameters.flip ? 'bg-teal-600 text-white border-teal-600' : 'bg-slate-50 text-slate-600 border-slate-300'
+                  }`}
+                >
+                  {selectedFeature.parameters.flip ? '向外 (Outer)' : '向內 (Inner)'}
+                </button>
               </div>
             </div>
           </div>
         ) : selectedFeature.type === 'HOLE_WIZARD' ? (
-          <div className="bg-surface p-2 rounded border border-border shadow-sm space-y-2 text-[14px]">
-            <label className="flex items-center justify-between gap-2">
-              <span className="text-[13px] text-secondary-text">孔類型</span>
+          <div className="bg-surface p-3 rounded-xl border border-slate-200 shadow-sm space-y-4 text-[14px]">
+            {/* Hole Type Selector */}
+            <div className="space-y-1.5">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider">孔類型 (Hole Type)</span>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: 'SIMPLE', label: '直孔', icon: '🕳️' },
+                  { id: 'COUNTERBORE', label: '沉頭', icon: '⧉' },
+                  { id: 'COUNTERSINK', label: '錐頭', icon: '⌵' }
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => onParamChange('hole_type', t.id)}
+                    className={`flex flex-col items-center justify-center p-2 rounded-lg border transition-all ${
+                      (selectedFeature.parameters.hole_type || 'SIMPLE') === t.id
+                        ? 'bg-primary/10 border-primary text-primary shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="text-xl font-bold">{t.icon}</span>
+                    <span className="text-[10px] font-bold mt-1 uppercase tracking-tighter">{t.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Standard Presets */}
+            <div className="space-y-1.5">
+              <label className="text-[11px] font-bold text-slate-500 uppercase">標準規格 (Presets)</label>
               <select
-                value={selectedFeature.parameters.hole_type || 'SIMPLE'}
-                onChange={(e) => onParamChange('hole_type', e.target.value)}
-                className="border border-[#C4C7CE] rounded px-1 py-0.5 w-[120px]"
+                value=""
+                onChange={(e) => {
+                  const preset = HOLE_PRESETS[e.target.value];
+                  if (preset) {
+                    onParamChange('diameter', preset.diameter);
+                    if (preset.cb_diameter) onParamChange('cb_diameter', preset.cb_diameter);
+                    if (preset.cb_depth) onParamChange('cb_depth', preset.cb_depth);
+                    if (preset.cs_diameter) onParamChange('cs_diameter', preset.cs_diameter);
+                    if (preset.cs_angle) onParamChange('cs_angle', preset.cs_angle);
+                  }
+                }}
+                className="w-full bg-slate-50 border border-slate-300 rounded-lg px-2 py-1.5 outline-none focus:border-primary transition-colors text-sm font-bold text-slate-700"
               >
-                <option value="SIMPLE">直孔 (Simple)</option>
-                <option value="COUNTERBORE">沉頭孔 (Counterbore)</option>
-                <option value="COUNTERSINK">錐頭孔 (Countersink)</option>
+                <option value="">— 自定義規格 —</option>
+                {Object.keys(HOLE_PRESETS).map(p => <option key={p} value={p}>{p} 標準孔</option>)}
               </select>
-            </label>
-            <div className="border-t border-border/50 pt-2 mt-2 space-y-2">
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-[13px] text-secondary-text">直徑</span>
-                <input type="number" value={selectedFeature.parameters.diameter ?? 5} onChange={(e) => onParamChange('diameter', e.target.value)} className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono" />
-              </label>
-              <label className="flex items-center justify-between gap-2">
-                <span className="text-[13px] text-secondary-text">深度</span>
-                <input type="number" value={selectedFeature.parameters.depth ?? 10} onChange={(e) => onParamChange('depth', e.target.value)} className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono" />
-              </label>
+            </div>
+
+            {/* Dynamic Parameters */}
+            <div className="space-y-3 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-tighter">孔徑 (Ø)</label>
+                <div className="relative w-28">
+                  <input type="number" value={selectedFeature.parameters.diameter ?? 5} onChange={(e) => onParamChange('diameter', parseFloat(e.target.value))} className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-sm outline-none text-right pr-8 font-mono" />
+                  <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-bold">mm</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-tighter">總深度 (Depth)</label>
+                <div className="relative w-28">
+                  <input type="number" value={selectedFeature.parameters.depth ?? 10} onChange={(e) => onParamChange('depth', parseFloat(e.target.value))} className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-sm outline-none text-right pr-8 font-mono" />
+                  <span className="absolute right-2 top-1.5 text-[10px] text-slate-400 font-bold">mm</span>
+                </div>
+              </div>
               
               {selectedFeature.parameters.hole_type === 'COUNTERBORE' && (
-                <>
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-secondary-text">沉頭直徑</span>
-                    <input type="number" value={selectedFeature.parameters.cb_diameter ?? 10} onChange={(e) => onParamChange('cb_diameter', e.target.value)} className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono" />
-                  </label>
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-secondary-text">沉頭深度</span>
-                    <input type="number" value={selectedFeature.parameters.cb_depth ?? 5} onChange={(e) => onParamChange('cb_depth', e.target.value)} className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono" />
-                  </label>
-                </>
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-indigo-600 uppercase tracking-tighter">沉頭直徑</label>
+                    <div className="relative w-28">
+                      <input type="number" value={selectedFeature.parameters.cb_diameter ?? 10} onChange={(e) => onParamChange('cb_diameter', parseFloat(e.target.value))} className="w-full bg-indigo-50/30 border border-indigo-200 rounded px-2 py-1 text-sm outline-none text-right pr-8 font-mono" />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-indigo-400 font-bold">mm</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-indigo-600 uppercase tracking-tighter">沉頭深度</label>
+                    <div className="relative w-28">
+                      <input type="number" value={selectedFeature.parameters.cb_depth ?? 5} onChange={(e) => onParamChange('cb_depth', parseFloat(e.target.value))} className="w-full bg-indigo-50/30 border border-indigo-200 rounded px-2 py-1 text-sm outline-none text-right pr-8 font-mono" />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-indigo-400 font-bold">mm</span>
+                    </div>
+                  </div>
+                </div>
               )}
 
               {selectedFeature.parameters.hole_type === 'COUNTERSINK' && (
-                <>
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-secondary-text">錐頭直徑</span>
-                    <input type="number" value={selectedFeature.parameters.cs_diameter ?? 10} onChange={(e) => onParamChange('cs_diameter', e.target.value)} className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono" />
-                  </label>
-                  <label className="flex items-center justify-between gap-2">
-                    <span className="text-[13px] text-secondary-text">錐角度數</span>
-                    <input type="number" value={selectedFeature.parameters.cs_angle ?? 90} onChange={(e) => onParamChange('cs_angle', e.target.value)} className="border border-[#C4C7CE] rounded px-1.5 py-0.5 w-[80px] text-right font-mono" />
-                  </label>
-                </>
+                <div className="space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-amber-600 uppercase tracking-tighter">錐頭直徑</label>
+                    <div className="relative w-28">
+                      <input type="number" value={selectedFeature.parameters.cs_diameter ?? 10} onChange={(e) => onParamChange('cs_diameter', parseFloat(e.target.value))} className="w-full bg-amber-50/30 border border-amber-200 rounded px-2 py-1 text-sm outline-none text-right pr-8 font-mono" />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-amber-400 font-bold">mm</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-amber-600 uppercase tracking-tighter">錐角度數</label>
+                    <div className="relative w-28">
+                      <input type="number" value={selectedFeature.parameters.cs_angle ?? 90} onChange={(e) => onParamChange('cs_angle', parseFloat(e.target.value))} className="w-full bg-amber-50/30 border border-amber-200 rounded px-2 py-1 text-sm outline-none text-right pr-8 font-mono" />
+                      <span className="absolute right-2 top-1.5 text-[10px] text-amber-400 font-bold">deg</span>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
             
-            <div className="border-t border-border/50 pt-2 mt-2">
-              <span className="text-[13px] text-secondary-text block mb-1">孔位 (Position)</span>
-              <div className="bg-white border border-[#C4C7CE] rounded p-1 min-h-[30px] flex flex-wrap gap-1">
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <span className="text-[12px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                孔位 (Position)
+              </span>
+              <div className="bg-slate-50 border border-slate-300 rounded-lg p-2 min-h-[40px] flex flex-wrap gap-1.5 items-center">
                 {(selectedFeature.parameters.hole_placement_refs || []).map((ref: any, idx: number) => (
-                  <div key={ref.id} className="bg-teal-100 text-teal-700 text-[11px] px-1.5 py-0.5 rounded flex items-center gap-1">
-                    Face Point
-                    <button onClick={() => onParamChange('hole_placement_refs', [])} className="hover:text-red-500">×</button>
+                  <div key={ref.id || idx} className="bg-teal-100 text-teal-700 text-[11px] font-bold px-2 py-1 rounded-md border border-teal-200 flex items-center gap-1.5">
+                    {ref.type || 'Point'} {ref.id.slice(0, 4)}
+                    <button onClick={() => onParamChange('hole_placement_refs', [])} className="hover:text-red-500 transition-colors">×</button>
                   </div>
                 ))}
                 {(selectedFeature.parameters.hole_placement_refs || []).length === 0 && (
-                  <span className="text-[11px] text-slate-400 p-1 italic">在 3D 視窗中點擊欲打孔的位置</span>
+                  <span className="text-[11px] text-slate-400 italic px-1">在視埠中點擊模型表面</span>
                 )}
               </div>
             </div>

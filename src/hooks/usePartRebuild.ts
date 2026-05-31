@@ -93,6 +93,22 @@ export function usePartRebuild(
           }
         }
         setMeshData(results);
+
+        // Update Reference Geometry
+        const refPlanes = results.flatMap((r: any) => r.ref_geometry || []).filter((g: any) => g.type === 'PLANE');
+        const formattedPlanes = refPlanes.map((p: any) => {
+          const featName = features.find(f => f.id === p.id)?.name || p.id;
+          return {
+            id: p.id,
+            name: featName,
+            origin: p.data.origin,
+            normal: p.data.normal,
+            xDir: p.data.xDir,
+            yDir: p.data.yDir
+          };
+        });
+        useCadStore.getState().setReferencePlanes(formattedPlanes);
+
         lastRebuildFingerprint.current = fingerprint;
         clearRebuildDirty();
       }

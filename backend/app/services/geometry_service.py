@@ -1060,7 +1060,11 @@ def process_features(features, deflection=0.01):
         elif f_type == 'SHELL':
             if final_shape is not None:
                 thickness = float(params.get('thickness', 2.0))
-                faces_to_remove_params = params.get('faces_to_remove', [])
+                is_flip = params.get('flip', False)
+                # In OCC, negative offset usually means internal shell
+                actual_offset = thickness if is_flip else -thickness
+                
+                faces_to_remove_params = params.get('faces_to_remove_refs', [])
                 
                 from OCC.Core.TopTools import TopTools_ListOfShape
                 from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
@@ -1080,7 +1084,7 @@ def process_features(features, deflection=0.01):
                     # Create the hollow solid
                     # Tolerance (1e-3), JoinType (GeomAbs_Arc), Inside(False)
                     from OCC.Core.GeomAbs import GeomAbs_Arc
-                    shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, removed_faces, -thickness, 1e-3, GeomAbs_Arc, False)
+                    shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, removed_faces, actual_offset, 1e-3, GeomAbs_Arc, False)
                     shell_tool.Build()
                     if shell_tool.IsDone():
                         final_shape = shell_tool.Shape()
@@ -1253,7 +1257,11 @@ def build_shape_only(
         elif f_type == 'SHELL':
             if final_shape is not None:
                 thickness = float(params.get('thickness', 2.0))
-                faces_to_remove_params = params.get('faces_to_remove', [])
+                is_flip = params.get('flip', False)
+                # In OCC, negative offset usually means internal shell
+                actual_offset = thickness if is_flip else -thickness
+                
+                faces_to_remove_params = params.get('faces_to_remove_refs', [])
                 
                 from OCC.Core.TopTools import TopTools_ListOfShape
                 from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
@@ -1273,7 +1281,7 @@ def build_shape_only(
                     # Create the hollow solid
                     # Tolerance (1e-3), JoinType (GeomAbs_Arc), Inside(False)
                     from OCC.Core.GeomAbs import GeomAbs_Arc
-                    shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, removed_faces, -thickness, 1e-3, GeomAbs_Arc, False)
+                    shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, removed_faces, actual_offset, 1e-3, GeomAbs_Arc, False)
                     shell_tool.Build()
                     if shell_tool.IsDone():
                         final_shape = shell_tool.Shape()
@@ -1505,8 +1513,12 @@ def build_shape_only(
                 n_ref = neutral_refs[0]
                 n_origin = n_ref.get('coordinates', [0,0,0])
                 n_normal = n_ref.get('normal', [0,0,1])
-                # Provide a small normalization protection
-                n_norm_vec = gp_Vec(*n_normal)
+                n_sig = n_ref.get('signature', {})
+                
+                # Resolve neutral face with signature
+                matched_n_origin, matched_n_normal, _ = find_matching_face(final_shape, n_origin, n_normal, n_sig)
+                
+                n_norm_vec = gp_Vec(*matched_n_normal)
                 if n_norm_vec.Magnitude() > 1e-6:
                     n_norm_vec.Normalize()
                 else:
@@ -1514,7 +1526,7 @@ def build_shape_only(
                 pull_dir = gp_Dir(n_norm_vec.X(), n_norm_vec.Y(), n_norm_vec.Z())
                 
                 from OCC.Core.Geom import Geom_Plane
-                neutral_plane_geom = Geom_Plane(gp_Pnt(*n_origin), pull_dir)
+                neutral_plane_geom = Geom_Plane(gp_Pnt(*matched_n_origin), pull_dir)
                 
                 from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
                 draft_tool = BRepOffsetAPI_DraftAngle(final_shape)
@@ -1523,7 +1535,8 @@ def build_shape_only(
                 for f_ref in face_refs:
                     f_origin = f_ref.get('coordinates', [0,0,0])
                     f_normal = f_ref.get('normal', [0,0,1])
-                    matched_face = find_matching_face(final_shape, f_origin, f_normal)
+                    f_sig = f_ref.get('signature', {})
+                    _, _, matched_face = find_matching_face(final_shape, f_origin, f_normal, f_sig)
                     if matched_face:
                         draft_tool.Add(matched_face, pull_dir, angle_rad, neutral_plane_geom)
                         faces_added += 1
@@ -1537,7 +1550,9 @@ def build_shape_only(
                         print(f"[ERROR] Draft failed: {e}")
 
         elif f_type == 'SHELL':
-            thickness = float(params.get('thickness', 2))
+            thickness = float(params.get('thickness', 2.0))
+            is_flip = params.get('flip', False)
+            actual_offset = thickness if is_flip else -thickness
             faces_refs = params.get('faces_to_remove_refs', [])
             
             if final_shape:
@@ -1548,17 +1563,20 @@ def build_shape_only(
                 for ref in faces_refs:
                     origin = ref.get('coordinates', [0,0,0])
                     normal = ref.get('normal', [0,0,1])
-                    matched_face = find_matching_face(final_shape, origin, normal)
+                    f_sig = ref.get('signature', {})
+                    _, _, matched_face = find_matching_face(final_shape, origin, normal, f_sig)
                     if matched_face:
                         faces_to_remove.Append(matched_face)
                 
                 try:
-                    shell_maker = BRepOffsetAPI_MakeThickSolid()
-                    shell_maker.MakeThickSolidByJoin(final_shape, faces_to_remove, -thickness, 1e-3)
-                    if shell_maker.IsDone():
-                        final_shape = shell_maker.Shape()
+                    from OCC.Core.GeomAbs import GeomAbs_Arc
+                    shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, faces_to_remove, actual_offset, 1e-3, GeomAbs_Arc, False)
+                    shell_tool.Build()
+                    if shell_tool.IsDone():
+                        final_shape = shell_tool.Shape()
                 except Exception as e:
-                    print(f"[ERROR] Shell failed: {e}")
+                    print(f"[ERROR] Isolated SHELL failed: {e}")
+            continue
                     
         elif f_type == 'HOLE_WIZARD':
             hole_type = params.get('hole_type', 'SIMPLE')
@@ -2013,12 +2031,24 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
     from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt
     from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
     
+    # Default camera orientation
+    eye = gp_Dir(0, 0, 1)
+    up = gp_Dir(0, 1, 0)
+    custom_basis = None
+
     # Define camera orientation for HLR based on plane_type
     if plane_type == 'FRONT': eye = gp_Dir(0, 0, 1); up = gp_Dir(0, 1, 0)
     elif plane_type == 'TOP': eye = gp_Dir(0, 1, 0); up = gp_Dir(0, 0, -1)
     elif plane_type == 'RIGHT': eye = gp_Dir(1, 0, 0); up = gp_Dir(0, 1, 0)
     elif plane_type == 'ISO': eye = gp_Dir(1, 1, 1); up = gp_Dir(0, 1, 0)
-    else: eye = gp_Dir(0, 0, 1); up = gp_Dir(0, 1, 0)
+    else:
+        # Check if it's a reference plane ID
+        target_plane = next((f for f in features if (f.id if hasattr(f, 'id') else f.get('id')) == plane_type), None)
+        if target_plane:
+            p_params = target_plane.parameters if hasattr(target_plane, 'parameters') else target_plane.get('parameters', {})
+            custom_basis = generate_reference_plane(p_params.get('planeType', 'OFFSET'), p_params.get('refs', []), p_params.get('offset', 0.0), features)
+            eye = gp_Dir(*custom_basis['normal'])
+            up = gp_Dir(*custom_basis['yDir'])
     
     # Setup HLR Projector
     from OCC.Core.HLRAlgo import HLRAlgo_Projector
@@ -2050,6 +2080,9 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
                 elif plane_type == 'ISO': 
                     u = (p.X() - p.Z()) * 0.707106781
                     v_val = p.Y() - (p.X() + p.Z()) * 0.35355339
+                elif custom_basis:
+                    uv = project_3d_to_2d(p.X(), p.Y(), p.Z(), 'FACE', face_origin=custom_basis['origin'], face_normal=custom_basis['normal'])
+                    u, v_val = uv[0], uv[1]
                 else: u, v_val = p.X(), p.Y()
                 pnts.append([u, v_val])
             output_lines.append({"points": pnts, "visible": is_visible})
@@ -2260,11 +2293,11 @@ def find_closest_face(shape, point_3d):
     return None
 
 
-def find_matching_face(shape, ref_origin, ref_normal):
+def find_matching_face(shape, ref_origin, ref_normal, signature=None):
     """
     Topological Naming Service (TNS) for faces:
     Attempts to locate the corresponding face on the rebuilt `shape` that matches
-    the original `ref_origin` and `ref_normal`.
+    the original `ref_origin`, `ref_normal`, and optional geometric `signature`.
     """
     if not shape or shape.IsNull():
         return ref_origin, ref_normal, None

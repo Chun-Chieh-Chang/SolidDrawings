@@ -685,14 +685,16 @@ export const SketchPreview = () => {
           const n2 = sketchNodes[edge.nodeIds[1]];
           if (!n1 || !n2) return null;
           pos = get3DPointForPlane((n1.x + n2.x) / 2, (n1.y + n2.y) / 2, activePlane, activeBasis);
-          
           if (constraint.type === 'HORIZONTAL') icon = "—";
           else if (constraint.type === 'VERTICAL') icon = "│";
           else if (constraint.type === 'PARALLEL') icon = "∥";
           else if (constraint.type === 'PERPENDICULAR') icon = "⊥";
           else if (constraint.type === 'CONCENTRIC') icon = "◎";
+          else if (constraint.type === 'TANGENT') icon = "○";
+          else if (constraint.type === 'MIDPOINT') icon = "⬗";
+          else if (constraint.type === 'SYMMETRIC') icon = "|⬵|";
 
-        } else if (constraint.type === 'COINCIDENT') {
+          } else if (constraint.type === 'COINCIDENT') {
           if (!constraint.nodeIds || constraint.nodeIds.length === 0) return null;
           const n = sketchNodes[constraint.nodeIds[0]];
           if (!n) return null;

@@ -333,9 +333,35 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 const featId = `feat_${Date.now()}`;
                 addFeature({
                   id: featId,
+                  type: 'DRAFT',
+                  name: `Draft ${features.filter(f => f.type === 'DRAFT').length + 1}`,
+                  parameters: { angle: 5, neutral_plane_refs: [], faces_to_draft_refs: [] }
+                });
+                setSelectedId(featId);
+                setActiveTab('FEATURES');
+                setPendingFeatureCommand('DRAFT');
+                setSelectedTopology(null);
+                setHint('Step 1: Select a neutral plane. Step 2: Select faces to draft.');
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'DRAFT' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+              title="Draft"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'DRAFT' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Draft</span>
+            </button>
+
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+
+            <button
+              onClick={() => {
+                const featId = `feat_${Date.now()}`;
+                addFeature({
+                  id: featId,
                   type: 'SHELL',
                   name: `Shell ${features.filter(f => f.type === 'SHELL').length + 1}`,
-                  parameters: { thickness: 2, faces_to_remove_refs: [] }
+                  parameters: { thickness: 2, faces_to_remove_refs: [], flip: false }
                 });
                 setSelectedId(featId);
                 appliedEdgeFeatureRef.current = null;
@@ -351,6 +377,32 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7h10v10H7z"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Shell</span>
+            </button>
+
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+
+            <button
+              onClick={() => {
+                const featId = `feat_${Date.now()}`;
+                addFeature({
+                  id: featId,
+                  type: 'REFERENCE_PLANE',
+                  name: `Plane ${features.filter(f => f.type === 'REFERENCE_PLANE').length + 1}`,
+                  parameters: { planeType: 'OFFSET', offset: 10, refs: [], flip: false }
+                });
+                setSelectedId(featId);
+                setActiveTab('FEATURES');
+                setPendingFeatureCommand('PLANE');
+                setSelectedTopology(null);
+                setHint('Select a face or plane as a reference for the new plane.');
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'PLANE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+              title="Reference Plane"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'PLANE' ? 'text-blue-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Plane</span>
             </button>
 
             <button
@@ -405,6 +457,20 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="m17 17-5-5-5 5"/><path d="m14.5 10.5-2.5 2.5-2.5-2.5"/><path d="M15 18H9"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Trim</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { setSketchTool('MIRROR'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'MIRROR' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Mirror Entities">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'MIRROR' ? 'text-indigo-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20"/><path d="m2 8 8 2"/><path d="m2 14 8-2"/><path d="m22 8-8 2"/><path d="m22 14-8-2"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Mirror</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { setSketchTool('EXTEND'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'EXTEND' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Extend Entities">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'EXTEND' ? 'text-emerald-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14"/><path d="m15 16 4-4-4-4"/><path d="M12 2v20"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Extend</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { (window as any).__handleConvertEntities?.(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Convert Entities">

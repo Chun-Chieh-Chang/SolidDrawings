@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useCadStore } from '../store/useCadStore';
 import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
@@ -14,8 +14,12 @@ export const SketchPropertyManager: React.FC = () => {
     setSketchEdges,
     sketchConstraints,
     setSketchConstraints,
-    solverReport
+    solverReport,
+    sketchTool,
+    setSketchTool,
   } = useCadStore();
+
+  const [mirrorAxisId, setMirrorAxisId] = useState<string | null>(null);
 
   const selectedNodes = useMemo(() => {
     return selectedEntityIds
@@ -146,6 +150,75 @@ export const SketchPropertyManager: React.FC = () => {
     triggerRebuild();
   };
 
+  const executeSketchMirror = async () => {
+    if (!mirrorAxisId) return;
+    const axisEdge = sketchEdges[mirrorAxisId];
+    if (!axisEdge || axisEdge.type !== 'CENTER_LINE') return;
+    const a1 = sketchNodes[axisEdge.nodeIds[0]];
+    const a2 = sketchNodes[axisEdge.nodeIds[1]];
+    if (!a1 || !a2) return;
+
+    const nextNodes = { ...sketchNodes };
+    const nextEdges = { ...sketchEdges };
+    const nextConstraints = { ...sketchConstraints };
+
+    const nodeMap = new Map<string, string>(); // Original ID -> Mirrored ID
+
+    const dx = a2.x - a1.x;
+    const dy = a2.y - a1.y;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq < 1e-6) return;
+
+    // Mirror Nodes
+    selectedNodes.forEach(n => {
+      const t = ((n.x - a1.x) * dx + (n.y - a1.y) * dy) / lenSq;
+      const projX = a1.x + t * dx;
+      const projY = a1.y + t * dy;
+      const dist = Math.hypot(n.x - projX, n.y - projY);
+      
+      if (dist < 1e-3) {
+        nodeMap.set(n.id, n.id);
+      } else {
+        const mirroredId = `n_m_${Date.now()}_${n.id.slice(-4)}`;
+        const mx = n.x + 2 * (projX - n.x);
+        const my = n.y + 2 * (projY - n.y);
+        nextNodes[mirroredId] = { id: mirroredId, x: mx, y: my, isFixed: false };
+        nodeMap.set(n.id, mirroredId);
+        
+        const cid = `c_sym_${Date.now()}_${n.id.slice(-4)}`;
+        nextConstraints[cid] = {
+          id: cid,
+          type: 'SYMMETRIC',
+          nodeIds: [n.id, mirroredId],
+          edgeIds: [mirrorAxisId]
+        };
+      }
+    });
+
+    // Mirror Edges
+    selectedEdges.forEach(e => {
+      if (e.id === mirrorAxisId) return;
+      const mirroredId = `e_m_${Date.now()}_${e.id.slice(-4)}`;
+      const mNodeIds = e.nodeIds.map(nid => nodeMap.get(nid) || nid);
+      if (mNodeIds.every((id, idx) => id === e.nodeIds[idx])) return;
+
+      nextEdges[mirroredId] = { 
+        ...e, 
+        id: mirroredId, 
+        nodeIds: mNodeIds as [string, string]
+      };
+    });
+
+    setSketchNodes(nextNodes);
+    setSketchEdges(nextEdges);
+    setSketchConstraints(nextConstraints);
+    setSketchTool('SELECT');
+    setSelectedEntityIds([]);
+    setMirrorAxisId(null);
+    await commitPreciseSketchSolve();
+    triggerRebuild();
+  };
+
   const triggerRebuild = () => {
     const rebuildHook = (window as any).__handleRebuild;
     if (rebuildHook) rebuildHook();
@@ -184,6 +257,55 @@ export const SketchPropertyManager: React.FC = () => {
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-3">
+        {/* Mirror Entities Rollout (Active Tool Only) */}
+        {sketchTool === 'MIRROR' && (
+          <div className="bg-white border border-indigo-300 rounded shadow-md overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+            <div className="px-2 py-1 bg-indigo-50 border-b border-indigo-200 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-indigo-700 uppercase tracking-tighter">Mirror Entities</span>
+              <button onClick={() => { setSketchTool('SELECT'); setMirrorAxisId(null); }} className="text-[10px] text-slate-400 hover:text-indigo-600 font-bold">CANCEL</button>
+            </div>
+            <div className="p-3 space-y-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Entities to Mirror</label>
+                <div className="p-2 bg-slate-50 border border-slate-200 rounded min-h-[40px] text-[11px] text-slate-600">
+                  {selectedEntityIds.filter(id => id !== mirrorAxisId).length === 0 ? (
+                    <span className="text-slate-400 italic">Select entities in viewport...</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1">
+                      {selectedEntityIds.filter(id => id !== mirrorAxisId).map(id => (
+                        <span key={id} className="bg-white px-1.5 py-0.5 border border-slate-200 rounded-sm text-[9px] font-mono">
+                          {id.slice(0, 4)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-slate-500 uppercase">Mirror About</label>
+                <div 
+                  className={`p-2 border rounded min-h-[40px] flex items-center justify-between transition-colors ${mirrorAxisId ? 'bg-indigo-50 border-indigo-300 text-indigo-700' : 'bg-white border-slate-300 text-slate-400 italic'}`}
+                  onClick={() => {
+                    const centerLine = selectedEdges.find(e => e.type === 'CENTER_LINE');
+                    if (centerLine) setMirrorAxisId(centerLine.id);
+                  }}
+                >
+                  <span className="text-[11px]">{mirrorAxisId ? `CenterLine (${mirrorAxisId.slice(0,4)})` : "Select a Center Line..."}</span>
+                  {mirrorAxisId && <button onClick={(e) => { e.stopPropagation(); setMirrorAxisId(null); }} className="text-indigo-400 hover:text-indigo-600 font-bold">×</button>}
+                </div>
+              </div>
+              <button 
+                disabled={!mirrorAxisId || selectedEntityIds.filter(id => id !== mirrorAxisId).length === 0}
+                onClick={executeSketchMirror}
+                className="w-full py-2 bg-indigo-600 text-white rounded font-bold text-[12px] hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm active:scale-95 flex items-center justify-center gap-2"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M20 6L9 17l-5-5"/></svg>
+                Apply Mirror
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Selection Rollout */}
         <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
           <div className="px-2 py-1 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
@@ -223,8 +345,10 @@ export const SketchPropertyManager: React.FC = () => {
               { type: 'TANGENT', label: 'Tangent', icon: '○' },
               { type: 'ANGLE', label: 'Angle', icon: '∠' },
               { type: 'PARALLEL', label: 'Parallel', icon: '∥' },
-              { type: 'PERPENDICULAR', label: 'Perpend.', icon: '⊥' }
-            ].map(c => (
+              { type: 'PERPENDICULAR', label: 'Perpend.', icon: '⊥' },
+              { type: 'MIDPOINT', label: 'Midpoint', icon: '⬗' },
+              { type: 'SYMMETRIC', label: 'Symmetric', icon: '|⬵|' }
+              ].map(c => (
               <button
                 key={c.type}
                 onClick={() => applyConstraint(c.type as any)}
@@ -233,9 +357,9 @@ export const SketchPropertyManager: React.FC = () => {
                 <span className="text-lg font-bold group-hover:scale-110 transition-transform">{c.icon}</span>
                 <span className="text-[9px] font-bold uppercase mt-1 tracking-tighter">{c.label}</span>
               </button>
-            ))}
-          </div>
-        </div>
+              ))}
+              </div>
+              </div>
 
         {/* Existing Constraints Rollout */}
         {selectedConstraints.length > 0 && (

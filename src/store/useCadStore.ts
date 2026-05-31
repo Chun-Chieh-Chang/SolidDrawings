@@ -35,6 +35,15 @@ export interface CADFeature {
   isBroken?: boolean;
 }
 
+export interface CADReferencePlane {
+  id: string;
+  name: string;
+  origin: [number, number, number];
+  normal: [number, number, number];
+  xDir: [number, number, number];
+  yDir: [number, number, number];
+}
+
 export interface SketchNode {
   id: string;
   x: number;
@@ -51,7 +60,7 @@ export interface SketchEdge {
 
 export interface SketchConstraint {
   id: string;
-  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR';
+  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR' | 'SYMMETRIC' | 'MIDPOINT';
   nodeIds?: string[];
   edgeIds?: string[];
   value?: number;
@@ -256,13 +265,13 @@ interface CadState {
   dismissToast: (id: string) => void;
 
   /** SolidWorks-style applied-feature placement: pick edges after ribbon command. */
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   
-  referencePlanes: any[];
-  setReferencePlanes: (planes: any[]) => void;
+  referencePlanes: CADReferencePlane[];
+  setReferencePlanes: (planes: CADReferencePlane[]) => void;
   referenceAxes: any[];
   setReferenceAxes: (axes: any[]) => void;
   

@@ -53,11 +53,62 @@ src/
 | 65 | Interactive Section View 3D | ✅ |
 | 67 | Auto-Constraint Application | ✅ |
 | 68 | Standard Mates Maturity | ✅ |
-| **64** | **Advanced Deletion Warning** | ✅ **最新** |
+| 64 | Advanced Deletion Warning | ✅ |
+| 69 | Power Trim Sketch Tool | ✅ |
+| 70 | Dynamic Dimension Overlay | ✅ |
+| 71 | Reference Planes (Reference Geometry) | ✅ |
+| 75 | Sketch Mirror Entities | ✅ |
+| 76 | Shell Feature (Uniform Wall Thickness) | ✅ |
+| 77 | Extend Entities (Sketch Completion) | ✅ |
+| 78 | Hole Wizard (Standard Fasteners) | ✅ |
+| **79** | **Draft Feature (Mold Design Essentials)** | ✅ **最新** |
 
 ---
 
-## 🔑 Phase 64 實作細節 (最新完成)
+## 🔑 Phase 79 實作細節 (最新完成)
+
+### 新增：Draft Feature (拔模特徵)
+**功能描述**：模具與塑膠件設計核心工具，允許側面相對於中立面產生特定角度的斜度。
+- **TNS Stage 2 拓樸鎖定**：後端全面改用幾何簽名匹配 (Signature Matching)，確保在父特徵（如拉伸深度）改變後，中立面與拔模面仍能精準維持參考。
+- **引導式 UI 選取流**：`PropertyManager` 採用分層選取設計。第一步選取中立面（Indigo 晶片），第二步多選拔模面（Orange 晶片），操作邏輯與 SolidWorks 對齊。
+- **OCC 內核整合**：利用 `BRepOffsetAPI_DraftAngle` 實作強固的幾何變換，支援複雜的多面拔模運算。
+
+---
+
+## 🔑 Phase 78 實作細節
+
+### 新增：Hole Wizard (標準化孔精靈)
+**功能描述**：實現工業級標準紧固件設計，支援 M3-M8 標準規格。
+- **標準預設庫**：內建 `HOLE_PRESETS`，自動對應公制標準的鑽孔、沉頭與錐頭尺寸。
+- **專業級 UI**：提供視覺化的孔類型切換（直孔、沉頭、錐頭）與規格選取下拉選單。
+
+---
+
+## 🔑 Phase 77 實作細節
+
+ (最新完成)
+
+### 新增：Reference Planes (自定義基準面)
+**功能描述**：解鎖空間建模自由度，允許使用者在任意位置建立偏移基準面。
+- **全參數化基準面**：`REFERENCE_PLANE` 特徵正式納入特徵樹，支援基於現有面或基準面的偏移 (Offset) 定義。
+- **跨維度投影**：重構了 `uvTo3D` 與後端 HLR 投影邏輯，支援在自定義基準面上進行草圖繪製，並精確映射至 3D 空間。
+- **PropertyManager 整合**：提供專業的基準面設定面板，包含參考選取、偏移數值輸入與方向反轉。
+- **即時預覽**：在視埠中以莫蘭迪紫藍色半透明平面渲染自定義基準面，支援滑鼠選取互動。
+
+---
+
+## 🔑 Phase 70 實作細節
+ (最新完成)
+
+### 新增：Dynamic Dimension Overlay (實時尺寸懸浮顯示)
+**功能描述**：在草圖繪製過程中提供即時的數值回饋，顯著提升建模手感。
+- **Heads-Up Display (HUD)**：利用 `@react-three/drei` 的 `Html` 組件，在滑鼠游標旁實作了一個隨動的懸浮標籤。
+- **動態幾何反饋**：繪製線段或矩形時，系統會實時計算當前段落的 **長度 (Length)** 與 **角度 (Angle)**，並以專業的 Monospace 字體顯示。
+- **Glassmorphism 視覺**：HUD 採用高質感的磨砂玻璃背景與語義化配色（藍色長度、綠色角度），對標 SolidWorks 的動態尺寸功能。
+
+---
+
+## 🔑 Phase 69 實作細節 (最新完成)
 
 ### 新增：Advanced Deletion Warning (進階刪除相依性警告)
 **功能描述**：對標 SolidWorks 的防呆機制，防止因刪除父特徵導致系統崩潰。
@@ -142,9 +193,9 @@ src/
 
 如果您接手本專案，建議從以下任務開始：
 
-1. **進階 TNS 3.0 (Topology Naming System)**：目前已實作 `TopologicalLinker` 記錄演化，但需進一步實作前端的面選取 ID 映射，讓被鏡射或陣列的面也能正確繼承材質或屬性。
-2. **手機/平板響應式優化 (Responsive UX)**：針對觸控環境優化 S-Key 菜單與 PropertyManager，確保在 iPad 等裝置上也能順暢進行草圖繪製。
-3. **父子特徵連帶刪除警告進階版**：目前已實作簡單警告，可進一步強化。
+1. **[進階] 幾何屬性傳遞 (Property Propagation)**：當執行鏡射或陣列時，確保新生成的面能繼承原始特徵的顏色、材質。
+2. **[工程] 裝配體干涉檢查 (Interference Detection)**：在 3D 空間中找出零件碰撞區域，補齊 Evaluate 標籤的最後一塊拼圖。
+3. **[交互] 尺寸即時驅動 (Callout Editing)**：在 3D 視埠中直接雙擊尺寸數值進行修改，取代面板輸入，達到最極致的建模手感。
 
 ---
 
