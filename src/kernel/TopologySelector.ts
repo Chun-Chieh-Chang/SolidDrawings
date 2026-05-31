@@ -9,6 +9,7 @@ export interface EdgeSignature {
 
 export interface FaceSignature {
   area: number;
+  tns_name?: string;
   curvature?: string;
   v_count: number;
   surface_type?: string;
@@ -232,6 +233,7 @@ export class TopologySelector {
                 matchedFaceId = faceMatch.id;
                 signature = { 
                     area: faceMatch.area, 
+                    tns_name: faceMatch.tns_name,
                     v_count: faceMatch.v_count, 
                     curvature: faceMatch.curvature,
                     surface_type: faceMatch.surface_type,

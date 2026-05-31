@@ -19,6 +19,8 @@
     "typecheck": "tsc --noEmit",
     "pdca:check": "node tools/pdca-check.mjs",
     "pdca:full": "npm run typecheck && npm run pdca:check",
+    "graphify:update": "graphify . --no-viz --update",
+    "graphify:query": "graphify query",
     "test:golden": "python tests/regression/run_golden.py",
     "test:regression": "npm run test:golden"
   },

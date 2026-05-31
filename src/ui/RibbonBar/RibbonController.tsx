@@ -6,13 +6,15 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractAllClosedLoops } from '../../utils/geometry/GraphAdapter';
 
 interface RibbonControllerProps {
-  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER';
+  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING';
   setActiveTab: (tab: any) => void;
   engineStatus: 'CONNECTED' | 'DISCONNECTED';
   solidSketchPointCount: number;
   handleExitAndExtrude: (op?: any) => void;
   handleRevolveFromSketch: () => void;
   handleImportStep: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onShowMassProps?: () => void;
+  onShowEquations?: () => void;
 }
 
 export const RibbonController: React.FC<RibbonControllerProps> = ({
@@ -23,6 +25,8 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   handleExitAndExtrude,
   handleRevolveFromSketch,
   handleImportStep,
+  onShowMassProps,
+  onShowEquations,
 }) => {
   const {
     features,
@@ -52,10 +56,14 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
     sketchEdges,
     addFeature,
     setSelectedId,
+    setSelectedSubNodeType,
     pushToast,
     components,
     viewportDisplayMode,
     setViewportDisplayMode,
+    explodedView,
+    setExplodedView,
+    calculateAutoExplosion,
     partMaterial,
     setPartMaterial,
     environmentMap,
@@ -72,6 +80,10 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
           onClick={() => { setActiveTab('FEATURES'); setMeasurementMode('NONE'); setMeasurementPoints([]); setMeasurementResults(null); } }
           className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "FEATURES" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
         >FEATURES</button>
+        <button
+          onClick={() => { setActiveTab('SURFACING'); setMeasurementMode('NONE'); } }
+          className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "SURFACING" ? "border-orange-500 text-orange-600 bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
+        >SURFACES</button>
         <button
           onClick={() => {
             setActiveTab('SKETCH'); 
@@ -134,21 +146,44 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Import</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
-            <button onClick={() => { if (solidSketchPointCount >= 3) handleExitAndExtrude(); else { setSketchMode(true); setSketchTool('SELECT'); } }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Boss/Base">
+            <button onClick={() => { 
+              if (solidSketchPointCount >= 3) {
+                handleExitAndExtrude();
+              } else { 
+                setSketchMode(true); 
+                setSketchTool('SELECT'); 
+                if (solidSketchPointCount > 0) pushToast('點數不足：拉伸至少需要 3 個草圖點。', 'info');
+              } 
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Boss/Base">
               <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Extrude</span>
             </button>
-            <button onClick={() => { if (solidSketchPointCount >= 3) handleExitAndExtrude('CUT'); else { setSketchMode(true); setSketchTool('SELECT'); } }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Cut">
+            <button onClick={() => { 
+              if (solidSketchPointCount >= 3) {
+                handleExitAndExtrude('CUT'); 
+              } else { 
+                setSketchMode(true); 
+                setSketchTool('SELECT'); 
+                if (solidSketchPointCount > 0) pushToast('點數不足：切除至少需要 3 個草圖點。', 'info');
+              } 
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Cut">
               <div className="w-10 h-10 flex items-center justify-center text-red-600 transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M3 8l9 4 9-4"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M3 8l9 4 9-4"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Cut</span>
             </button>
-            <button onClick={() => { if (solidSketchPointCount >= 2) handleExitAndExtrude('SURFACE'); else { setSketchMode(true); setSketchTool('SELECT'); } }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Surface">
+            <button onClick={() => { 
+              if (solidSketchPointCount >= 2) {
+                handleExitAndExtrude('SURFACE'); 
+              } else { 
+                setSketchMode(true); 
+                setSketchTool('SELECT'); 
+              } 
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Surface">
               <div className="w-10 h-10 flex items-center justify-center text-orange-500 transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l9 4-9 4-9-4 9-4z"/><path d="M12 17l9-4-9-4-9 4 9 4z"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l9 4-9 4-9-4 9-4z"/><path d="M12 17l9-4-9-4-9 4 9 4z"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Surface</span>
             </button>
@@ -156,14 +191,23 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
             <button
               onClick={() => {
                 const loops = extractAllClosedLoops(sketchNodes, sketchEdges);
-                if (isSketchMode && loops.length > 0 && loops[0].length >= 3) handleRevolveFromSketch();
-                else { setSketchMode(true); setSketchTool('SELECT'); setHint('Draw closed profile, then Revolved Boss/Base'); }
+                if (isSketchMode && loops.length > 0 && loops[0].length >= 3) {
+                  handleRevolveFromSketch();
+                } else { 
+                  setSketchMode(true); 
+                  setSketchTool('SELECT'); 
+                  if (isSketchMode && loops.length === 0) {
+                    pushToast('無法旋轉：需要閉合輪廓。', 'warning');
+                  } else {
+                    setHint('Draw closed profile, then Revolved Boss/Base');
+                  }
+                }
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand ? 'border-transparent' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Revolve Boss/Base"
             >
               <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m7.8 16.2-2.9 2.9"/><path d="M2 12h4"/><path d="m7.8 7.8-2.9-2.9"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Revolve</span>
             </button>
@@ -180,26 +224,56 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
               title="Swept Boss/Base"
             >
-              <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 22C4 13 14 13 14 4"/><circle cx="14" cy="4" r="2"/><circle cx="4" cy="22" r="2"/></svg>
-              </div>
-              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Sweep</span>
+            <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 22C4 13 14 13 14 4"/><circle cx="14" cy="4" r="2"/><circle cx="4" cy="22" r="2"/></svg>
+            </div>
+            <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Sweep</span>
             </button>
             <button
-              onClick={() => {
-                addFeature({
-                  id: `feat_${uuidv4()}`,
-                  type: 'LOFT',
-                  name: `Loft ${features.filter(f => f.type === 'LOFT').length + 1}`,
-                  parameters: { profile_ids: [] }
-                });
-                setHint('Loft feature created. Configure in PropertyManager.');
-              }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
-              title="Lofted Boss/Base"
+            onClick={() => {
+              addFeature({
+                id: `feat_${uuidv4()}`,
+                type: 'HELICAL_SWEEP',
+                name: `Helix ${features.filter(f => f.type === 'HELICAL_SWEEP').length + 1}`,
+                parameters: { 
+                  profile_id: '', 
+                  pitch: 5, 
+                  revolutions: 10, 
+                  diameter: 20, 
+                  handedness: 'CW',
+                  start_angle: 0,
+                  taper_angle: 0,
+                  axis_ref: null
+                }
+              });
+              setHint('Helical Sweep created. Configure in PropertyManager.');
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+            title="Helical Sweep"
+            >
+            <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M12 2C12 2 15 5 15 10C15 15 9 15 9 10C9 5 12 2 12 2Z" opacity="0.5"/>
+                <path d="M12 22V2M12 22C16 22 19 19 19 15C19 11 12 8 12 2M12 22C8 22 5 19 5 15C5 11 12 8 12 2"/>
+              </svg>
+            </div>
+            <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Helical<br/>Sweep</span>
+            </button>
+            <button
+            onClick={() => {
+              addFeature({
+                id: `feat_${uuidv4()}`,
+                type: 'LOFT',
+                name: `Loft ${features.filter(f => f.type === 'LOFT').length + 1}`,
+                parameters: { profile_ids: [] }
+              });
+              setHint('Loft feature created. Configure in PropertyManager.');
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+            title="Lofted Boss/Base"
             >
               <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M6 12h12"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M6 12h12"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Loft</span>
             </button>
@@ -228,7 +302,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               title="Fillet"
             >
               <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M4 4v16"/><path d="M4 12c4 0 8-4 8-8"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 2a7 7 0 0 1 7 7"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Fillet</span>
             </button>
@@ -238,7 +312,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               title="Chamfer"
             >
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'CHAMFER' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20V4"/><path d="M4 20 16 4"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><line x1="12" y1="2" x2="19" y2="9"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Chamfer</span>
             </button>
@@ -274,8 +348,8 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'PATTERN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Pattern"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'PATTERN' ? 'text-indigo-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'PATTERN' ? 'text-indigo-500 scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Pattern</span>
             </button>
@@ -299,8 +373,8 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'MIRROR' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Mirror"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'MIRROR' ? 'text-indigo-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20"/><path d="M3 7l6 5-6 5V7z"/><path d="M21 7l-6 5 6 5V7z"/></svg>
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'MIRROR' ? 'text-indigo-500 scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="3" x2="12" y2="21"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Mirror</span>
             </button>
@@ -324,8 +398,8 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'DRAFT' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Draft"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'DRAFT' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'DRAFT' ? 'text-[#005B9A] scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Draft</span>
             </button>
@@ -351,15 +425,15 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'SHELL' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Shell"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'SHELL' ? 'text-teal-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7h10v10H7z"/></svg>
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'SHELL' ? 'text-teal-600 scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><path d="M7 7h10v10H7z"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Shell</span>
             </button>
 
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
 
-            <button
+            <button 
               onClick={() => {
                 const featId = `feat_${Date.now()}`;
                 addFeature({
@@ -369,20 +443,39 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   parameters: { planeType: 'OFFSET', offset: 10, refs: [], flip: false }
                 });
                 setSelectedId(featId);
-                setActiveTab('FEATURES');
-                setPendingFeatureCommand('PLANE');
-                setSelectedTopology(null);
-                setHint('Select a face or plane as a reference for the new plane.');
+                setSelectedSubNodeType('FEATURE');
+                setHint('Select entities (faces, points, edges) to define the reference plane.');
               }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'PLANE' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
               title="Reference Plane"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'PLANE' ? 'text-blue-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110`}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Plane</span>
             </button>
 
+            <button 
+              onClick={() => {
+                const featId = `feat_${Date.now()}`;
+                addFeature({
+                  id: featId,
+                  type: 'REFERENCE_AXIS',
+                  name: `Axis ${features.filter(f => f.type === 'REFERENCE_AXIS').length + 1}`,
+                  parameters: { axisType: 'TWO_POINTS', refs: [] }
+                });
+                setSelectedId(featId);
+                setSelectedSubNodeType('FEATURE');
+                setHint('Select entities to define the reference axis.');
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Reference Axis"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="2" x2="12" y2="22"/><polyline points="5 12 12 12 19 12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Axis</span>
+            </button>
             <button
               onClick={() => {
                 const featId = `feat_${Date.now()}`;
@@ -408,6 +501,74 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Hole</span>
             </button>
           </div>
+        ) : activeTab === 'SURFACING' ? (
+          <div className="flex items-center gap-1 h-full animate-in fade-in slide-in-from-left-2 duration-300">
+            <button onClick={() => { setSketchMode(true); setSketchTool('SELECT'); setHint('Select profile for Surface Extrude'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Surface">
+              <div className="w-10 h-10 flex items-center justify-center text-orange-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 3l9 4-9 4-9-4 9-4z"/><path d="M12 17l9-4-9-4-9 4 9 4z"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Surface<br/>Extrude</span>
+            </button>
+            <button onClick={() => { setSketchMode(true); setSketchTool('SELECT'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Revolved Surface">
+              <div className="w-10 h-10 flex items-center justify-center text-orange-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M12 12L3 12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Surface<br/>Revolve</span>
+            </button>
+            <button onClick={() => { 
+                const featId = `feat_${uuidv4()}`;
+                addFeature({
+                  id: featId,
+                  type: 'LOFT',
+                  name: `Surface-Loft ${features.filter(f => f.type === 'LOFT').length + 1}`,
+                  parameters: { profile_ids: [], isSurfaceOnly: true }
+                });
+             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Lofted Surface">
+              <div className="w-10 h-10 flex items-center justify-center text-orange-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Surface<br/>Loft</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { 
+                const featId = `feat_${uuidv4()}`;
+                addFeature({
+                  id: featId,
+                  type: 'SURFACE_OFFSET',
+                  name: `Offset-Surf ${features.filter(f => f.type === 'SURFACE_OFFSET').length + 1}`,
+                  parameters: { distance: 1.0, refs: [] }
+                });
+                setPendingFeatureCommand('SURFACE_OFFSET');
+                setHint('Select faces to offset as a surface.');
+             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Offset Surface">
+              <div className="w-10 h-10 flex items-center justify-center text-orange-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M16 14l4-4-4-4"/><path d="M20 10H4"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Offset<br/>Surface</span>
+            </button>
+            <button onClick={() => { 
+                const featId = `feat_${uuidv4()}`;
+                addFeature({
+                  id: featId,
+                  type: 'SURFACE_KNIT',
+                  name: `Knit-Surf ${features.filter(f => f.type === 'SURFACE_KNIT').length + 1}`,
+                  parameters: { refs: [] }
+                });
+                setHint('Knit surface feature created. All current surfaces will be sewn.');
+             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Knit Surface">
+              <div className="w-10 h-10 flex items-center justify-center text-orange-700 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3H8l-5 9 5 9h8l5-9-5-9z"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Knit<br/>Surface</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { pushToast('Boundary Surface requires multi-directional curves.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Boundary Surface">
+              <div className="w-10 h-10 flex items-center justify-center text-orange-400 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12c4-4 8-4 12 0s8 4 12 0"/><path d="M12 2c-4 4-4 8 0 12s4 8 0 12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Boundary<br/>Surface</span>
+            </button>
+          </div>
         ) : activeTab === 'SKETCH' ? (
           <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
             <button onClick={() => { (window as any).__handleSaveSketchOnly?.(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Save Sketch">
@@ -425,54 +586,54 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
             <div className="w-[1px] h-10 bg-border/50 mx-2" />
             <button onClick={() => useCadStore.setState(s => ({ smartDimensionActive: !s.smartDimensionActive }))} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${useCadStore.getState().smartDimensionActive ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Smart Dimension">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${useCadStore.getState().smartDimensionActive ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m18 8 3 3-3 3"/><path d="m6 8-3 3 3 3"/><path d="M2 11h20"/><path d="M2 4v14"/><path d="M22 4v14"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m18 8 3 3-3 3"/><path d="m6 8-3 3 3 3"/><path d="M2 11h20"/><path d="M2 4v14"/><path d="M22 4v14"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Smart Dim</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { setSketchTool('TRIM'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'TRIM' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Trim Entities">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'TRIM' ? 'text-red-500 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="m17 17-5-5-5 5"/><path d="m14.5 10.5-2.5 2.5-2.5-2.5"/><path d="M15 18H9"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M6 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="M18 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z"/><path d="m17 17-5-5-5 5"/><path d="m14.5 10.5-2.5 2.5-2.5-2.5"/><path d="M15 18H9"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Trim</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { setSketchTool('MIRROR'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'MIRROR' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Mirror Entities">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'MIRROR' ? 'text-indigo-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20"/><path d="m2 8 8 2"/><path d="m2 14 8-2"/><path d="m22 8-8 2"/><path d="m22 14-8-2"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v20"/><path d="m2 8 8 2"/><path d="m2 14 8-2"/><path d="m22 8-8 2"/><path d="m22 14-8-2"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Mirror</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { setSketchTool('EXTEND'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'EXTEND' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Extend Entities">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'EXTEND' ? 'text-emerald-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14"/><path d="m15 16 4-4-4-4"/><path d="M12 2v20"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14"/><path d="m15 16 4-4-4-4"/><path d="M12 2v20"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Extend</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { setSketchTool('LINEAR_PATTERN'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'LINEAR_PATTERN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Linear Sketch Pattern">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'LINEAR_PATTERN' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M12 6h3"/><path d="M6 12v3"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="15" width="6" height="6" rx="1"/><path d="M12 6h3"/><path d="M6 12v3"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Linear<br/>Pattern</span>
             </button>
             <button onClick={() => { setSketchTool('CIRCULAR_PATTERN'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${sketchTool === 'CIRCULAR_PATTERN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Circular Sketch Pattern">
               <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'CIRCULAR_PATTERN' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v2"/><path d="M12 18v2"/><path d="M2 12h2"/><path d="M18 12h2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3"/><path d="M12 2v2"/><path d="M12 18v2"/><path d="M2 12h2"/><path d="M18 12h2"/><path d="m4.9 4.9 1.4 1.4"/><path d="m17.7 17.7 1.4 1.4"/><path d="m4.9 19.1 1.4-1.4"/><path d="m17.7 6.3 1.4-1.4"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Circular<br/>Pattern</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { (window as any).__handleConvertEntities?.(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Convert Entities">
               <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M12 12 3.5 7.5"/><path d="M12 12l8.5-4.5"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M12 22V12"/><path d="M12 12 3.5 7.5"/><path d="M12 12l8.5-4.5"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Convert</span>
             </button>
             <button onClick={() => { (window as any).__handleOffsetEntities?.(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Offset Entities">
               <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 12A10 10 0 0 0 12 2v0"/><path d="M22 12A10 10 0 0 1 12 22v0"/><path d="M12 22a10 10 0 0 1-10-10v0"/><path d="M12 2a10 10 0 0 0-10 10v0"/><path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 12A10 10 0 0 0 12 2v0"/><path d="M22 12A10 10 0 0 1 12 22v0"/><path d="M12 22a10 10 0 0 1-10-10v0"/><path d="M12 2a10 10 0 0 0-10 10v0"/><path d="M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Offset</span>
             </button>
@@ -514,8 +675,33 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[11px] font-semibold text-slate-800 leading-tight">Interference</span>
             </button>
+
+            <div className="w-px h-10 bg-slate-300 mx-1"></div>
+
+            <button
+              onClick={onShowMassProps}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 rounded-md group`}
+              title="Mass Properties"
+            >
+              <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-800 leading-tight">Mass<br />Props</span>
+            </button>
+
+            <button
+              onClick={onShowEquations}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 rounded-md group`}
+              title="Equations"
+            >
+              <div className="w-10 h-10 flex items-center justify-center text-indigo-600 transition-transform group-hover:scale-110">
+                <span className="text-2xl font-black italic">∑</span>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-800 leading-tight">Equations</span>
+            </button>
           </div>
-        ) : activeTab === 'RENDER' ? (
+        ) : 
+ activeTab === 'RENDER' ? (
           <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
             <div className="flex flex-col gap-1 px-3 py-1 border border-[#A0A0A0] rounded bg-white">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">材質 (Material)</label>
@@ -552,12 +738,12 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setViewportDisplayMode(currentMode === 'SHADED' ? 'SHADED_EDGES' : 'SHADED');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 rounded-md group`}
-              title="純淨彩現模式 (切換線框)"
+              title="Display Style (Toggle Edges)"
             >
               <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 12h3v8h14v-8h3L12 2z" /></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
               </div>
-              <span className="text-[11px] font-semibold text-slate-800 leading-tight">Toggle<br />Wireframe</span>
+              <span className="text-[11px] font-semibold text-slate-800 leading-tight">Display<br />Style</span>
             </button>
           </div>
         ) : activeTab === 'ASSEMBLY' ? (
@@ -571,6 +757,26 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Insert Comp</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button 
+              onClick={() => {
+                const nextActive = !explodedView.isActive;
+                setExplodedView({ isActive: nextActive });
+                if (nextActive && Object.keys(explodedView.directions).length === 0) {
+                  calculateAutoExplosion();
+                }
+                if (nextActive && explodedView.factor === 0) {
+                  useCadStore.getState().setExplosionFactor(0.5);
+                }
+              }} 
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${explodedView.isActive ? 'bg-indigo-50 border-indigo-300 shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} 
+              title="Exploded View"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${explodedView.isActive ? 'text-indigo-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><line x1="12" y1="12" x2="12" y2="2"/><line x1="12" y1="12" x2="22" y2="12"/><line x1="12" y1="12" x2="12" y2="22"/><line x1="12" y1="12" x2="2" y2="12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Explode</span>
             </button>
           </div>
         ) : null}

@@ -98,6 +98,62 @@ def solve_assembly_mates(components_dict, mates_list):
                 angle_rad = math.radians(angle_target)
                 target_dot = math.cos(angle_rad)
                 residuals.append(np.dot(n1, n2) - (sign * target_dot))
+            elif m_type == 'GEAR':
+                # Gear Mate: DeltaTheta_B = -Ratio * DeltaTheta_A
+                ratio = float(params.get('ratio', 1.0))
+                init_transforms = params.get('initialTransforms', {})
+                
+                def get_delta_theta(ent):
+                    cid = ent.get('componentId')
+                    if cid not in components_dict: return 0.0
+                    
+                    # Current rotation
+                    if cid in comp_to_idx:
+                        idx = comp_to_idx[cid]
+                        curr_rot = x_vars[idx*6+3 : idx*6+6]
+                    else:
+                        curr_rot = components_dict[cid]['transform']['rotation']
+                    
+                    # Initial rotation
+                    init_t = init_transforms.get(cid, components_dict[cid]['transform'])
+                    init_rot = init_t['rotation']
+                    
+                    # Compute simplified delta (SW2000 style usually works on a single primary axis)
+                    # We'll use the magnitude of the rotation vector change as a proxy or specific axis
+                    return np.sum(np.array(curr_rot) - np.array(init_rot))
+
+                dt1 = get_delta_theta(ent1)
+                dt2 = get_delta_theta(ent2)
+                residuals.append(dt2 - (-ratio * dt1))
+
+            elif m_type == 'SCREW':
+                # Screw Mate: DeltaPos = Pitch * DeltaTheta / 2PI
+                pitch = float(params.get('pitch', 1.0)) # mm per revolution
+                init_transforms = params.get('initialTransforms', {})
+                
+                cid_a = ent1.get('componentId')
+                cid_b = ent2.get('componentId')
+                
+                # Component A (Rotation)
+                if cid_a in comp_to_idx:
+                    idx = comp_to_idx[cid_a]
+                    curr_rot = x_vars[idx*6+3 : idx*6+6]
+                else:
+                    curr_rot = components_dict[cid_a]['transform']['rotation']
+                init_t_a = init_transforms.get(cid_a, components_dict[cid_a]['transform'])
+                dt_a = np.sum(np.array(curr_rot) - np.array(init_t_a['rotation']))
+                
+                # Component B (Translation)
+                if cid_b in comp_to_idx:
+                    idx = comp_to_idx[cid_b]
+                    curr_pos = x_vars[idx*6 : idx*6+3]
+                else:
+                    curr_pos = components_dict[cid_b]['transform']['position']
+                init_t_b = init_transforms.get(cid_b, components_dict[cid_b]['transform'])
+                dp_b = np.sum(np.array(curr_pos) - np.array(init_t_b['position']))
+                
+                # Linear translation = (Pitch / 2PI) * RotationInRadians
+                residuals.append(dp_b - (pitch * dt_a / (2 * math.pi)))
         
         # Soft spring
         for i, cid in enumerate(variable_comps):

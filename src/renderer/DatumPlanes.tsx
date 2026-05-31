@@ -772,6 +772,32 @@ export const DatumPlanes = () => {
         );
       })}
 
+      {referenceAxes.map((axis) => {
+        const { id, origin, direction, name } = axis;
+        const originVec = new THREE.Vector3(...origin);
+        const dirVec = new THREE.Vector3(...direction).normalize();
+        const start = originVec.clone().addScaledVector(dirVec, -200);
+        const end = originVec.clone().addScaledVector(dirVec, 200);
+        return (
+          <group key={id}>
+            <Line
+              points={[start, end]}
+              color="#F59E0B"
+              lineWidth={1.5}
+              dashed
+              dashScale={2}
+              dashSize={5}
+              gapSize={2}
+            />
+            <Html position={originVec} center className="pointer-events-none">
+              <div className="px-1.5 py-0.5 rounded bg-amber-500/80 text-white text-[9px] font-black border border-amber-400 shadow-sm whitespace-nowrap">
+                {name || id}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+
       {computedRefGeometry?.filter(g => g.type === 'PLANE').map((plane) => {
         const { id, data } = plane;
         const origin = new THREE.Vector3(...data.origin);

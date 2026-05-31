@@ -131,12 +131,13 @@ export function extractAllClosedLoops(
     // For now, let's just emit all faces, and let the backend boolean ops handle it, OR we can filter it here.
     // We'll pass them all, sorted by bounding area descending. 
     
-    // Convert to coordinates [x, y, tag]
+    // Convert to coordinates [x, y, tag, metadata]
     const result: any[] = [];
     for (let i = 0; i < face.length; i++) {
       const he = face[i];
       const p = nodes[he.from];
-      result.push([p.x, p.y, i === 0 ? 'START' : undefined]);
+      const metadata = { edgeId: he.edge.id };
+      result.push([p.x, p.y, i === 0 ? 'START' : undefined, metadata]);
       
       if (he.edge.type === 'SPLINE') {
          // Emit intermediate control points with 'SPLINE_CONTROL' tag
@@ -147,14 +148,15 @@ export function extractAllClosedLoops(
          for (const innerId of innerNodeIds) {
              const innerP = nodes[innerId];
              if (innerP) {
-                 result.push([innerP.x, innerP.y, 'SPLINE_CONTROL']);
+                 result.push([innerP.x, innerP.y, 'SPLINE_CONTROL', metadata]);
              }
          }
       }
     }
     // Close the loop
     const firstP = nodes[face[0].from];
-    result.push([firstP.x, firstP.y, undefined]);
+    const firstMetadata = { edgeId: face[0].edge.id };
+    result.push([firstP.x, firstP.y, undefined, firstMetadata]);
     
     loops.push(result);
   }
@@ -219,17 +221,18 @@ export function extractAllPaths(
       const p2 = nodes[n2];
       if (!p1 || !p2) continue;
       
-      path.push([p1.x, p1.y, 'START']);
+      const metadata = { edgeId: e.id };
+      path.push([p1.x, p1.y, 'START', metadata]);
       if (e.type === 'SPLINE') {
           for (let i = 1; i < e.nodeIds.length - 1; i++) {
               const cp = nodes[e.nodeIds[i]];
-              if (cp) path.push([cp.x, cp.y, 'SPLINE_CONTROL']);
+              if (cp) path.push([cp.x, cp.y, 'SPLINE_CONTROL', metadata]);
           }
       } else if (e.type === 'CIRCLE') {
           // Add dummy control point for arc
           const cp = nodes[e.nodeIds[1]]; // Assuming nodeIds[1] is arc control if it were arc... but CIRCLE is full
       }
-      path.push([p2.x, p2.y, undefined]);
+      path.push([p2.x, p2.y, undefined, metadata]);
       paths.push(path);
       visitedEdges.add(e.id);
   }

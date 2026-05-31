@@ -6,6 +6,7 @@ import { HeavyEngineClient, RebuildError } from '@/kernel/HeavyEngineClient';
 import { formatCadErrorMessage, formatFeatureWarnings } from '@/utils/cad-error-messages';
 import { featureTreeFingerprint } from '@/utils/rebuild-fingerprint';
 import type { CADFeature } from '@/store/useCadStore';
+import { EquationEngine } from '@/utils/EquationEngine';
 
 export function usePartRebuild(
   features: CADFeature[],
@@ -27,27 +28,40 @@ export function usePartRebuild(
       dirtyFromFeatureIndex,
     } = useCadStore.getState();
 
-    let activeFeatures = features;
+    let activeFeatures = features.filter(f => !f.isSuppressed);
 
     if (rollbackIndex !== null) {
-      activeFeatures = features.slice(0, rollbackIndex + 1);
+      // Find the index in the original features to correctly slice the filtered ones
+      activeFeatures = features.slice(0, rollbackIndex + 1).filter(f => !f.isSuppressed);
     }
 
     if (isSketchMode && editingFeatureId) {
       const index = features.findIndex((f) => f.id === editingFeatureId);
       if (index !== -1) {
-        activeFeatures = features.slice(0, index);
+        activeFeatures = features.slice(0, index).filter(f => !f.isSuppressed);
       }
     }
 
-    if (activeFeatures.length === 0) {
+    const { evaluatedVariables } = useCadStore.getState();
+    const evaluatedFeatures = activeFeatures.map(f => {
+      const p = { ...f.parameters };
+      Object.keys(p).forEach(key => {
+        const val = p[key];
+        if (typeof val === 'string' && val.startsWith('=')) {
+          p[key] = EquationEngine.evaluate(val.substring(1), evaluatedVariables);
+        }
+      });
+      return { ...f, parameters: p };
+    });
+
+    if (evaluatedFeatures.length === 0) {
       setMeshData([]);
       lastRebuildFingerprint.current = '';
       clearRebuildDirty();
       return;
     }
 
-    const fingerprint = featureTreeFingerprint(activeFeatures);
+    const fingerprint = featureTreeFingerprint(evaluatedFeatures);
     if (!rebuildDirty && fingerprint === lastRebuildFingerprint.current) {
       return;
     }
@@ -74,7 +88,7 @@ export function usePartRebuild(
         return;
       }
 
-      const results = await client.rebuild(activeFeatures, 0.01, signal, {
+      const results = await client.rebuild(evaluatedFeatures, 0.01, signal, {
         fromFeatureIndex,
         featureFingerprint: fingerprint,
       });
@@ -95,8 +109,9 @@ export function usePartRebuild(
         setMeshData(results);
 
         // Update Reference Geometry
-        const refPlanes = results.flatMap((r: any) => r.ref_geometry || []).filter((g: any) => g.type === 'PLANE');
-        const formattedPlanes = refPlanes.map((p: any) => {
+        const allRefGeo = results.flatMap((r: any) => r.ref_geometry || []);
+        
+        const formattedPlanes = allRefGeo.filter((g: any) => g.type === 'PLANE').map((p: any) => {
           const featName = features.find(f => f.id === p.id)?.name || p.id;
           return {
             id: p.id,
@@ -108,6 +123,17 @@ export function usePartRebuild(
           };
         });
         useCadStore.getState().setReferencePlanes(formattedPlanes);
+
+        const formattedAxes = allRefGeo.filter((g: any) => g.type === 'AXIS').map((a: any) => {
+          const featName = features.find(f => f.id === a.id)?.name || a.id;
+          return {
+            id: a.id,
+            name: featName,
+            origin: a.data.origin,
+            direction: a.data.direction
+          };
+        });
+        useCadStore.getState().setReferenceAxes(formattedAxes);
 
         lastRebuildFingerprint.current = fingerprint;
         clearRebuildDirty();

@@ -207,6 +207,22 @@ async def export_assembly_step(request: AssemblyExportStepRequest):
 
 
 
+class TopologyAnalysisRequest(BaseModel):
+    features: List[dict]
+    subshape_id: str
+
+@router.post("/analyze_topology")
+async def analyze_topology(request: TopologyAnalysisRequest):
+    try:
+        shape = geometry_service.build_shape_only(request.features)
+        if not shape or shape.IsNull():
+            return {"type": "UNKNOWN"}
+        return geometry_service.analyze_topology(shape, request.subshape_id)
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 class ProjectRequest(BaseModel):
     features: List[FeatureDefinition]
     materialId: Optional[str] = "GENERIC"

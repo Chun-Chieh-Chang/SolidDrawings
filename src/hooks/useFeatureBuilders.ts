@@ -163,22 +163,23 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     }
 
     if (activePlane === 'FACE' && activeFaceOrigin && activeFaceNormal) {
-      let [nx, ny, nz] = activeFaceNormal;
-      const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-      nx /= nLen; ny /= nLen; nz /= nLen;
-
-      let xx = 1.0, xy = 0.0, xz = 0.0;
-      if (Math.abs(nx) < 1e-5 && Math.abs(ny) < 1e-5) {
-        xx = 1.0; xy = 0.0; xz = 0.0;
-      } else {
-        xx = -ny; xy = nx; xz = 0.0;
-        const xLen = Math.sqrt(xx * xx + xy * xy);
-        xx /= xLen; xy /= xLen;
+      const [nx, ny, nz] = activeFaceNormal;
+      
+      // Robust Plane Axis Logic (Aligned with OCC gp_Ax2 defaults)
+      let ux = 0, uy = 1, uz = 0;
+      if (Math.abs(ny) > 0.9) {
+        ux = 0; uy = 0; uz = 1;
       }
 
-      let yx = ny * xz - nz * xy;
-      let yy = nz * xx - nx * xz;
-      let yz = nx * xy - ny * xx;
+      let xx = uy * nz - uz * ny;
+      let xy = uz * nx - ux * nz;
+      let xz = ux * ny - uy * nx;
+      const xLen = Math.sqrt(xx * xx + xy * xy + xz * xz) || 1;
+      xx /= xLen; xy /= xLen; xz /= xLen;
+
+      const yx = ny * xz - nz * xy;
+      const yy = nz * xx - nx * xz;
+      const yz = nx * xy - ny * xx;
 
       return [
         activeFaceOrigin[0] + u * xx + v * yx,
@@ -363,64 +364,101 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
   }, [sketchNodes, sketchEdges, sketchConstraints, activePlane, editingFeatureId, features, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId, setRollbackIndex, pushToast, setDanglingNodes, uvTo3D]);
 
   /** Convert a SKETCH feature's 2D points to 3D world-space coordinates using its plane. */
-  const sketchFeatureTo3DPoints = useCallback((sketchFeat: CADFeature): number[][] => {
+  const sketchFeatureTo3DPoints = useCallback((sketchFeat: CADFeature): any[][] => {
     const points = sketchFeat.parameters.points as any[][] | undefined;
     if (!points || points.length === 0) return [];
     const plane = sketchFeat.parameters.plane as string;
     const faceOrigin = sketchFeat.parameters.faceOrigin as [number,number,number] | undefined;
     const faceNormal = sketchFeat.parameters.faceNormal as [number,number,number] | undefined;
 
-    const result: number[][] = [];
+    const result: any[][] = [];
     for (const loop of points) {
       for (const pt of loop) {
         if (!pt || pt.length < 2) continue;
         const [u, v] = [Number(pt[0]), Number(pt[1])];
         let x = 0, y = 0, z = 0;
+        
         if (plane === 'FRONT')       { x = u; y = v; z = 0; }
         else if (plane === 'TOP')    { x = u; y = 0; z = v; }
         else if (plane === 'RIGHT')  { x = 0; y = u; z = v; }
         else if (plane === 'FACE' && faceOrigin && faceNormal) {
-          let [nx, ny, nz] = faceNormal;
-          const nLen = Math.sqrt(nx * nx + ny * ny + nz * nz) || 1;
-          nx /= nLen; ny /= nLen; nz /= nLen;
-
-          let xx = 1.0, xy = 0.0, xz = 0.0;
-          if (Math.abs(nx) < 1e-5 && Math.abs(ny) < 1e-5) {
-            xx = 1.0; xy = 0.0; xz = 0.0;
-          } else {
-            xx = -ny; xy = nx; xz = 0.0;
-            const xLen = Math.sqrt(xx * xx + xy * xy);
-            xx /= xLen; xy /= xLen;
+          const [nx, ny, nz] = faceNormal;
+          
+          // Robust Plane Axis Logic (Aligned with OCC gp_Ax2 defaults)
+          // 1. Choose a candidate 'up' vector
+          let ux = 0, uy = 1, uz = 0;
+          if (Math.abs(ny) > 0.9) {
+            ux = 0; uy = 0; uz = 1;
           }
 
-          let yx = ny * xz - nz * xy;
-          let yy = nz * xx - nx * xz;
-          let yz = nx * xy - ny * xx;
+          // 2. X = normalize(up x N)
+          let xx = uy * nz - uz * ny;
+          let xy = uz * nx - ux * nz;
+          let xz = ux * ny - uy * nx;
+          const xLen = Math.sqrt(xx * xx + xy * xy + xz * xz) || 1;
+          xx /= xLen; xy /= xLen; xz /= xLen;
+
+          // 3. Y = N x X
+          const yx = ny * xz - nz * xy;
+          const yy = nz * xx - nx * xz;
+          const yz = nx * xy - ny * xx;
 
           x = faceOrigin[0] + u * xx + v * yx;
           y = faceOrigin[1] + u * xy + v * yy;
           z = faceOrigin[2] + u * xz + v * yz;
         }
-        result.push([x, y, z]);
+
+        // Preserve all metadata (labels like 'SPLINE_CONTROL', 'ARC_CONTROL')
+        const labels = pt.slice(2);
+        result.push([x, y, z, ...labels]);
       }
     }
     return result;
   }, []);
+const handleBuildSweepLoft = useCallback((feat: CADFeature) => {
+  if (feat.type === 'SWEEP') {
+    const profileFeat = features.find(f => f.id === feat.parameters.profile_id);
+    const pathFeat    = features.find(f => f.id === feat.parameters.path_id);
+    if (!profileFeat || !pathFeat) {
+      pushToast('Sweep: Please select both a Profile and a Path sketch.', 'error');
+      return;
+    }
+    
+    // Extract guide points if any
+    const guideIds: string[] = feat.parameters.guide_ids || [];
+    const guidePointsList = guideIds.filter(Boolean).map(id => {
+      const f = features.find(feat => feat.id === id);
+      return f ? sketchFeatureTo3DPoints(f) : [];
+    });
 
-  const handleBuildSweepLoft = useCallback((feat: CADFeature) => {
-    if (feat.type === 'SWEEP') {
-      const profileFeat = features.find(f => f.id === feat.parameters.profile_id);
-      const pathFeat    = features.find(f => f.id === feat.parameters.path_id);
-      if (!profileFeat || !pathFeat) {
-        pushToast('Sweep: Please select both a Profile and a Path sketch.', 'error');
-        return;
-      }
-      updateFeatureParams(feat.id, {
-        ...feat.parameters,
-        profile_points: sketchFeatureTo3DPoints(profileFeat),
-        path_points:    sketchFeatureTo3DPoints(pathFeat),
-      });
-    } else if (feat.type === 'LOFT') {
+    updateFeatureParams(feat.id, {
+      ...feat.parameters,
+      profile_points: sketchFeatureTo3DPoints(profileFeat),
+      path_points:    sketchFeatureTo3DPoints(pathFeat),
+      guide_points:   guidePointsList,
+    });
+  } else if (feat.type === 'HELICAL_SWEEP') {
+    const profileFeat = features.find(f => f.id === feat.parameters.profile_id);
+    if (!profileFeat) {
+      pushToast('Helical Sweep: Please select a Profile sketch.', 'error');
+      return;
+    }
+
+    let axisPoints: number[][] = [];
+    const axisRef = feat.parameters.axis_ref;
+    if (axisRef && axisRef.type === 'EDGE' && axisRef.edgeData) {
+      axisPoints = [axisRef.edgeData.start, axisRef.edgeData.end];
+    } else if (axisRef && axisRef.coordinates) {
+      // Fallback for single point selection or other types
+      axisPoints = [axisRef.coordinates, [axisRef.coordinates[0], axisRef.coordinates[1], axisRef.coordinates[2] + 10]];
+    }
+
+    updateFeatureParams(feat.id, {
+      ...feat.parameters,
+      profile_points: sketchFeatureTo3DPoints(profileFeat),
+      axis_points: axisPoints,
+    });
+  } else if (feat.type === 'LOFT') {
       const profileIds: string[] = feat.parameters.profile_ids || [];
       if (profileIds.filter(Boolean).length < 2) {
         pushToast('Loft: Please select at least two Profile sketches.', 'error');
@@ -432,7 +470,24 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
           const f = features.find(f => f.id === id);
           return f ? sketchFeatureTo3DPoints(f) : [];
         });
-      updateFeatureParams(feat.id, { ...feat.parameters, profiles: profilePts });
+
+      // Extract guide points if any
+      const guideIds: string[] = feat.parameters.guide_ids || [];
+      const guidePointsList = guideIds.filter(Boolean).map(id => {
+        const f = features.find(feat => feat.id === id);
+        return f ? sketchFeatureTo3DPoints(f) : [];
+      });
+
+      updateFeatureParams(feat.id, { 
+        ...feat.parameters, 
+        profiles: profilePts,
+        guide_points: guidePointsList,
+      });
+    } else if (feat.type === 'FILLET' || feat.type === 'CHAMFER') {
+      // In multi-select mode, refs are already in the store. 
+      // Just trigger a rebuild.
+      const rebuildHook = (window as any).__handleRebuild;
+      if (rebuildHook) rebuildHook();
     }
   }, [features, sketchFeatureTo3DPoints, updateFeatureParams, pushToast]);
 

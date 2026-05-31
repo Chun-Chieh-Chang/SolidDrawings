@@ -17,8 +17,14 @@ export const StatusBar: React.FC = () => {
     sketchNodes, 
     mousePos,
     hint,
-    solverReport
+    solverReport,
+    isLargeAssemblyMode,
+    components,
   } = useCadStore();
+
+  const isManyLightweight = useMemo(() => {
+    return components.filter(c => c.isLightweight).length > 5;
+  }, [components]);
 
   const definitionStatus = useMemo(() => {
     if (!isSketchMode) return null;
@@ -54,6 +60,12 @@ export const StatusBar: React.FC = () => {
           <div className="flex items-center gap-2 px-3 border-l border-slate-400">
             <span className="text-slate-500 font-black">STATUS:</span>
             <span className={definitionStatus?.color}>{definitionStatus?.text}</span>
+          </div>
+        )}
+
+        {(isLargeAssemblyMode || isManyLightweight) && (
+          <div className="flex items-center gap-2 px-3 border-l border-orange-400 bg-orange-100/50">
+            <span className="text-orange-700 font-black">⚡ LARGE ASSEMBLY MODE</span>
           </div>
         )}
       </div>

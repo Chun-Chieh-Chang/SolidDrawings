@@ -171,6 +171,21 @@ export class HeavyEngineClient {
     }
   }
 
+  public async analyzeTopology(features: CADFeature[], subshapeId: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/analyze_topology`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features, subshape_id: subshapeId }),
+      });
+      if (!response.ok) throw new Error('Topology analysis failed');
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] Topology analysis error:', error);
+      return { type: 'UNKNOWN' };
+    }
+  }
+
   public async solveSketch(nodes: any, edges: any, constraints: any): Promise<any> {
     try {
       const response = await fetch(`${this.baseUrl}/solve_sketch`, {

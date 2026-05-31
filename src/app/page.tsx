@@ -11,7 +11,9 @@ import { SketchHUD } from '@/renderer/SketchHUD';
 import { fileAPI } from '../../electron/renderer';
 import { MatePanel } from '@/ui/MatePanel';
 import { AssemblyTreePanel } from '@/ui/AssemblyTreePanel';
+import { MotionStudyPanel } from '@/ui/MotionStudyPanel';
 import { AssemblyComponent } from '@/renderer/AssemblyComponent';
+import { MassPropertiesSymbol } from '@/renderer/MassPropertiesSymbol';
 import { DrawingSheet } from '@/ui/DrawingSheet';
 import { SketchPropertyManager } from '@/ui/SketchPropertyManager';
 import { analyzeSketchDefinitions } from '@/utils/geometry/ConstraintSolver';
@@ -30,14 +32,20 @@ import { useFeatureBuilders } from '@/hooks/useFeatureBuilders';
 import { useAppIntegrations } from '@/hooks/useAppIntegrations';
 import { MassPropertiesModal } from '@/ui/Modals/MassPropertiesModal';
 import { TranslatorModal } from '@/ui/Modals/TranslatorModal';
+import { ExportModal } from '@/ui/Modals/ExportModal';
+import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
+import { EquationsModal } from '@/ui/Modals/EquationsModal';
+import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
-  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER'>('FEATURES');
-  const [massProps, setMassProps] = useState<{ volume: number; surface_area: number; center_of_mass: number[]; inertia_matrix: number[][]; } | null>(null);
+  const [activeTab, setActiveTab] = useState<'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING'>('FEATURES');
+  const [sidebarTab, setSidebarTab] = useState<'TREE' | 'PROPERTIES' | 'CONFIGS'>('TREE');
+  const [taskPaneTab, setTaskPaneTab] = useState<'LIBRARY' | 'NONE'>('LIBRARY');
   const [showMassPropsModal, setShowMassPropsModal] = useState(false);
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
+  const [showEquationsModal, setShowEquationsModal] = useState(false);
 
   const client = HeavyEngineClient.getInstance();
   const { 
@@ -55,7 +63,9 @@ export default function Home() {
     triggerCameraNormal, pendingFeatureCommand, setPendingFeatureCommand,
     defaultFilletRadius, defaultChamferDistance,
     components, meshData,
-    rollbackIndex, setRollbackIndex
+    rollbackIndex, setRollbackIndex,
+    massProperties, setMassProperties,
+    showExportModal, setShowExportModal
   } = useCadStore();
 
   const { handleRebuild, resetRebuildCache, abortRebuild } = usePartRebuild(features, setMeshData, setLoading, setEngineStatus);
@@ -227,6 +237,54 @@ export default function Home() {
       setSelectedTopology(null);
       setTimeout(handleRebuild, 50);
     }
+    else if (feat.type === 'SHELL' && topo.type === 'FACE') {
+      const faceRef = { id: topo.id, type: 'FACE', coordinates: topo.coordinates, normal: topo.normal, signature: topo.signature };
+      const current = feat.parameters.faces_to_remove_refs || [];
+      if (!current.some((r: any) => r.id === faceRef.id)) {
+        updateFeatureParams(selectedId, { faces_to_remove_refs: [...current, faceRef] });
+        setTimeout(handleRebuild, 50);
+      }
+      setSelectedTopology(null);
+    }
+    else if (feat.type === 'REFERENCE_PLANE') {
+      const ref = { id: topo.id, type: topo.type, coordinates: topo.coordinates, normal: topo.normal, edgeData: topo.edgeData, signature: topo.signature };
+      const current = feat.parameters.refs || [];
+      if (!current.some((r: any) => r.id === ref.id)) {
+        updateFeatureParams(selectedId, { refs: [...current, ref] });
+        setTimeout(handleRebuild, 50);
+      }
+      setSelectedTopology(null);
+    }
+    else if (feat.type === 'REFERENCE_AXIS') {
+      const ref = { id: topo.id, type: topo.type, coordinates: topo.coordinates, normal: topo.normal, edgeData: topo.edgeData, signature: topo.signature };
+      const current = feat.parameters.refs || [];
+      if (!current.some((r: any) => r.id === ref.id)) {
+        updateFeatureParams(selectedId, { refs: [...current, ref] });
+        setTimeout(handleRebuild, 50);
+      }
+      setSelectedTopology(null);
+    }
+    else if (feat.type === 'HOLE_WIZARD' && topo.type === 'FACE') {
+      const faceRef = { id: topo.id, type: 'FACE', coordinates: topo.coordinates, normal: topo.normal, signature: topo.signature };
+      updateFeatureParams(selectedId, { hole_placement_refs: [faceRef] });
+      setSelectedTopology(null);
+      setTimeout(handleRebuild, 50);
+    }
+    else if (feat.type === 'DRAFT') {
+      if (topo.type === 'FACE' || topo.type === 'PLANE') {
+        const ref = { id: topo.id, type: topo.type, coordinates: topo.coordinates, normal: topo.normal, signature: topo.signature };
+        if (!feat.parameters.neutral_plane_refs || feat.parameters.neutral_plane_refs.length === 0) {
+          updateFeatureParams(selectedId, { neutral_plane_refs: [ref] });
+        } else {
+          const current = feat.parameters.faces_to_draft_refs || [];
+          if (!current.some((r: any) => r.id === ref.id)) {
+            updateFeatureParams(selectedId, { faces_to_draft_refs: [...current, ref] });
+          }
+        }
+        setSelectedTopology(null);
+        setTimeout(handleRebuild, 50);
+      }
+    }
   }, [selectedTopology, isSketchMode, selectedId, features, updateFeatureParams, setSelectedTopology, handleRebuild]);
 
   // Window Callbacks for Shortcuts
@@ -239,12 +297,14 @@ export default function Home() {
       (window as any).__handleSaveSketchOnly = handleSaveSketchOnly;
       (window as any).__handleConvertEntities = handleConvertEntities;
       (window as any).__handleOffsetEntities = handleOffsetEntities;
+      (window as any).__handlePrintToPDF = handlePrintToPDF;
+      (window as any).__handleEditFeatureSketch = handleEditFeatureSketch;
     }
-  }, [handleRebuild, handleExitAndExtrude, handleRevolveFromSketch, resetSketchSession, handleSaveSketchOnly, handleConvertEntities, handleOffsetEntities]);
+  }, [handleRebuild, handleExitAndExtrude, handleRevolveFromSketch, resetSketchSession, handleSaveSketchOnly, handleConvertEntities, handleOffsetEntities, handlePrintToPDF, handleEditFeatureSketch]);
 
   return (
     <main className="flex flex-col h-screen w-screen overflow-hidden bg-background text-primary-text font-sans">
-      <TopMenu engineStatus={engineStatus} />
+      <TopMenu engineStatus={engineStatus} onExport={() => setShowExportModal(true)} />
       
       <RibbonController
         activeTab={activeTab}
@@ -254,6 +314,8 @@ export default function Home() {
         handleExitAndExtrude={handleExitAndExtrude}
         handleRevolveFromSketch={handleRevolveFromSketch}
         handleImportStep={handleImportStep}
+        onShowMassProps={() => setShowMassPropsModal(true)}
+        onShowEquations={() => setShowEquationsModal(true)}
       />
 
       {engineStatus === 'DISCONNECTED' && (
@@ -266,15 +328,38 @@ export default function Home() {
       <div className="flex-1 flex w-full overflow-hidden relative">
         <aside className="w-[300px] h-full bg-[#F5F6F9] border-r border-slate-300 flex flex-col z-10 shrink-0">
           <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
-            {["Tree", "Properties", "Configs"].map((tab, idx) => (
-              <div key={tab} className={`flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter cursor-pointer border-r border-slate-300 ${idx === (isSketchMode ? 1 : 0) ? 'bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]' : 'text-slate-500 hover:bg-slate-100'}`}>
-                {tab}
-              </div>
-            ))}
+            {["Tree", "Properties", "Configs"].map((tab, idx) => {
+              const tabId = (['TREE', 'PROPERTIES', 'CONFIGS'] as const)[idx];
+              const isActive = sidebarTab === tabId;
+              return (
+                <div 
+                  key={tab} 
+                  onClick={() => setSidebarTab(tabId)}
+                  className={`flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter cursor-pointer border-r border-slate-300 ${isActive ? 'bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]' : 'text-slate-500 hover:bg-slate-100'}`}
+                >
+                  {tab}
+                </div>
+              );
+            })}
           </div>
           <div className="flex-grow flex flex-col overflow-hidden">
-            {isSketchMode ? (
-              <div className="flex-grow flex flex-col overflow-hidden"><SketchPropertyManager /></div>
+            {sidebarTab === 'CONFIGS' ? (
+              <ConfigurationManagerPanel />
+            ) : isSketchMode || sidebarTab === 'PROPERTIES' ? (
+              <div className="flex-grow flex flex-col overflow-hidden">
+                {isSketchMode ? <SketchPropertyManager /> : (
+                  selectedFeature ? (
+                    <PartFeaturePropertyManager
+                      selectedFeature={selectedFeature}
+                      features={features}
+                      onParamChange={onParamChange}
+                      onEditSketch={handleEditFeatureSketch}
+                      onSelectFeature={setSelectedId}
+                      onBuildSweepLoft={handleBuildSweepLoft}
+                    />
+                  ) : <div className="p-10 text-center text-slate-400 italic text-[11px]">No feature selected</div>
+                )}
+              </div>
             ) : activeTab === 'ASSEMBLY' ? (
               <div className="flex-1 flex flex-col p-2 gap-2 bg-[#F8FAFC]"><AssemblyTreePanel /><MatePanel /></div>
             ) : measurementMode !== 'NONE' ? (
@@ -305,17 +390,6 @@ export default function Home() {
             )}
 
             <SectionViewPropertyManager />
-
-            {!isSketchMode && selectedFeature && selectedSubNodeType !== 'SKETCH' && measurementMode === 'NONE' && (!selectedTopology || selectedTopology.type !== 'FACE') && (
-              <PartFeaturePropertyManager
-                selectedFeature={selectedFeature}
-                features={features}
-                onParamChange={onParamChange}
-                onEditSketch={handleEditFeatureSketch}
-                onSelectFeature={setSelectedId}
-                onBuildSweepLoft={handleBuildSweepLoft}
-              />
-            )}
           </div>
         </aside>
 
@@ -330,13 +404,18 @@ export default function Home() {
 
           {activeTab === 'DRAWING' ? <DrawingSheet /> : (
             <Viewport>
-              {activeTab === 'ASSEMBLY' ? components.map(comp => (
-                <AssemblyComponent key={comp.id} comp={comp} meshes={meshData} isActive={useCadStore.getState().activeComponentId === comp.id} />
-              )) : meshData.map((mesh: { data: MeshData }, idx: number) => (
+              {activeTab === 'ASSEMBLY' ? (
+                (useCadStore.getState().assemblyPreviewComponents || components).map(comp => (
+                  <AssemblyComponent key={comp.id} comp={comp} meshes={meshData} isActive={useCadStore.getState().activeComponentId === comp.id} />
+                ))
+              ) : meshData.map((mesh: { data: MeshData }, idx: number) => (
                 <OcctShape key={idx} data={mesh.data} />
               ))}
+              <MassPropertiesSymbol />
             </Viewport>
           )}
+
+          {activeTab === 'ASSEMBLY' && <MotionStudyPanel />}
 
           <SketchHUD onReset={resetSketchSession} onExit={handleExitAndExtrude} />
 
@@ -350,9 +429,37 @@ export default function Home() {
             </div>
           )}
 
-          {showMassPropsModal && massProps && <MassPropertiesModal massProps={massProps} onClose={() => setShowMassPropsModal(false)} />}
+          {showMassPropsModal && massProperties && <MassPropertiesModal massProps={massProperties} onClose={() => setShowMassPropsModal(false)} />}
+          {showEquationsModal && <EquationsModal onClose={() => setShowEquationsModal(false)} />}
           {showTranslatorModal && <TranslatorModal onClose={() => setShowTranslatorModal(false)} onOpenAlternative={async () => { setShowTranslatorModal(false); const r = await fileAPI.open(); if(r) { const res = await fileAPI.read(r.path); if(res.success && res.content) loadCadData(res.content, r.path); } }} />}
+          {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} activeTab={activeTab} />}
         </section>
+
+        {/* Right Task Pane (Design Library) */}
+        {taskPaneTab !== 'NONE' && (
+          <aside className="w-[280px] h-full bg-[#F5F6F9] border-l border-slate-300 flex flex-col z-10 shrink-0 animate-in slide-in-from-right duration-300">
+            <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
+               <div className="flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]">
+                 Library
+               </div>
+               <button 
+                 onClick={() => setTaskPaneTab('NONE')}
+                 className="px-2 text-slate-400 hover:text-slate-600"
+               >✕</button>
+            </div>
+            <DesignLibraryPanel />
+          </aside>
+        )}
+
+        {/* Task Pane Toggle handle if closed */}
+        {taskPaneTab === 'NONE' && (
+          <div 
+            onClick={() => setTaskPaneTab('LIBRARY')}
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-24 bg-white border-l border-y border-slate-300 rounded-l-md shadow-md cursor-pointer flex items-center justify-center text-slate-400 hover:text-primary transition-all z-20 hover:w-8 group"
+          >
+            <span className="rotate-90 font-black text-[10px] whitespace-nowrap tracking-widest group-hover:text-primary transition-colors">TASK PANE</span>
+          </div>
+        )}
       </div>
       <StatusBar />
     </main>

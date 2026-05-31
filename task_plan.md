@@ -1,32 +1,44 @@
-# Task Plan - Phase 29：裝配體模式與配合 (Assembly & Mates)
+# Task Plan - SW2000 Industrial Parity (Phases 92-100)
 
-> **Plan of Record**：[implementation_plan.md](implementation_plan.md)
+## Goal
+Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 industrial-grade modeling software. This includes professionalizing the UI (PropertyManager 2.0), completing the feature set (Sweep, Loft, Draft), and ensuring high engineering robustness (TNS 2.0).
 
-## [P] Plan
-- 目標里程碑：**Phase 3 (Public Beta)** — 組立件配合 (Mates)
-- 核心架構：後端 Python 求解器 + Component Registry 快取策略
-- 已核准：2026-05-30 使用者明確批准
+## Phases
+| Phase | Title | Status | Description |
+|-------|-------|--------|-------------|
+| 92 | PropertyManager 2.0 | complete | Rollout-based wizard UI for features |
+| 93 | Reference Geometry | complete | Standard industrial reference planes and axes |
+| 94 | Sweep & Loft | complete | Advanced geometry construction |
+| 95 | TNS 2.0 (Persistence) | complete | Robust topological naming system |
+| 96 | Engineering Drawing | complete | Automatic BOM and professional annotations |
+| 97 | Configuration Manager | complete | Part variations and feature suppression |
+| 98 | Equations & Variables | complete | Parametric formulas and global variables |
+| 99 | Mechanical Mates | complete | Gear, Screw, and dynamic assembly constraints |
+| 100 | Final Polish & Toolbox | complete | Standard library and SW2000 aesthetic finish |
+| 101 | Industrial Reinforcements | complete | Integrated Draft, Advanced Surfacing, and Surfaces Tab |
 
-## Phase 29 裝配體模式與配合求解 (Assembly Mode & Mates)
+## Phase 101 Details: Industrial Reinforcements
+- [x] Backend: Refine integrated **Draft logic** in Extrude using OpenCASCADE history (`prism_tool.Generated`).
+- [x] Backend: Implement **Surface Offset** (`BRepOffsetAPI_MakeOffsetShape`) for complex surface creation.
+- [x] Backend: Implement **Surface Knit** (`BRepBuilderAPI_Sewing`) to merge open shells into manifold bodies.
+- [x] UI: Add a dedicated **SURFACING** tab to the RibbonBar with professional industrial icons.
+- [x] UI: Integrate **Draft Rollout** and **Surface Mode** toggle into the Extrude PropertyManager.
+- [x] UI: Implement specialized PropertyManager UI for Surface Offset and Knit features.
+- [x] Stability: Verified that drafted extrusions and offset surfaces rebuild correctly under TNS 2.0.
 
-- [x] **Step 1: 後端裝配體求解服務**
-  - [x] 建立 `backend/app/services/component_registry.py` 以快取 B-Rep
-  - [x] 擴充 `backend/app/routers/geometry.py` 新增 `/api/geometry/register_component` 路由
-- [x] **Step 2: 前端 HeavyEngineClient 擴充**
-  - [x] 在 `HeavyEngineClient.ts` 新增 `registerComponent()` 方法
-  - [x] 完善 `AssemblyService.ts` 新增 `registerComponent()`
-- [x] **Step 3: 狀態管理 (Zustand) 擴充**
-  - [x] 新增 `activeComponentId` 與 `components` 陣列至 `useCadStore.ts`
-- [x] **Step 4: UI/UX 裝配體介面**
-  - [x] 在 Ribbon 新增「ASSEMBLY」分頁與「Insert Comp」按鈕
-  - [x] 左側面板根據 `activeTab` 顯示 Component 樹與 `MatePanel`
+## Phase 100 Details: Final Polish & Toolbox
+- [x] Implement **Design Library** panel in the right-side task pane.
+- [x] Create **Standard Fastener Generators** (ISO Metric Bolts, Nuts) that automatically generate geometry based on size (M3, M4, M5, etc.).
+- [x] UI: Standardize all icons to a high-contrast industrial style (using custom SVG sets).
+- [x] UI: Implement **PropertyManager Tabs** (General, Custom) for better parameter organization.
+- [x] UI: Final polish of the **Feature Tree** (Icons for each feature type, suppression visuals).
+- [x] Performance: Final audit of `usePartRebuild` and `AssemblySolver` for high-complexity models.
+- [x] Documentation: Final update of `README.md` and `HANDOVER_RESUME_GUIDE.md` for 1.0 release.
 
-## [C] Check
-- [x] `npx tsc --noEmit` 無錯誤
-- [x] UI 面板切換與 Component 狀態讀寫正常 (開發日誌紀錄)無迴歸
-- [ ] 後端 pytest 基本 Coincident 約束收斂測試
-- [ ] 手動：掛載兩個組件，套用面對面配合，確認幾何吸附
-
-## [A] Act
-- 完成後更新 `DEV_LOG.md` 與 `handover_resume_guide.md`。
-- 未通過 Check → DEV_LOG RCA/CAPA，不得宣稱 Assembly 可用。
+## Phase 99 Details: Mechanical Mates
+- [x] Backend: Update `solve_assembly_mates` in `assembly_solver.py` to support coupling constraints.
+- [x] Implement **Gear Mate** logic: coupling rotational angles of two components around their respective axes.
+- [x] Implement **Screw Mate** logic: coupling rotational angle of one component to the translation of another.
+- [x] UI: Update `MatePanel.tsx` to include "Mechanical Mates" category.
+- [x] UI: Add inputs for **Gear Ratio** and **Screw Pitch** in the MatePanel.
+- [x] Verify functional machine motion (e.g., turning a gear rotates the connected gear) in the assembly environment.

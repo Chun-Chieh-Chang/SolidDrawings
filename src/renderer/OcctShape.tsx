@@ -7,6 +7,7 @@ import { topologySelector, getFeatureDistance } from './Viewport';
 
 export interface FaceMetadata {
   id: string;
+  tns_name?: string;
   area: number;
   v_count: number;
   curvature?: string;

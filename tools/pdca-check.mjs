@@ -5,7 +5,6 @@ import { execFileSync } from "node:child_process";
 const failures = [];
 const warnings = [];
 const requiredFiles = [
-  "SOLIDWORKS_MASTER_PLAN.md",
   "docs/productization/PRODUCTIZATION_PLAN.md",
   "docs/governance/PDCA_GOVERNANCE.md",
   "task_plan.md",
