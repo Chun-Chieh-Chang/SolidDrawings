@@ -66,4 +66,23 @@
 
 ---
 
+## 🚦 開發接續指引 (Resume Protocol)
+
+任何新接手的 Agent 或開發者，請嚴格遵守以下 SOP 恢復開發狀態：
+
+### 1. 狀態還原 (State Restoration)
+- 確保 Node.js 與 Python 虛擬環境就緒。
+- 若需修改底層幾何鏈路 (Geometry Service)，**強制要求** 在執行前跑通 E2E 測試：
+  ```bash
+  cd backend
+  PYTHONPATH="." python ../tests/regression/e2e_workflow_sim.py
+  ```
+  *(註: 若無 PythonOCC 環境，該測試應優雅降級為 Mesh Mock 模式且不拋出 500 錯誤。)*
+
+### 2. 下一步開發重點 (Next Objectives)
+目前草圖建構與基礎實體特徵 (Extrude, Revolve, Sweep, Loft) 已達工業級魯棒性。下一步的突破口為：
+- **[A] 複雜曲面邊界條件**：強化 `Boundary Surface` 與 `Knit Surface` 在不連續拓撲下的接縫處理。
+- **[B] 裝配體動力學**：優化 `MotionStudyPanel.tsx`，解決複雜齒輪鏈在拖曳時的 PBD 約束求解延遲 (Lag)。
+- **[C] UI/UX 細節**：將 `RibbonController.tsx` 中過多的硬編碼 (Hardcoded) 條件，重構為基於 Store 的動態許可權控制 (Command Pattern)。
+
 **3D-Builder 已準備好進入生產環境使用。**

@@ -41,3 +41,8 @@
 - [x] Relax point count limit for Extrude to >=2 (supports Circle).
 - [x] Relax point count limit for Cut to >=2.
 - [x] Delegate true closed-loop validation to \handleExitAndExtrude\.
+
+### Phase 106: Primitive Tool UI/UX Final Audit
+- [x] Audit RECTANGLE macro-expansion logic.
+- [x] Audit CIRCLE radius preview computation.
+- [x] Verify LINE chain persistence logic.
