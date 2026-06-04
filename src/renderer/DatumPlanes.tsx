@@ -158,14 +158,21 @@ export const DatumPlanes = () => {
     let foundH = false;
     let foundV = false;
 
-    if (lastClickedUV) {
-       if (Math.abs(rawU - lastClickedUV.u) < SNAP_DIST) {
-         bestU = lastClickedUV.u; foundV = true;
-         currentInferences.push({ p1: [lastClickedUV.u, lastClickedUV.v], p2: [lastClickedUV.u, rawV] });
+    // BUG FIX: Read last click position from the store (lastClickedNodeId) instead of
+    // local lastClickedUV, because ToolHandlers update lastClickedNodeId in the store
+    // but never update the local lastClickedUV state.
+    const storeLastNodeId = useCadStore.getState().lastClickedNodeId;
+    const storeLastNode = storeLastNodeId ? useCadStore.getState().sketchNodes[storeLastNodeId] : null;
+    const lastClickRef = storeLastNode ? { u: storeLastNode.x, v: storeLastNode.y } : lastClickedUV;
+
+    if (lastClickRef) {
+       if (Math.abs(rawU - lastClickRef.u) < SNAP_DIST) {
+         bestU = lastClickRef.u; foundV = true;
+         currentInferences.push({ p1: [lastClickRef.u, lastClickRef.v], p2: [lastClickRef.u, rawV] });
        }
-       if (Math.abs(rawV - lastClickedUV.v) < SNAP_DIST) {
-         bestV = lastClickedUV.v; foundH = true;
-         currentInferences.push({ p1: [lastClickedUV.u, lastClickedUV.v], p2: [rawU, lastClickedUV.v] });
+       if (Math.abs(rawV - lastClickRef.v) < SNAP_DIST) {
+         bestV = lastClickRef.v; foundH = true;
+         currentInferences.push({ p1: [lastClickRef.u, lastClickRef.v], p2: [rawU, lastClickRef.v] });
        }
     }
 
@@ -190,7 +197,11 @@ export const DatumPlanes = () => {
       return { u: bestU, v: bestV, id: null };
     }
 
-    setCursorState(null);
+    // BUG FIX: Never set cursorState to null. The preview lines rendering at line 919+
+    // is gated by {cursorState && ...}. Setting null kills ALL preview lines (ghost line,
+    // circle preview, rectangle preview). Instead, always provide the current position
+    // with type: null to indicate "no snap, but cursor is here".
+    setCursorState({ u, v, type: null });
     return { u, v, id: null };
   };
 
@@ -209,14 +220,19 @@ export const DatumPlanes = () => {
     }
 
     const { u, v } = getSnappedUV(rawU, rawV);
+
+    // Use store-synced reference for active dimension readout
+    const moveLastNodeId = useCadStore.getState().lastClickedNodeId;
+    const moveLastNode = moveLastNodeId ? useCadStore.getState().sketchNodes[moveLastNodeId] : null;
+    const moveLastRef = moveLastNode ? { u: moveLastNode.x, v: moveLastNode.y } : lastClickedUV;
     
-    if (lastClickedUV && Math.hypot(u - lastClickedUV.u, v - lastClickedUV.v) > 2) {
+    if (moveLastRef && Math.hypot(u - moveLastRef.u, v - moveLastRef.v) > 2) {
       setHasMovedAway(true);
     }
 
-    if (lastClickedUV && (sketchTool === 'LINE' || sketchTool === 'CENTER_LINE' || sketchTool === 'RECTANGLE')) {
-      const du = u - lastClickedUV.u;
-      const dv = v - lastClickedUV.v;
+    if (moveLastRef && (sketchTool === 'LINE' || sketchTool === 'CENTER_LINE' || sketchTool === 'RECTANGLE')) {
+      const du = u - moveLastRef.u;
+      const dv = v - moveLastRef.v;
       const len = Math.hypot(du, dv);
       const ang = Math.atan2(dv, du) * (180 / Math.PI);
       setActiveDim({ length: len, angle: ang });
@@ -458,8 +474,22 @@ export const DatumPlanes = () => {
       activeSnapType: activeSnapType || undefined
     };
 
+    // Helper: After any ToolHandler call, sync lastClickedUV from the store
+    // so the local state (used by preview dimensions, inference lines, etc.) stays in sync.
+    const syncLastClickedUV = () => {
+      const nodeId = useCadStore.getState().lastClickedNodeId;
+      const node = nodeId ? useCadStore.getState().sketchNodes[nodeId] : null;
+      if (node) {
+        setLastClickedUV({ u: node.x, v: node.y });
+        setHasMovedAway(false);
+      } else {
+        setLastClickedUV(null);
+      }
+    };
+
     if (sketchTool === 'LINE' || sketchTool === 'CENTER_LINE') {
       new LineToolHandler(sketchTool === 'CENTER_LINE').onPointerDown(ctx);
+      syncLastClickedUV();
       return;
     }
     if (sketchTool === 'TRIM') {
@@ -474,18 +504,22 @@ export const DatumPlanes = () => {
     }
     if (sketchTool === 'ARC') {
       new ArcToolHandler().onPointerDown(ctx);
+      syncLastClickedUV();
       return;
     }
     if (sketchTool === 'SPLINE') {
       new SplineToolHandler().onPointerDown(ctx);
+      syncLastClickedUV();
       return;
     }
     if (sketchTool === 'CIRCLE') {
       new CircleToolHandler().onPointerDown(ctx);
+      syncLastClickedUV();
       return;
     }
     if (sketchTool === 'RECTANGLE') {
       new RectangleToolHandler().onPointerDown(ctx);
+      syncLastClickedUV();
       return;
     }
     useCadStore.setState((state) => {
@@ -833,8 +867,8 @@ export const DatumPlanes = () => {
         </Plane>
         )}
 
-      {/* Snap/Constraint Cursor Feedback */}
-      {isSketchMode && cursorState && (
+      {/* Snap/Constraint Cursor Feedback - only show when an actual snap is active */}
+      {isSketchMode && cursorState && cursorState.type && (
         <group position={get3DPnt(cursorState.u, cursorState.v)}>
           <mesh scale={[1.2, 1.2, 1.2]}>
             <sphereGeometry args={[0.4, 16, 16]} />

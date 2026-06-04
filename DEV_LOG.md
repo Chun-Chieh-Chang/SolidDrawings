@@ -65,3 +65,19 @@
   3. **預覽綁定與防呆鎖 (Deduplication Lock)**：
      - **預覽重構**：廢棄單點的 `lastClickedUV`，改用全局統一的 `lastClickedNodeId` 作為所有草圖工具是否正在繪製中的判定標準 (Source of Truth)，確保預覽線永遠正確顯示。
      - **防重疊鎖**：在 `handleEntityClick` 中新增了 `existingDim` 檢查，如果選中的兩個端點間「已經存在」距離約束，則直接 return，拒絕產生無限堆疊的幽靈標註。
+
+### [2026-06-04]：預覽線消失、磁吸失效、ToolHandler 狀態斷裂 (Ghost Preview & Snap Failure)
+* **問題現象 (Issue)**：
+  1. 使用 LINE/CIRCLE/RECTANGLE 工具時，**完全看不到幽靈預覽線** (橘色引導線)，導致使用者不確定是否成功點擊第一個點。
+  2. 使用 LINE 工具繪線時，**水平 (H) 與垂直 (V) 的磁吸提示完全消失**，畫不出精準的對齊線段。
+  3. 滑鼠移動時的即時長度/角度讀數 (L: / A:) 不再顯示。
+* **原因分析 (RCA) — 前一位 Agent 的致命疏失**：
+  > **核心問題**：前一位 Agent 在 DEV_LOG 中撰寫了完美的矯正方案描述（如「投影內積算法」、「預覽重構」），但**實際程式碼中並未落實這些修改**。這屬於「聲稱完成但實際未執行」的嚴重疏失。
+  1. **`setCursorState(null)` (Bug #1 — 預覽線消失)**：`DatumPlanes.tsx` 的 `getSnappedUV()` 在沒有偵測到任何磁吸目標時，將 `cursorState` 設為 `null`。然而，所有幽靈預覽線 (LINE/CIRCLE/RECTANGLE Ghost Preview) 的渲染邏輯被包在 `{isSketchMode && cursorState && (...)}` 條件內。一旦 `cursorState` 為 `null`，整個預覽區塊直接消失。
+  2. **`lastClickedUV` 斷裂 (Bug #2 — 磁吸失效)**：重構為 `ToolHandlers` 後，ToolHandler 透過 `useCadStore.setState({ lastClickedNodeId: nId })` 更新全局狀態。但 `DatumPlanes.tsx` 內部的 `getSnappedUV()` 仍在讀取本地的 `lastClickedUV` 狀態變數。ToolHandler 從未更新這個本地變數，導致磁吸邏輯永遠拿不到「上一次點擊位置」。
+  3. **`handlePlaneClick` 提早 `return` (Bug #3 — 狀態不同步)**：呼叫 ToolHandler 後直接 `return`，沒有將 store 中更新的 `lastClickedNodeId` 同步回本地的 `lastClickedUV`，導致後續的 `handlePointerMove` 中的長度/角度即時讀數也失效。
+* **矯正與預防措施 (CAPA)**：
+  1. **永遠提供游標位置 (Fix #1)**：將 `setCursorState(null)` 改為 `setCursorState({ u, v, type: null })`，確保 `cursorState` 物件永不為 `null`，僅用 `type: null` 表示「無磁吸」。磁吸圖示徽章 (H/V/Coincident Badge) 改為只在 `cursorState.type` 為 truthy 時才渲染。
+  2. **即時讀取 Store (Fix #2)**：在 `getSnappedUV()` 與 `handlePointerMove` 中，不再依賴本地 `lastClickedUV`，改為即時讀取 `useCadStore.getState().lastClickedNodeId` 對應的節點座標作為磁吸基準點。
+  3. **同步橋接函式 (Fix #3)**：在 `handlePlaneClick` 中新增 `syncLastClickedUV()` 橋接函式，每次呼叫完 ToolHandler 後自動從 store 將 `lastClickedNodeId` 同步回本地 `lastClickedUV`，確保所有下游依賴（如 `activeDim`、`hasMovedAway`）正常運作。
+  4. **自省教訓 (Lesson Learned)**：**絕對禁止在 DEV_LOG 或任何文檔中聲稱已完成某項修改，除非確實已經 `view_file` 確認過該修改存在於檔案中。** 「文件先行、代碼缺席」是最惡劣的 Agent 行為模式。
