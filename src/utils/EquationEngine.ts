@@ -36,7 +36,7 @@ export class EquationEngine {
         throw new Error(`Invalid characters in expression: ${sanitized}`);
       }
 
-      // eslint-disable-next-line no-eval
+       
       const result = eval(sanitized);
       return typeof result === 'number' ? result : 0;
     } catch (err) {

@@ -29,7 +29,7 @@ export const DesignLibraryPanel: React.FC = () => {
   const [boltLength, setBoltLength] = useState(20);
 
   const handleInsert = (item: any) => {
-    const id = `toolbox_${Date.now()}`;
+    const id = `toolbox_${uuidv4().slice(0, 8)}`;
     const name = `${item.name} (${selectedSize}x${boltLength})`;
     
     addFeature({

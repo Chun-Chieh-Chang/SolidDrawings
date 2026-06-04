@@ -116,7 +116,7 @@ export const EquationsModal: React.FC<EquationsModalProps> = ({ onClose }) => {
 
         {/* Footer info */}
         <div className="px-6 py-3 border-t border-slate-200 text-[10px] text-slate-500 font-medium bg-white flex justify-between">
-          <span>HINT: DIMENSIONS CAN BE LINKED TO THESE BY ENTERING "=" FOLLOWED BY THE EXPRESSION.</span>
+          <span>HINT: DIMENSIONS CAN BE LINKED TO THESE BY ENTERING &quot;=&quot; FOLLOWED BY THE EXPRESSION.</span>
           <span>REBUILD DIRTY: {Object.keys(globalVariables).length > 0 ? 'YES' : 'NO'}</span>
         </div>
       </div>

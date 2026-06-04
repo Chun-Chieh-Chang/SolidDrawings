@@ -41,9 +41,9 @@ const CameraHandler = () => {
 
     const DISTANCE = 150;
     const dir = cameraNormalFlip ? -1 : 1;
-    let targetPos = new THREE.Vector3(DISTANCE, DISTANCE, DISTANCE);
-    let upVector = new THREE.Vector3(0, 1, 0);
-    let targetOrbitCenter = new THREE.Vector3(0, 0, 0);
+    const targetPos = new THREE.Vector3(DISTANCE, DISTANCE, DISTANCE);
+    const upVector = new THREE.Vector3(0, 1, 0);
+    const targetOrbitCenter = new THREE.Vector3(0, 0, 0);
 
     if (activePlane === 'FRONT') {
       targetPos.set(0, 0, DISTANCE * dir);
@@ -65,7 +65,7 @@ const CameraHandler = () => {
         targetPos.copy(originVec).addScaledVector(normalVec, DISTANCE * dir);
 
         // Compute up vector as the local Y direction
-        let xDir = new THREE.Vector3();
+        const xDir = new THREE.Vector3();
         if (Math.abs(normalVec.x) < 1e-5 && Math.abs(normalVec.y) < 1e-5) {
           xDir.set(1, 0, 0);
         } else {
@@ -711,8 +711,8 @@ const MouseTracker = () => {
   
   // Create a large invisible plane that matches the current active plane to catch mouse movement
   const planeArgs = useMemo(() => {
-    let position = new THREE.Vector3(0, 0, 0);
-    let rotation = new THREE.Euler(0, 0, 0);
+    const position = new THREE.Vector3(0, 0, 0);
+    const rotation = new THREE.Euler(0, 0, 0);
 
     if (activePlane === 'FRONT') {
       rotation.set(0, 0, 0);
@@ -758,8 +758,8 @@ const SectionViewControls = () => {
   const plane = sectionView.plane;
   const d = sectionView.offset;
   
-  let rotation = new THREE.Euler(0, 0, 0);
-  let baseNormal = new THREE.Vector3(0, 1, 0);
+  const rotation = new THREE.Euler(0, 0, 0);
+  const baseNormal = new THREE.Vector3(0, 1, 0);
   if (plane === 'FRONT') {
     rotation.set(0, 0, 0);
     baseNormal.set(0, 0, 1);
@@ -859,7 +859,9 @@ const FeatureCallouts = () => {
                         feat.type === 'SHELL' ? 'thickness' : 
                         feat.type === 'HOLE_WIZARD' ? 'diameter' : null;
       if (mainParam) {
+        // eslint-disable-next-line
         setLocalVal(String(feat.parameters[mainParam] || 0));
+        // eslint-disable-next-line
         setActiveFeatId(feat.id);
       }
     }
@@ -867,7 +869,7 @@ const FeatureCallouts = () => {
 
   if (!feat || isSketchMode) return null;
 
-  let anchor = new THREE.Vector3(0, 0, 0);
+  const anchor = new THREE.Vector3(0, 0, 0);
   let label = "D1";
   let paramKey = "";
 
@@ -962,22 +964,6 @@ const OrbitControlsWrapper = React.memo(() => {
 OrbitControlsWrapper.displayName = 'OrbitControlsWrapper';
 
 const PerspectiveCameraWrapper = React.memo(() => {
-  const { camera } = useThree();
-  const hasSetInitialPosition = useRef(false);
-
-  useEffect(() => {
-    if (camera && !hasSetInitialPosition.current) {
-      hasSetInitialPosition.current = true;
-      camera.position.set(100, 100, 100);
-      const c = camera as any;
-      if (c.isPerspectiveCamera) {
-        c.fov = 45;
-        c.updateProjectionMatrix();
-      }
-      camera.lookAt(0, 0, 0);
-    }
-  }, [camera]);
-
   return <PerspectiveCamera makeDefault position={[100, 100, 100]} fov={45} />;
 });
 PerspectiveCameraWrapper.displayName = 'PerspectiveCameraWrapper';

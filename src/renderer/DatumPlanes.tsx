@@ -58,7 +58,7 @@ export const DatumPlanes = () => {
     }
     const origin = new THREE.Vector3(...activeFaceOrigin);
     const normal = new THREE.Vector3(...activeFaceNormal).normalize();
-    let xDir = new THREE.Vector3();
+    const xDir = new THREE.Vector3();
     if (Math.abs(normal.x) < 1e-5 && Math.abs(normal.y) < 1e-5) {
       xDir.set(1, 0, 0);
     } else {
@@ -119,7 +119,7 @@ export const DatumPlanes = () => {
   const getSnappedUV = (rawU: number, rawV: number) => {
     let u = rawU;
     let v = rawV;
-    let snappedId = null;
+    const snappedId = null;
     const currentInferences: { p1: [number, number], p2: [number, number] }[] = [];
 
     if (gridSnap) {
@@ -489,9 +489,9 @@ export const DatumPlanes = () => {
       return;
     }
     useCadStore.setState((state) => {
-      let nextNodes = { ...state.sketchNodes };
-      let nextEdges = { ...state.sketchEdges };
-      let nextConstraints = { ...state.sketchConstraints };
+      const nextNodes = { ...state.sketchNodes };
+      const nextEdges = { ...state.sketchEdges };
+      const nextConstraints = { ...state.sketchConstraints };
 
       if (sketchTool === 'SMART_DIMENSION') {
          // Smart Dimension Logic: Create a distance constraint between selected nodes or on an edge

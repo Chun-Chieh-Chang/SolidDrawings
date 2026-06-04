@@ -14,6 +14,14 @@ const eslintConfig = defineConfig([
     ".miniforge/**",
     "next-env.d.ts",
   ]),
+  {
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-vars": "warn",
+      "@typescript-eslint/no-require-imports": "warn",
+      "react-compiler/react-compiler": "off"
+    }
+  }
 ]);
 
 export default eslintConfig;

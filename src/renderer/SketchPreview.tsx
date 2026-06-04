@@ -142,7 +142,7 @@ export const SketchPreview = () => {
     if (activePlane !== 'FACE' || !activeFaceOrigin || !activeFaceNormal) return null;
     const origin = new THREE.Vector3(...activeFaceOrigin);
     const normal = new THREE.Vector3(...activeFaceNormal).normalize();
-    let xDir = new THREE.Vector3();
+    const xDir = new THREE.Vector3();
     if (Math.abs(normal.x) < 1e-5 && Math.abs(normal.y) < 1e-5) {
       xDir.set(1, 0, 0);
     } else {
@@ -242,7 +242,7 @@ export const SketchPreview = () => {
     if (plane === 'FACE' && origin && normal) {
       const originVec = new THREE.Vector3(...origin);
       const normalVec = new THREE.Vector3(...normal).normalize();
-      let xDir = new THREE.Vector3();
+      const xDir = new THREE.Vector3();
       if (Math.abs(normalVec.x) < 1e-5 && Math.abs(normalVec.y) < 1e-5) {
         xDir.set(1, 0, 0);
       } else {

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useCadStore } from '../store/useCadStore';
 import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
@@ -101,8 +102,8 @@ export const SketchPropertyManager: React.FC = () => {
   };
 
   const applyConstraint = async (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE') => {
-    const cid = `c_${Date.now()}`;
-    let newConstraint: any = { id: cid, type };
+    const cid = `c_${uuidv4().slice(0, 8)}`;
+    const newConstraint: any = { id: cid, type };
 
     if (type === 'HORIZONTAL' || type === 'VERTICAL') {
       if (selectedEdges.length === 1) {
@@ -202,13 +203,13 @@ export const SketchPropertyManager: React.FC = () => {
       if (dist < 1e-3) {
         nodeMap.set(n.id, n.id);
       } else {
-        const mirroredId = `n_m_${Date.now()}_${n.id.slice(-4)}`;
+        const mirroredId = `n_m_${uuidv4().slice(0, 8)}_${n.id.slice(-4)}`;
         const mx = n.x + 2 * (projX - n.x);
         const my = n.y + 2 * (projY - n.y);
         nextNodes[mirroredId] = { id: mirroredId, x: mx, y: my, isFixed: false };
         nodeMap.set(n.id, mirroredId);
         
-        const cid = `c_sym_${Date.now()}_${n.id.slice(-4)}`;
+        const cid = `c_sym_${uuidv4().slice(0, 8)}_${n.id.slice(-4)}`;
         nextConstraints[cid] = {
           id: cid,
           type: 'SYMMETRIC',
@@ -221,7 +222,7 @@ export const SketchPropertyManager: React.FC = () => {
     // Mirror Edges
     selectedEdges.forEach(e => {
       if (e.id === mirrorAxisId) return;
-      const mirroredId = `e_m_${Date.now()}_${e.id.slice(-4)}`;
+      const mirroredId = `e_m_${uuidv4().slice(0, 8)}_${e.id.slice(-4)}`;
       const mNodeIds = e.nodeIds.map(nid => nodeMap.get(nid) || nid);
       if (mNodeIds.every((id, idx) => id === e.nodeIds[idx])) return;
 
@@ -266,7 +267,7 @@ export const SketchPropertyManager: React.FC = () => {
       const nodeMap = new Map<string, string>();
 
       selectedNodes.forEach(n => {
-        const newId = `n_lp_${Date.now()}_${i}_${n.id.slice(-4)}`;
+        const newId = `n_lp_${uuidv4().slice(0, 8)}_${i}_${n.id.slice(-4)}`;
         nextNodes[newId] = { 
           id: newId, 
           x: n.x + ux * offset, 
@@ -277,13 +278,13 @@ export const SketchPropertyManager: React.FC = () => {
       });
 
       selectedEdges.forEach(e => {
-        const newId = `e_lp_${Date.now()}_${i}_${e.id.slice(-4)}`;
+        const newId = `e_lp_${uuidv4().slice(0, 8)}_${i}_${e.id.slice(-4)}`;
         const mNodeIds = e.nodeIds.map(nid => nodeMap.get(nid) || nid);
         nextEdges[newId] = { ...e, id: newId, nodeIds: mNodeIds as [string, string] };
 
         // Auto-Constraint: Equal length/radius
         if (e.type === 'LINE' || e.type === 'CIRCLE') {
-           const cId = `c_eq_lp_${Date.now()}_${i}_${e.id.slice(-4)}`;
+           const cId = `c_eq_lp_${uuidv4().slice(0, 8)}_${i}_${e.id.slice(-4)}`;
            nextConstraints[cId] = {
              id: cId,
              type: 'EQUAL',
@@ -320,7 +321,7 @@ export const SketchPropertyManager: React.FC = () => {
       const toPattern = selectedNodes.filter(n => n.id !== center.id);
 
       toPattern.forEach(n => {
-        const newId = `n_cp_${Date.now()}_${i}_${n.id.slice(-4)}`;
+        const newId = `n_cp_${uuidv4().slice(0, 8)}_${i}_${n.id.slice(-4)}`;
         const rx = n.x - center.x;
         const ry = n.y - center.y;
         nextNodes[newId] = { 
@@ -333,14 +334,14 @@ export const SketchPropertyManager: React.FC = () => {
       });
 
       selectedEdges.forEach(e => {
-        const newId = `e_cp_${Date.now()}_${i}_${e.id.slice(-4)}`;
+        const newId = `e_cp_${uuidv4().slice(0, 8)}_${i}_${e.id.slice(-4)}`;
         const mNodeIds = e.nodeIds.map(nid => nodeMap.get(nid) || nid);
         const finalIds = mNodeIds.map((id, idx) => nodeMap.has(e.nodeIds[idx]) ? id : e.nodeIds[idx]);
         nextEdges[newId] = { ...e, id: newId, nodeIds: finalIds as [string, string] };
 
         // Auto-Constraint: Equal length/radius
         if (e.type === 'LINE' || e.type === 'CIRCLE') {
-           const cId = `c_eq_cp_${Date.now()}_${i}_${e.id.slice(-4)}`;
+           const cId = `c_eq_cp_${uuidv4().slice(0, 8)}_${i}_${e.id.slice(-4)}`;
            nextConstraints[cId] = {
              id: cId,
              type: 'EQUAL',

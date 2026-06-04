@@ -65,8 +65,8 @@ export default function OcctShape({
     if (!sectionView.isActive) return [];
     
     const plane = sectionView.plane;
-    let normal = new THREE.Vector3();
-    let origNormal = new THREE.Vector3();
+    const normal = new THREE.Vector3();
+    const origNormal = new THREE.Vector3();
     
     if (plane === 'FRONT') {
       normal.set(0, 0, 1);
