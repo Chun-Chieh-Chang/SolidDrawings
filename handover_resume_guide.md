@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-05 21:14:23
+**Last Saved:** 2026-06-05 22:33:56
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,13 +7,53 @@
 
 ## 1. Current Git State
 ```shell
-b4ff396 ci: integrate backend pytest suite into npm test:regression pipeline
+861cb23 docs: write geometry kernel and CI defense rules into global_rules wiki
 ```
 
 ### Uncommitted Changes
 ```shell
-M wiki/global_rules.md
+M DEV_LOG.md
+ D SOLIDWORKS_MASTER_PLAN.md
+ D get_transcript.py
+ D get_transcript2.py
+ D get_transcript3.py
+ D get_transcript4.py
+ D get_transcript5.py
+ D get_transcript6.py
+ D get_transcript7.py
+ M handover_resume_guide.md
+ D implementation_plan.md
+ D simulation_result.json
+ M task_plan.md
+ D transcript.json
+ D transcript.txt
+ D transcript_6sUKuBigJk0.json
+ D transcript_NlZhgKhmYtI.json
+ D transcript_XkP8xTNrsDw.json
+ D transcript_sDqD0PRYhJI.json
+ D transcript_test.json
+ D transcript_utf8.txt
+?? docs/architecture/SOLIDWORKS_MASTER_PLAN.md
+?? docs/architecture/implementation_plan.md
+?? docs/benchmarks/EXERCISE_01_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_01_SOP.md
+?? docs/benchmarks/EXERCISE_06_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_06_SOP.md
+?? docs/benchmarks/EXERCISE_11_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_11_SOP.md
+?? docs/benchmarks/EXERCISE_PLUMMER_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_PLUMMER_SOP.md
+?? docs/benchmarks/EXERCISE_cWWP_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_cWWP_SOP.md
+?? docs/benchmarks/EXERCISE_soEP5_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_soEP5_SOP.md
 ?? sync.ffs_db
+?? tests/regression/e2e_video_cWWP_sim.py
+?? tests/regression/e2e_video_ex11_sim.py
+?? tests/regression/e2e_video_ex1_sim.py
+?? tests/regression/e2e_video_ex6_sim.py
+?? tests/regression/e2e_video_plummer_sim.py
+?? tests/regression/e2e_video_soEP5_sim.py
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)
