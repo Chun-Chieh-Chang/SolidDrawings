@@ -486,6 +486,8 @@ export const useCadStore = create<CadState>()(
       setActiveFaceNormal: (activeFaceNormal) => set({ activeFaceNormal }),
       activeFaceId: null,
       setActiveFaceId: (activeFaceId) => set({ activeFaceId }),
+      revolveAxisId: null,
+      setRevolveAxisId: (revolveAxisId) => set({ revolveAxisId }),
       sketchTool: 'SELECT',
       setSketchTool: (sketchTool) => set({ 
         sketchTool,

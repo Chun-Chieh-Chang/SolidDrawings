@@ -109,7 +109,7 @@ export class CenterRectangleToolHandler implements SketchToolHandler {
 
       // Remove temporary center node if it's not fixed (like the origin)
       const centerId = state.lastClickedNodeId!;
-      if (newNodes[centerId] && !newNodes[centerId].isFixed) {
+      if (newNodes[centerId] && !(newNodes[centerId] as any).isFixed) {
         delete newNodes[centerId];
       }
 
