@@ -9,9 +9,8 @@ on:
 jobs:
   test:
     name: Backend Pytest with PythonOCC
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     
-    # Needs bash login shell for conda activate
     defaults:
       run:
         shell: bash -el {0}
@@ -20,18 +19,27 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Cache Conda
+        uses: actions/cache@v4
+        with:
+          path: ~/conda_pkgs_dir
+          key: ${{ runner.os }}-conda-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-conda-
+
       - name: Setup Miniforge (Mamba)
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
+          python-version: "3.10"
           activate-environment: test-env
           use-mamba: true
+          channels: conda-forge
+          channel-priority: true
 
-      - name: Install PythonOCC and Dependencies
+      - name: Install Dependencies
         run: |
-          # Use mamba to install pythonocc-core from conda-forge
-          mamba install -y -c conda-forge \
-            python=3.10 \
+          mamba install -y \
             pythonocc-core \
             pytest \
             fastapi \
@@ -40,14 +48,8 @@ jobs:
             uvicorn \
             python-multipart
 
-      - name: Check Environment
-        run: |
-          python --version
-          conda list
-
       - name: Run Backend Tests
         working-directory: ./backend
         run: |
-          # Setup PYTHONPATH so app module can be found
           export PYTHONPATH=$(pwd)
-          pytest tests/ -v
+          pytest tests/ -v --maxfail=2 --durations=5
