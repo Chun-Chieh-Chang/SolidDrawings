@@ -1,3 +1,16 @@
+## 2026-06-05 Fix Syntax Error in Geometry Service (修復幾何服務語法錯誤)
+
+### Issue:
+GitHub Actions 執行測試時，在 `backend/tests/test_geometry.py` 收集階段報錯，原因為 `backend/app/services/geometry_service.py` 存在語法錯誤。
+
+### Failure Analysis:
+1. **Error**: `SyntaxError: unmatched ')'` at line 3946.
+2. **Cause**: `export_assembly_step` 函式的回傳語句被誤寫為 `return Falsee)`，多出了一個 `e` 與一個右括號 `)`。
+
+### Resolution:
+1. **Surgical Fix**: 將 `return Falsee)` 修正為正確的 `return False`。
+2. **Validation**: 於本地環境執行 `python -m pytest backend/tests/test_geometry.py`，確認測試收集成功（雖然在無 OpenCASCADE 環境下功能測試會 Fail，但語法錯誤已排除）。
+
 # DEV_LOG (開發日誌)
 
 ## 2026-06-05 Branch Merge and Cleanup (分支合併與清理)

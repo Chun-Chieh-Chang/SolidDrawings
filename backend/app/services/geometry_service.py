@@ -3943,5 +3943,4 @@ def export_assembly_step(components_data, filepath):
         import traceback
         traceback.print_exc()
         print("[ERROR] export_assembly_step failed:", e)
-        return Falsee)
         return False
