@@ -82,6 +82,7 @@ def _shape_to_mesh(shape, deflection=0.01):
     # Extract Face Metadata
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
     while explorer.More():
+        face = topods.Face(explorer.Current())
         h_face = get_shape_hash(face)
         
         # Resolve Color

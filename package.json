@@ -22,7 +22,7 @@
     "pdca:full": "npm run typecheck && npm run pdca:check",
     "graphify:update": "graphify . --no-viz --update",
     "graphify:query": "graphify query",
-    "postinstall": "node vendor/SkillsBuilder/skills/dev/git-push-guardian/scripts/install-hook.js",
+    "postinstall": "node -e \"if (require('fs').existsSync('vendor/SkillsBuilder/skills/dev/git-push-guardian/scripts/install-hook.js')) require('child_process').execSync('node vendor/SkillsBuilder/skills/dev/git-push-guardian/scripts/install-hook.js', {stdio: 'inherit'})\"",
     "test:golden": "python tests/regression/run_golden.py",
     "test:regression": "npm run test:golden"
   },
