@@ -88,9 +88,9 @@ export const DatumPlanes = () => {
 
   const sketchCoordinateSystem = useMemo(() => {
     if (!activePlane) return null;
-    let origin = new THREE.Vector3(0, 0, 0);
-    let xDir = new THREE.Vector3(1, 0, 0);
-    let yDir = new THREE.Vector3(0, 1, 0);
+    const origin = new THREE.Vector3(0, 0, 0);
+    const xDir = new THREE.Vector3(1, 0, 0);
+    const yDir = new THREE.Vector3(0, 1, 0);
 
     if (activePlane === 'FRONT') {
       origin.set(0, 0, 0);

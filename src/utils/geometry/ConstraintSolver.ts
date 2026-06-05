@@ -91,7 +91,7 @@ function applyConstraint(
 
     case 'DISTANCE': {
       let n1, n2;
-      let targetValue = constraint.value;
+      const targetValue = constraint.value;
 
       if (constraint.nodeIds && constraint.nodeIds.length === 2) {
         n1 = nodes[constraint.nodeIds[0]];
