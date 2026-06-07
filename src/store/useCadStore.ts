@@ -26,6 +26,9 @@ export interface CADMate {
     ratio?: number; // For Gear
     pitch?: number; // For Screw
     initialTransforms?: Record<string, { position: [number, number, number], rotation: [number, number, number] }>;
+    isLimitAngle?: boolean;
+    minAngle?: number;
+    maxAngle?: number;
   };
   alignment?: 'ALIGNED' | 'ANTI_ALIGNED';
   offset?: number;
@@ -74,14 +77,20 @@ export interface SketchNode {
 
 export interface SketchEdge {
   id: string;
-  type: 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE' | 'SPLINE';
+  type: 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE' | 'SPLINE' | 'TEXT';
   nodeIds: string[];
   isConstruction?: boolean;
+  parameters?: {
+    text?: string;
+    height?: number;
+    font?: string;
+    isSingleLine?: boolean;
+  };
 }
 
 export interface SketchConstraint {
   id: string;
-  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR' | 'SYMMETRIC' | 'MIDPOINT';
+  type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR' | 'SYMMETRIC' | 'MIDPOINT' | 'COLLINEAR' | 'PIERCE';
   nodeIds?: string[];
   edgeIds?: string[];
   value?: number;
@@ -135,6 +144,20 @@ export interface MotionStudyState {
   currentTime: number;
   playbackSpeed: number;
   drivers: MotionDriver[];
+}
+
+export interface RibbonButton {
+  id: string;
+  label: string;
+  icon: string | React.ReactNode;
+  action?: string; // string identifier for callback
+  category?: string;
+}
+
+export interface RibbonLayout {
+  FEATURES: string[];
+  SKETCH: string[];
+  EVALUATE: string[];
 }
 
 export type CadToastType = 'error' | 'warning' | 'info';
@@ -224,6 +247,11 @@ export interface CadState {
   convertEntities: (selectedEdgeIds: string[]) => void;
   selectedEntityIds: string[];
   setSelectedEntityIds: (ids: string[] | ((prev: string[]) => string[])) => void;
+
+  dimensionSelection: string[];
+  setDimensionSelection: (ids: string[]) => void;
+  addDimensionSelection: (id: string) => void;
+  clearDimensionSelection: () => void;
 
   sketchNodes: Record<string, SketchNode>;
   setSketchNodes: (nodes: Record<string, SketchNode> | ((prev: Record<string, SketchNode>) => Record<string, SketchNode>)) => void;
@@ -334,8 +362,8 @@ export interface CadState {
   pushToast: (message: string, type?: CadToastType) => void;
   dismissToast: (id: string) => void;
 
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'DOME' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'DOME' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   
@@ -378,7 +406,25 @@ export interface CadState {
   setPartMaterial: (material: string) => void;
   environmentMap: string;
   setEnvironmentMap: (env: string) => void;
+
+  viewOrientationSelectorVisible: boolean;
+  setViewOrientationSelectorVisible: (visible: boolean) => void;
+
+  showMaterialModal: boolean;
+  setShowMaterialModal: (show: boolean) => void;
+  targetMaterialEntity: { type: 'PART' | 'COMPONENT' | 'FEATURE', id: string } | null;
+  setTargetMaterialEntity: (target: { type: 'PART' | 'COMPONENT' | 'FEATURE', id: string } | null) => void;
+
+  ribbonLayout: RibbonLayout;
+  setRibbonLayout: (layout: RibbonLayout) => void;
+  resetRibbonLayout: () => void;
 }
+
+export const DEFAULT_RIBBON_LAYOUT: RibbonLayout = {
+  FEATURES: ['EXTRUDE', 'REVOLVE', 'EXTRUDE_CUT', 'REVOLVED_CUT', 'SWEEP', 'LOFT', 'FILLET', 'CHAMFER', 'MIRROR', 'PATTERN', 'SHELL', 'DOME', 'DRAFT'],
+  SKETCH: ['LINE', 'CIRCLE', 'ARC', 'RECTANGLE', 'SMART_DIMENSION', 'TRIM', 'EXTEND', 'OFFSET', 'MIRROR', 'PATTERN', 'TEXT'],
+  EVALUATE: ['MEASURE', 'MASS_PROPS', 'INTERFERENCE', 'SECTION_VIEW']
+};
 
 export const MATERIAL_PRESETS: Record<string, {
   color: string;
@@ -522,6 +568,14 @@ export const useCadStore = create<CadState>()(
 
       selectedEntityIds: [],
       setSelectedEntityIds: (ids) => set((state) => ({ selectedEntityIds: typeof ids === 'function' ? ids(state.selectedEntityIds) : ids })),
+      
+      dimensionSelection: [],
+      setDimensionSelection: (dimensionSelection) => set({ dimensionSelection }),
+      addDimensionSelection: (id) => set((state) => ({ 
+        dimensionSelection: state.dimensionSelection.includes(id) ? state.dimensionSelection : [...state.dimensionSelection, id] 
+      })),
+      clearDimensionSelection: () => set({ dimensionSelection: [] }),
+
       sketchNodes: {},
       setSketchNodes: (nodes) => { get().markRebuildDirty(0); set((state) => ({ sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes })); },
       sketchEdges: {},
@@ -657,6 +711,18 @@ export const useCadStore = create<CadState>()(
       setPartMaterial: (m) => set({ partMaterial: m }),
       environmentMap: 'studio',
       setEnvironmentMap: (env) => set({ environmentMap: env }),
+
+      viewOrientationSelectorVisible: false,
+      setViewOrientationSelectorVisible: (visible) => set({ viewOrientationSelectorVisible: visible }),
+
+      showMaterialModal: false,
+      setShowMaterialModal: (show) => set({ showMaterialModal: show }),
+      targetMaterialEntity: null,
+      setTargetMaterialEntity: (target) => set({ targetMaterialEntity: target }),
+
+      ribbonLayout: DEFAULT_RIBBON_LAYOUT,
+      setRibbonLayout: (ribbonLayout) => set({ ribbonLayout }),
+      resetRibbonLayout: () => set({ ribbonLayout: DEFAULT_RIBBON_LAYOUT }),
     }),
     {
       name: 'cad-storage',
@@ -686,6 +752,7 @@ export const useCadStore = create<CadState>()(
         configurations: state.configurations,
         activeConfigurationId: state.activeConfigurationId,
         globalVariables: state.globalVariables,
+        ribbonLayout: state.ribbonLayout,
       }),
     }
   )

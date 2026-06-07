@@ -20,6 +20,9 @@ export const MatePanel = () => {
   const [mateType, setMateType] = React.useState<MateType>('COINCIDENT');
   const [offset, setOffset] = React.useState<number>(0);
   const [angle, setAngle] = React.useState<number>(0);
+  const [isLimitAngle, setIsLimitAngle] = React.useState<boolean>(false);
+  const [minAngle, setMinAngle] = React.useState<number>(0);
+  const [maxAngle, setMaxAngle] = React.useState<number>(90);
   const [ratio, setRatio] = React.useState<number>(1);
   const [pitch, setPitch] = React.useState<number>(1.5);
   const [alignment, setAlignment] = React.useState<'ALIGNED' | 'ANTI_ALIGNED'>('ANTI_ALIGNED');
@@ -78,7 +81,10 @@ export const MatePanel = () => {
           parameters: { 
             offset: (mateType === 'DISTANCE' || mateType === 'COINCIDENT') ? offset : 0, 
             angle: mateType === 'ANGLE' ? angle : 0,
-            alignmentFlip: alignment === 'ANTI_ALIGNED' 
+            alignmentFlip: alignment === 'ANTI_ALIGNED',
+            isLimitAngle: mateType === 'ANGLE' ? isLimitAngle : undefined,
+            minAngle: mateType === 'ANGLE' ? minAngle : undefined,
+            maxAngle: mateType === 'ANGLE' ? maxAngle : undefined
           },
         };
 
@@ -234,17 +240,47 @@ export const MatePanel = () => {
       )}
 
       {mateType === 'ANGLE' && (
-        <div className="flex items-center gap-2">
-          <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">角度 (Angle):</span>
-          <div className="relative flex-1">
-            <input
-              type="number"
-              value={angle}
-              onChange={(e) => setAngle(parseFloat(e.target.value))}
-              className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[13px] focus:border-primary outline-none text-right pr-7 font-mono"
-            />
-            <span className="absolute right-2 top-1.5 text-[11px] text-slate-400 font-bold">deg</span>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">角度 (Angle):</span>
+            <div className="relative flex-1">
+              <input
+                type="number"
+                value={angle}
+                onChange={(e) => setAngle(parseFloat(e.target.value))}
+                className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[13px] focus:border-primary outline-none text-right pr-7 font-mono"
+              />
+              <span className="absolute right-2 top-1.5 text-[11px] text-slate-400 font-bold">deg</span>
+            </div>
           </div>
+          
+          <label className="flex items-center gap-2 text-[12px] text-slate-600 font-bold cursor-pointer">
+            <input type="checkbox" checked={isLimitAngle} onChange={(e) => setIsLimitAngle(e.target.checked)} className="rounded border-slate-300" />
+            啟用極限角度 (Limit Angle)
+          </label>
+
+          {isLimitAngle && (
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <span className="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">MIN</span>
+                <input
+                  type="number"
+                  value={minAngle}
+                  onChange={(e) => setMinAngle(parseFloat(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-300 rounded pl-8 pr-2 py-1 text-[12px] focus:border-primary outline-none text-right font-mono"
+                />
+              </div>
+              <div className="relative flex-1">
+                <span className="absolute left-2 top-1.5 text-[10px] text-slate-400 font-bold">MAX</span>
+                <input
+                  type="number"
+                  value={maxAngle}
+                  onChange={(e) => setMaxAngle(parseFloat(e.target.value))}
+                  className="w-full bg-slate-50 border border-slate-300 rounded pl-8 pr-2 py-1 text-[12px] focus:border-primary outline-none text-right font-mono"
+                />
+              </div>
+            </div>
+          )}
         </div>
       )}
 

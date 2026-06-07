@@ -164,6 +164,75 @@ export const sketchActions = {
       });
     }
   },
+
+  splitEdge: (edgeId: string, x: number, y: number): string[] => {
+    const state = useCadStore.getState();
+    const edge = state.sketchEdges[edgeId];
+    if (!edge || edge.type !== 'LINE') return [];
+
+    const n1 = state.sketchNodes[edge.nodeIds[0]];
+    const n2 = state.sketchNodes[edge.nodeIds[1]];
+    if (!n1 || !n2) return [];
+
+    // 1. Create split node
+    const splitNodeId = uuidv4();
+    const splitNode: SketchNode = { id: splitNodeId, x, y };
+
+    // 2. Create two new edges
+    const e1Id = uuidv4();
+    const e2Id = uuidv4();
+    const e1: SketchEdge = { ...edge, id: e1Id, nodeIds: [edge.nodeIds[0], splitNodeId] };
+    const e2: SketchEdge = { ...edge, id: e2Id, nodeIds: [splitNodeId, edge.nodeIds[1]] };
+
+    const nextNodes = { ...state.sketchNodes, [splitNodeId]: splitNode };
+    const nextEdges = { ...state.sketchEdges };
+    delete nextEdges[edgeId];
+    nextEdges[e1Id] = e1;
+    nextEdges[e2Id] = e2;
+
+    useCadStore.setState({
+      sketchNodes: nextNodes,
+      sketchEdges: nextEdges
+    });
+
+    return [e1Id, e2Id];
+  },
+
+  selectChain: (startingEdgeId: string) => {
+    const state = useCadStore.getState();
+    const startEdge = state.sketchEdges[startingEdgeId];
+    if (!startEdge) return;
+
+    const chainEdgeIds = new Set<string>([startingEdgeId]);
+    const queue = [...startEdge.nodeIds];
+    const visitedNodes = new Set<string>();
+
+    while (queue.length > 0) {
+      const nodeId = queue.shift()!;
+      if (visitedNodes.has(nodeId)) continue;
+      visitedNodes.add(nodeId);
+
+      // Find all edges connected to this node
+      Object.values(state.sketchEdges).forEach(edge => {
+        if (edge.nodeIds.includes(nodeId) && !chainEdgeIds.has(edge.id)) {
+          // In Select Chain, we usually stop at junctions (degree > 2)
+          // But for a simple "Select Chain", we can just select all connected.
+          // SolidWorks usually follows the path.
+          chainEdgeIds.add(edge.id);
+          edge.nodeIds.forEach(nid => {
+            if (nid !== nodeId) queue.push(nid);
+          });
+        }
+      });
+    }
+
+    useCadStore.setState({
+      selection: {
+        type: 'SKETCH',
+        ids: Array.from(chainEdgeIds)
+      }
+    });
+  },
   
   commitBatch: (
     newNodes: Record<string, SketchNode>,

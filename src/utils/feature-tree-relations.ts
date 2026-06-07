@@ -53,7 +53,23 @@ export function getParentsAndChildren(targetFeature: CADFeature, allFeatures: CA
     });
   };
 
+  // Recursive search for all ancestors
+  const findAncestors = (childId: string) => {
+    const child = allFeatures.find(f => f.id === childId);
+    if (!child) return;
+
+    allFeatures.forEach(potentialParent => {
+      if (isDirectChild(potentialParent, child)) {
+        if (!parents.some(p => p.id === potentialParent.id)) {
+          parents.push({ id: potentialParent.id, name: potentialParent.name, type: potentialParent.type });
+          findAncestors(potentialParent.id);
+        }
+      }
+    });
+  };
+
   findDescendants(targetFeature.id);
+  findAncestors(targetFeature.id);
 
   // Parents (simplified for now: immediate sketch dependency)
   if (targetFeature.type === 'EXTRUDE' || targetFeature.type === 'REVOLVE') {

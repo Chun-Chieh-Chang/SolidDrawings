@@ -94,10 +94,27 @@ def solve_assembly_mates(components_dict, mates_list):
                 residuals.extend(np.cross(n1, n2))
                 residuals.append(np.dot(p2 - p1, n1) - offset)
             elif m_type == 'ANGLE':
-                # Dot product of normals should equal cos(angle)
-                angle_rad = math.radians(angle_target)
-                target_dot = math.cos(angle_rad)
-                residuals.append(np.dot(n1, n2) - (sign * target_dot))
+                is_limit = params.get('isLimitAngle', False)
+                if is_limit:
+                    min_ang = float(params.get('minAngle', 0))
+                    max_ang = float(params.get('maxAngle', 180))
+                    current_dot = np.dot(n1, n2) * sign
+                    current_angle = math.degrees(math.acos(max(-1.0, min(1.0, current_dot))))
+                    
+                    if current_angle < min_ang:
+                        target_dot = math.cos(math.radians(min_ang))
+                        residuals.append(np.dot(n1, n2) - (sign * target_dot))
+                    elif current_angle > max_ang:
+                        target_dot = math.cos(math.radians(max_ang))
+                        residuals.append(np.dot(n1, n2) - (sign * target_dot))
+                    else:
+                        # Inside limits, no penalty
+                        residuals.append(0.0)
+                else:
+                    # Dot product of normals should equal cos(angle)
+                    angle_rad = math.radians(angle_target)
+                    target_dot = math.cos(angle_rad)
+                    residuals.append(np.dot(n1, n2) - (sign * target_dot))
             elif m_type == 'GEAR':
                 # Gear Mate: DeltaTheta_B = -Ratio * DeltaTheta_A
                 ratio = float(params.get('ratio', 1.0))

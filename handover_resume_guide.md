@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-05 22:33:56
+**Last Saved:** 2026-06-07 21:33:43
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,53 +7,115 @@
 
 ## 1. Current Git State
 ```shell
-861cb23 docs: write geometry kernel and CI defense rules into global_rules wiki
+f118a73 chore: project cleanup, MECE organization, and SkillsBuilder geometric verifications
 ```
 
 ### Uncommitted Changes
 ```shell
-M DEV_LOG.md
- D SOLIDWORKS_MASTER_PLAN.md
- D get_transcript.py
- D get_transcript2.py
- D get_transcript3.py
- D get_transcript4.py
- D get_transcript5.py
- D get_transcript6.py
- D get_transcript7.py
+D "# SOLIDWORKS UXUI Compatibility Aud.md"
+ M DEV_LOG.md
+ M backend/app/services/assembly_solver.py
+ M backend/app/services/geometry_service.py
+ M backend/tests/test_geometry.py
+ D "goal \345\225\237\345\213\225 SkillsBuilder \351\226\211\347\222\260\346\251\237\345\210\266.md"
  M handover_resume_guide.md
- D implementation_plan.md
- D simulation_result.json
- M task_plan.md
- D transcript.json
- D transcript.txt
- D transcript_6sUKuBigJk0.json
- D transcript_NlZhgKhmYtI.json
- D transcript_XkP8xTNrsDw.json
- D transcript_sDqD0PRYhJI.json
- D transcript_test.json
- D transcript_utf8.txt
-?? docs/architecture/SOLIDWORKS_MASTER_PLAN.md
-?? docs/architecture/implementation_plan.md
-?? docs/benchmarks/EXERCISE_01_EXPERT_GUIDE.md
-?? docs/benchmarks/EXERCISE_01_SOP.md
-?? docs/benchmarks/EXERCISE_06_EXPERT_GUIDE.md
-?? docs/benchmarks/EXERCISE_06_SOP.md
-?? docs/benchmarks/EXERCISE_11_EXPERT_GUIDE.md
-?? docs/benchmarks/EXERCISE_11_SOP.md
-?? docs/benchmarks/EXERCISE_PLUMMER_EXPERT_GUIDE.md
-?? docs/benchmarks/EXERCISE_PLUMMER_SOP.md
-?? docs/benchmarks/EXERCISE_cWWP_EXPERT_GUIDE.md
-?? docs/benchmarks/EXERCISE_cWWP_SOP.md
-?? docs/benchmarks/EXERCISE_soEP5_EXPERT_GUIDE.md
-?? docs/benchmarks/EXERCISE_soEP5_SOP.md
+ M skills/dev/solidworks-gap-analyzer/gap-checklist.md
+ M src/app/page.tsx
+ M src/hooks/useFeatureBuilders.ts
+ M src/renderer/DatumPlanes.tsx
+ M src/renderer/OcctShape.tsx
+ M src/renderer/SketchPreview.tsx
+ M src/renderer/Viewport.tsx
+ M src/store/sketchActions.ts
+ M src/store/useCadStore.ts
+ M src/ui/ContextMenu.tsx
+ M src/ui/FeatureManagerPanel.tsx
+ M src/ui/MatePanel.tsx
+ M src/ui/PartFeaturePropertyManager.tsx
+ M src/ui/RibbonBar/RibbonController.tsx
+ M src/ui/SketchPropertyManager.tsx
+ M src/ui/StatusBar.tsx
+ M src/utils/feature-tree-relations.ts
+ M src/utils/geometry/ConstraintSolver.ts
+ M src/utils/sketch/ToolHandlers/BaseTool.ts
+ M src/utils/sketch/ToolHandlers/LineTool.ts
+ M src/utils/sketch/ToolHandlers/RectangleTool.ts
+ M src/utils/sketch/ToolHandlers/TrimTool.ts
+?? "docs/architecture/Video-Driven Gap Detection & Repair.md"
+?? docs/benchmarks/EXERCISE_432_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_A84_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_A84_SOP.md
+?? docs/benchmarks/EXERCISE_COCA_COLA_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_COCA_COLA_SOP.md
+?? docs/benchmarks/EXERCISE_CONSTRAINTS_MASTER_GUIDE.md
+?? docs/benchmarks/EXERCISE_CONSTRAINTS_SHORTCUTS_GUIDE.md
+?? docs/benchmarks/EXERCISE_FEATURE_TREE_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_LOFT_ADVANCED_GUIDE.md
+?? docs/benchmarks/EXERCISE_LOFT_CONSTRAINTS_GUIDE.md
+?? docs/benchmarks/EXERCISE_REVOLVE_EXPERT_GUIDE.md
+?? docs/benchmarks/EXERCISE_SKETCH_WORKFLOW_GUIDE.md
+?? docs/benchmarks/EXERCISE_SWEEP_ADVANCED_GUIDE.md
+?? docs/benchmarks/EXERCISE_TRIM_EXPERT_GUIDE.md
+?? docs/productization/Advanced_Fillet_Gap_Report.md
+?? docs/productization/Chamfer_Gap_Report.md
+?? docs/productization/Constant_Fillet_Gap_Report.md
+?? docs/productization/Extrude_Symmetric_Gap_Report.md
+?? docs/productization/Extrude_UpToNext_Gap_Report.md
+?? docs/productization/Extrude_UpToSurface_Gap_Report.md
+?? docs/productization/Extrude_UpToVertex_Gap_Report.md
+?? docs/productization/Face_Fillet_Advanced_Gap_Report.md
+?? docs/productization/Feature_Reorder_Gap_Report.md
+?? docs/productization/Fillet_Advanced_Gap_Report.md
+?? docs/productization/Fillet_Profile_Gap_Report.md
+?? docs/productization/Fillet_Types_Gap_Report.md
+?? docs/productization/Hole_Wizard_Gap_Report.md
+?? docs/productization/Mirror_Feature_Gap_Report.md
+?? docs/productization/Revolve_Advanced_Gap_Report.md
+?? docs/productization/Revolved_Cut_Gap_Report.md
+?? docs/productization/Selected_Contours_Gap_Report.md
+?? docs/productization/Sketch_Text_Gap_Report.md
+?? docs/productization/Sweep_Pattern_Gap_Report.md
+?? docs/productization/UI_Customization_Gap_Report.md
+?? docs/productization/Variable_Fillet_Gap_Report.md
+?? src/ui/ConfirmationCorner.tsx
+?? src/ui/Modals/CustomizeRibbonModal.tsx
+?? src/ui/Modals/MaterialSelectorModal.tsx
+?? src/ui/ViewOrientationSelector.tsx
+?? src/utils/geometry/Intersection.ts
+?? src/utils/sketch/ToolHandlers/TextTool.ts
 ?? sync.ffs_db
-?? tests/regression/e2e_video_cWWP_sim.py
-?? tests/regression/e2e_video_ex11_sim.py
-?? tests/regression/e2e_video_ex1_sim.py
-?? tests/regression/e2e_video_ex6_sim.py
-?? tests/regression/e2e_video_plummer_sim.py
-?? tests/regression/e2e_video_soEP5_sim.py
+?? tests/regression/e2e_A84_sim.py
+?? tests/regression/e2e_coca_cola_sim.py
+?? tests/regression/e2e_video_05NN229l2Wc_sim.py
+?? tests/regression/e2e_video_9B7CFz_jKpg_sim.py
+?? tests/regression/e2e_video_AGDV78Jmo3k_sim.py
+?? tests/regression/e2e_video_KIxyS5mb7zY_sim.py
+?? tests/regression/e2e_video_MxB_3Lq0qGA_sim.py
+?? tests/regression/e2e_video_WvJHy0ph4i0_sim.py
+?? tests/regression/e2e_video_ZxYzcZ0SnfA_sim.py
+?? tests/regression/e2e_video_axLwYdBmJ0o_sim.py
+?? tests/regression/e2e_video_bxaio0HCzh8_sim.py
+?? tests/regression/e2e_video_cGA3q5zlGAw_sim.py
+?? tests/regression/e2e_video_cjB3FWxvKY_sim.py
+?? tests/regression/e2e_video_gxIlg9irqHU_local_sim.py
+?? tests/regression/e2e_video_gxIlg9irqHU_sim.py
+?? tests/regression/e2e_video_ifzVEFoETEk_sim.py
+?? tests/regression/e2e_video_kTgbW1hrMn0_sim.py
+?? tests/regression/e2e_video_kaVW4h_JAQ8_sim.py
+?? tests/regression/e2e_video_mWhWNJ09O5c_sim.py
+?? tests/regression/e2e_video_yzkN6ehVThc_sim.py
+?? tests/regression/e2e_video_zCsIojVjmvM_adv_sim.py
+?? tests/regression/e2e_video_zCsIojVjmvM_sim.py
+?? tests/regression/test_angle_limiter.py
+?? tests/regression/test_collinear_logic.py
+?? tests/regression/test_concentric_equal_logic.py
+?? tests/regression/test_corner_trim_logic.py
+?? tests/regression/test_equal_radius.py
+?? tests/regression/test_midpoint_logic.py
+?? tests/regression/test_parallel_perpendicular_logic.py
+?? tests/regression/test_point_on_edge_logic.py
+?? tests/regression/test_trim_logic.py
+?? tests/regression/test_trim_logic_repro.py
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)

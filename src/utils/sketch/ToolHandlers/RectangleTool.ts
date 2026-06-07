@@ -72,7 +72,6 @@ export class CenterRectangleToolHandler implements SketchToolHandler {
     const state = useCadStore.getState();
 
     if (state.sketchNewChain || !state.lastClickedNodeId) {
-      // First click: store center point as a temporary reference node
       let centerId = ctx.snappedNodeId;
       if (!centerId) {
         const isOrigin = Math.abs(ctx.snappedU) < 1e-5 && Math.abs(ctx.snappedV) < 1e-5;
@@ -81,8 +80,8 @@ export class CenterRectangleToolHandler implements SketchToolHandler {
       }
       useCadStore.setState({ sketchNewChain: false, lastClickedNodeId: centerId, firstChainNodeId: centerId });
     } else {
-      // Second click: corner is the current point; expand symmetrically from center
-      const centerNode = state.sketchNodes[state.lastClickedNodeId!];
+      const centerId = state.lastClickedNodeId!;
+      const centerNode = state.sketchNodes[centerId];
       if (!centerNode) return;
 
       const cx = centerNode.x;
@@ -92,42 +91,45 @@ export class CenterRectangleToolHandler implements SketchToolHandler {
 
       const dx = fx - cx;
       const dy = fy - cy;
+      if (Math.abs(dx) < 0.1 && Math.abs(dy) < 0.1) return;
 
-      if (!requireValidPoint(dx, dy)) return;
-
-      // 4 corners: center ± dx/dy
-      const id1 = uuidv4(); const id2 = uuidv4();
-      const id3 = uuidv4(); const id4 = uuidv4();
+      // 4 corners
+      const n1 = uuidv4(); const n2 = uuidv4();
+      const n3 = uuidv4(); const n4 = uuidv4();
 
       const newNodes = {
         ...state.sketchNodes,
-        [id1]: { id: id1, x: cx + dx, y: cy + dy },  // corner (fx, fy)
-        [id2]: { id: id2, x: cx - dx, y: cy + dy },
-        [id3]: { id: id3, x: cx - dx, y: cy - dy },
-        [id4]: { id: id4, x: cx + dx, y: cy - dy },
+        [n1]: { id: n1, x: cx + dx, y: cy + dy },
+        [n2]: { id: n2, x: cx - dx, y: cy + dy },
+        [n3]: { id: n3, x: cx - dx, y: cy - dy },
+        [n4]: { id: n4, x: cx + dx, y: cy - dy },
       };
 
-      // Remove temporary center node if it's not fixed (like the origin)
-      const centerId = state.lastClickedNodeId!;
-      if (newNodes[centerId] && !(newNodes[centerId] as any).isFixed) {
-        delete newNodes[centerId];
-      }
-
+      // 4 boundary edges (solid)
       const e1 = uuidv4(); const e2 = uuidv4();
       const e3 = uuidv4(); const e4 = uuidv4();
+      // 2 diagonals (construction)
+      const d1 = uuidv4(); const d2 = uuidv4();
+
       const newEdges = {
         ...state.sketchEdges,
-        [e1]: { id: e1, type: 'LINE', nodeIds: [id1, id2] },
-        [e2]: { id: e2, type: 'LINE', nodeIds: [id2, id3] },
-        [e3]: { id: e3, type: 'LINE', nodeIds: [id3, id4] },
-        [e4]: { id: e4, type: 'LINE', nodeIds: [id4, id1] },
+        [e1]: { id: e1, type: 'LINE', nodeIds: [n1, n2] },
+        [e2]: { id: e2, type: 'LINE', nodeIds: [n2, n3] },
+        [e3]: { id: e3, type: 'LINE', nodeIds: [n3, n4] },
+        [e4]: { id: e4, type: 'LINE', nodeIds: [n4, n1] },
+        [d1]: { id: d1, type: 'LINE', nodeIds: [n1, n3], isConstruction: true },
+        [d2]: { id: d2, type: 'LINE', nodeIds: [n2, n4], isConstruction: true },
       } as Record<string, any>;
 
-      const c1 = uuidv4(); const c2 = uuidv4();
+      const cH = uuidv4(); const cV = uuidv4();
+      const cMid1 = uuidv4(); const cMid2 = uuidv4();
+      
       const newConstraints = {
         ...state.sketchConstraints,
-        [c1]: { id: c1, type: 'HORIZONTAL' as const, edgeIds: [e1, e3] },
-        [c2]: { id: c2, type: 'VERTICAL' as const, edgeIds: [e2, e4] },
+        [cH]: { id: cH, type: 'HORIZONTAL' as const, edgeIds: [e1, e3] },
+        [cV]: { id: cV, type: 'VERTICAL' as const, edgeIds: [e2, e4] },
+        [cMid1]: { id: cMid1, type: 'MIDPOINT' as const, edgeIds: [d1], nodeIds: [centerId] },
+        [cMid2]: { id: cMid2, type: 'MIDPOINT' as const, edgeIds: [d2], nodeIds: [centerId] },
       };
 
       sketchActions.commitBatch(newNodes, newEdges, newConstraints);

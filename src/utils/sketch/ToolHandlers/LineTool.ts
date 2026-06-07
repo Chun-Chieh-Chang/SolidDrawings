@@ -33,28 +33,55 @@ export class LineToolHandler implements SketchToolHandler {
       if (state.lastClickedNodeId === nId) return; // Prevent degenerate lines
       const eId = sketchActions.addEdge(this.isCenterLine ? 'CENTER_LINE' : 'LINE', [state.lastClickedNodeId, nId]);
       
-      // Auto-Constraint Capture
+      // Auto-Constraint Capture (Horizontal/Vertical)
       if (ctx.activeSnapType === 'HORIZONTAL' || ctx.activeSnapType === 'VERTICAL') {
         sketchActions.addConstraint(ctx.activeSnapType, [eId]);
-        
-        // Solve the sketch precisely so the endpoint actually moves to the horizontal/vertical line
-        const solved = previewSolve(
-          useCadStore.getState().sketchNodes,
-          useCadStore.getState().sketchEdges,
-          useCadStore.getState().sketchConstraints,
-          4
-        );
-        useCadStore.setState({ sketchNodes: { ...useCadStore.getState().sketchNodes, ...solved } });
       }
+
+      // Auto-Constraint Capture (Tangent)
+      if (ctx.activeSnapType === 'TANGENT' && ctx.snappedEdgeId) {
+        sketchActions.addConstraint('TANGENT', [eId, ctx.snappedEdgeId]);
+      }
+
+      // Auto-Constraint Capture (Midpoint)
+      if (ctx.activeSnapType === 'MIDPOINT' && ctx.snappedEdgeId) {
+        sketchActions.addConstraint('MIDPOINT', [ctx.snappedEdgeId], [nId]);
+      }
+
+      // Auto-Constraint Capture (Coincident on Edge - not a node)
+      if (ctx.activeSnapType === 'COINCIDENT' && ctx.snappedEdgeId && !ctx.snappedNodeId) {
+        sketchActions.addConstraint('COINCIDENT', [ctx.snappedEdgeId], [nId]);
+      }
+      
+      // Solve the sketch precisely
+      const solved = previewSolve(
+        useCadStore.getState().sketchNodes,
+        useCadStore.getState().sketchEdges,
+        useCadStore.getState().sketchConstraints,
+        4
+      );
+      useCadStore.setState({ sketchNodes: { ...useCadStore.getState().sketchNodes, ...solved } });
     }
 
     // 4. Update UI chain state
     if (isClosing) {
+      // Auto-closure optimization: Select the closed chain and end tool mode
+      const closedNodeId = nId;
       useCadStore.setState({
         sketchNewChain: true,
         lastClickedNodeId: null,
-        firstChainNodeId: null
+        firstChainNodeId: null,
       });
+
+      // Find an edge connected to the closing node to start the chain selection
+      const finalEdges = useCadStore.getState().sketchEdges;
+      const closingEdge = Object.values(finalEdges).find(e => e.nodeIds.includes(closedNodeId));
+      if (closingEdge) {
+        sketchActions.selectChain(closingEdge.id);
+      }
+      
+      // Industrial UX: Auto-switch back to SELECT tool on closure if desired
+      // useCadStore.setState({ sketchTool: 'SELECT' });
     } else {
       useCadStore.setState({
         sketchNewChain: false,
