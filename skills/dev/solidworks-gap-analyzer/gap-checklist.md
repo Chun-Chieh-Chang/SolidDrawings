@@ -52,3 +52,12 @@ This document tracks implementation status, file paths, and alignment strategies
 | **Confirmation Corner** | Viewport Top-Right | ✅ Implemented | [Viewport.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/renderer/Viewport.tsx) | High | Transparent check/cross buttons at top-right of graphics view to finish/cancel sketch/feature editing. |
 | **Design Tree** | Side Panel | ✅ Implemented | [FeatureManagerPanel.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/ui/FeatureManagerPanel.tsx) | Critical | Displays history/tree hierarchy. |
 | **PropertyManager** | Left Side panel | ⚠️ Partial | [SketchPropertyManager.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/ui/SketchPropertyManager.tsx) | High | Panel showing active parameters for Extrude/Revolve/Fillet with check/cross header. |
+
+---
+
+## 5. Feature Engine Capabilities (特徵能力)
+
+| SolidWorks Feature | Capability | Current Status | Relevant Files | Priority | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Extrude End Conditions** | Up To Next / Surface | ✅ Implemented | [geometry_service.py](file:///c:/Users/USER/Downloads/3D-Builder/backend/app/services/geometry_service.py) | High | Ray-casting logic to extrude up to the nearest solid body or a specific target surface. |
+| **Sketch Constraints** | Arc Condition (Min/Max/Center) | ✅ Implemented | [ConstraintSolver.ts](file:///c:/Users/USER/Downloads/3D-Builder/src/utils/geometry/ConstraintSolver.ts) | High | Full SolidWorks parity for dimensioning to Arc/Circle edges. Supports Point-to-Circle and Line-to-Circle with 'Leaders' tab UI for Min/Max/Center selection. |

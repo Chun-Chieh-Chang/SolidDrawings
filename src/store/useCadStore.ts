@@ -86,6 +86,7 @@ export interface SketchConstraint {
   edgeIds?: string[];
   value?: number;
   offset?: number;
+  arcCondition?: 'CENTER' | 'MIN' | 'MAX';
 }
 
 export interface CADComponent {

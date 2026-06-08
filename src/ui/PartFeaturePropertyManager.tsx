@@ -281,6 +281,8 @@ export function PartFeaturePropertyManager({
                       >
                         <option value="BLIND">Blind</option>
                         <option value="THROUGH_ALL">Through All</option>
+                        <option value="UP_TO_NEXT">Up To Next</option>
+                        <option value="UP_TO_SURFACE">Up To Surface</option>
                       </select>
                     </div>
 

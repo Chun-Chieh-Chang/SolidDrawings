@@ -739,6 +739,50 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         # Extrude along plane normal in global coordinates
         normal_dir = ax2.Direction()
         is_flip = params.get('flip', False)
+        depth = float(params.get('depth', 10.0))
+        end_cond = params.get('endCondition', 'BLIND')
+        
+        # --- Up To Next / Up To Surface implementation via Raycasting ---
+        if end_cond in ['UP_TO_NEXT', 'UP_TO_SURFACE'] and parent_shape and not parent_shape.IsNull():
+            try:
+                from OCC.Core.IntCurvesFace import IntCurvesFace_ShapeIntersector
+                from OCC.Core.gp import gp_Lin, gp_Dir, gp_Pnt, gp_Trsf, gp_Ax3
+                
+                # Use centroid of the first sketch loop as ray origin
+                cx, cy, cz = 0.0, 0.0, 0.0
+                pts_count = 0
+                if cleaned_loops:
+                    for pt in cleaned_loops[0]:
+                        cx += float(pt[0]); cy += float(pt[1]); cz += float(pt[2])
+                        pts_count += 1
+                if pts_count > 0:
+                    cx /= pts_count; cy /= pts_count; cz /= pts_count
+                
+                local_pnt = gp_Pnt(cx, cy, cz)
+                trsf = gp_Trsf()
+                trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
+                local_pnt.Transform(trsf)
+                
+                ray_dir_gp = gp_Dir(-normal_dir.X(), -normal_dir.Y(), -normal_dir.Z()) if is_flip else normal_dir
+                ray = gp_Lin(local_pnt, ray_dir_gp)
+                
+                intersector = IntCurvesFace_ShapeIntersector()
+                intersector.Load(parent_shape, 1e-4)
+                intersector.Perform(ray, 0.001, 9999.0)
+                
+                min_dist = None
+                if intersector.IsDone():
+                    for i in range(1, intersector.NbPnt() + 1):
+                        d = intersector.WParameter(i)
+                        if d > 0.001:
+                            if min_dist is None or d < min_dist:
+                                min_dist = d
+                
+                if min_dist is not None:
+                    depth = min_dist
+            except Exception as e:
+                print(f"[WARNING] {end_cond} ray casting failed: {e}")
+
         mag = -depth if is_flip else depth
         vec = gp_Vec(normal_dir.X() * mag, normal_dir.Y() * mag, normal_dir.Z() * mag)
         
