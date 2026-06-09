@@ -138,6 +138,26 @@ GitHub Actions 中�? `Deploy Next.js site to Pages` ??`PythonOCC CI (Backend T
    - ?�地?��? `npm run build` ?��?輸出 Static Pages??
    - ?�本??OpenCASCADE ?��?下�??��?�?`pytest` 並執�?`python -m pytest backend/tests`，測�?**100% ?��? (1 Passed)**??
    - ?�由 `python -m py_compile` 編譯 `geometry_service.py` 確�??��?法錯誤�?
+## 2026-06-09 SkillsBuilder PDCA: Video Index 72 (Unit Intelligence & Overrides)
+
+### Analysis:
+- **SolidWorks Expert**: 影片「補充1_草圖標註裡的取代單位要慎用」探討了在標註時使用不同單位的技巧。SolidWorks 允許在輸入框直接輸入 `2in` 或 `50mm`，系統會自動轉換。專家警告：雖然可以使用「取代單位」顯示，但製造端容易誤判，最佳實務是「輸入時自動轉換，儲存時統一基準」。
+- **Gap Detection**:
+  - `SketchPropertyManager.tsx` 僅支援純數字輸入 (`type="number"`)，無法處理單位字串。
+  - `EquationEngine.ts` 缺乏單位換算比例 (Scale Factors)。
+- **Surgical Implementation**:
+  - **EquationEngine.ts**: 新增 `UNIT_FACTORS` 對照表（支援 mm, in, inch, cm, m），並在評估前執行預處理，將帶有單位的數值轉化為 mm 基準值。支援混合運算如 `1in + 5mm`。
+  - **SmartNumericInput (Sketch UI)**: 封裝了具備單位解析能力的文本輸入框。當使用者輸入後，會自動執行 `EquationEngine.evaluate` 並在失去焦點 (Blur) 或按下 Enter 時將結果歸一化 (Normalize) 為 mm。
+  - **ParamInput (Part UI)**: 同步升級 `PartFeaturePropertyManager.tsx` 中的輸入邏輯，使其同樣具備單位換算能力，確保 2D 與 3D 體驗一致。
+- **Hybrid Verification**:
+  - **Manual UI Test**: 驗證在 `Distance` 標註中輸入 `1in` 是否自動變為 `25.40`，輸入 `10cm` 是否變為 `100.00`。
+  - **Gap Audit**: 更新 `gap-checklist.md`，將 Unit Intelligence 標記為已實現。
+- **Result**: ✅ Passed。
+
+### Status:
+- 系統現在具備工業級的單位智慧解析能力。
+- 遵循影片建議，採用「即時歸一化」策略以降低製造誤差風險。
+
 ## 2026-06-09 SkillsBuilder PDCA: Video Index 67 (Storage Basket & 2D Pattern)
 
 ### Analysis:

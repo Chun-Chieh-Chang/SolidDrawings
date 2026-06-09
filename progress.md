@@ -70,3 +70,9 @@
 - [x] Implement Direction 2 resolution via edge references or global axes.
 - [x] Add "Direction 2" rollout to `PartFeaturePropertyManager.tsx` with Enable toggle.
 - [x] Verified correct translation vector $V = i \cdot V_1 + j \cdot V_2$ for grid patterns.
+
+### Phase 131: Unit Intelligence (Multi-Unit Evaluation)
+- [x] Enhance `EquationEngine.ts` with `UNIT_FACTORS` (mm, in, cm, m).
+- [x] Implement unit-preprocessing logic to convert suffixes to base units (mm) before evaluation.
+- [x] Create `SmartNumericInput` in `SketchPropertyManager.tsx` for intelligent text-to-number conversion.
+- [x] Upgrade `PartFeaturePropertyManager.tsx`'s `ParamInput` to support consistent unit-aware evaluation.

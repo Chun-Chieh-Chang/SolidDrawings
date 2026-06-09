@@ -17,9 +17,26 @@ const ParamInput: React.FC<{
   badge?: string;
 }> = ({ label, value, onChange, unit = 'mm', badge }) => {
   const { evaluatedVariables } = useCadStore();
-  const isFormula = typeof value === 'string' && value.startsWith('=');
-  const displayValue = isFormula ? value : value ?? 0;
-  const evaluated = isFormula ? EquationEngine.evaluate(value.substring(1), evaluatedVariables) : Number(value);
+  const [localValue, setLocalValue] = React.useState(value?.toString() || '0');
+
+  React.useEffect(() => {
+    setLocalValue(value?.toString() || '0');
+  }, [value]);
+
+  const isFormula = localValue.startsWith('=');
+  const evaluated = isFormula 
+    ? EquationEngine.evaluate(localValue.substring(1), evaluatedVariables) 
+    : EquationEngine.evaluate(localValue, evaluatedVariables);
+
+  const handleBlur = () => {
+    if (isFormula) {
+      onChange(localValue);
+    } else {
+      const solved = EquationEngine.evaluate(localValue, evaluatedVariables);
+      onChange(solved);
+      setLocalValue(solved.toFixed(3));
+    }
+  };
 
   return (
     <div className="space-y-1">
@@ -35,17 +52,12 @@ const ParamInput: React.FC<{
         <div className="relative flex-1">
           <input
             type="text"
-            value={displayValue}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (val.startsWith('=')) onChange(val);
-              else {
-                const num = parseFloat(val);
-                onChange(isNaN(num) ? 0 : num);
-              }
-            }}
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
+                handleBlur();
                 (e.target as HTMLInputElement).blur();
               }
             }}
@@ -55,7 +67,7 @@ const ParamInput: React.FC<{
         </div>
         <span className="text-[11px] text-slate-500 font-bold w-6">{unit}</span>
       </div>
-      {isFormula && (
+      {(isFormula || (localValue !== evaluated.toString() && localValue !== evaluated.toFixed(3))) && (
         <div className="text-[10px] text-emerald-600 font-black text-right pr-8 animate-in fade-in">
           = {evaluated.toFixed(3)} {unit}
         </div>

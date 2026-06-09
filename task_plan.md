@@ -29,6 +29,12 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 | 128 | Loft Industrial Reinforcement | complete | 升級 Loft 演算法支援導引曲線與多斷面選取 |
 | 129 | Thin Feature (Extrude) | complete | 實現薄件特徵，支援從 2D 草圖生成中空管狀或薄壁實體 |
 | 130 | 2D Linear Pattern | complete | 升級排列特徵支援 Direction 2，實現工業級網格/矩陣生成能力 |
+| 131 | Unit Intelligence | complete | 實現多單位 (mm, in, cm) 自動換算與數學表達式評估 |
+
+## Phase 131 Details: Unit Intelligence (Multi-Unit Evaluation)
+- [x] Logic: Upgraded `EquationEngine` with automated unit suffix preprocessing.
+- [x] UI: Implemented `SmartNumericInput` for seamless 2D/3D dimension conversion.
+- [x] UX: Followed SolidWorks safety protocols for immediate unit normalization.
 
 ## Phase 130 Details: 2D Linear Pattern (Direction 2)
 - [x] Backend: Upgraded `PATTERN` handler with nested loops and dual-vector translation.
@@ -71,6 +77,7 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 - [x] Phase 128: Loft Industrial Reinforcement
 - [x] Phase 129: Thin Feature (Extrude)
 - [x] Phase 130: 2D Linear Pattern (Direction 2)
+- [x] Phase 131: Unit Intelligence (Multi-Unit Evaluation)
 
 ## Current Phase
-All high-priority SolidWorks alignment and structural cleanup phases completed. 2D Linear Pattern for industrial mesh modeling implemented. v1.5 established.
+All high-priority SolidWorks alignment and structural cleanup phases completed. Unit Intelligence for multi-unit modeling implemented. v1.6 established.
