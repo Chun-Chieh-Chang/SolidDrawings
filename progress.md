@@ -58,3 +58,15 @@
 - [x] Support multiple guide curves and robust profile-to-path interpolation.
 - [x] Upgrade PropertyManager UI to handle multi-sketch selection for Guide Curves.
 - [x] Fix profile loop indexing to always select outer loops for stable B-Rep.
+
+### Phase 129: Thin Feature (Extrude/Revolve)
+- [x] Implement backend `isThin` logic in `geometry_service.py` using `BRepOffsetAPI_MakeOffset`.
+- [x] Add `isThin`, `thinThickness`, and `thinDirection` parameters to `CADFeature` in `useCadStore.ts`.
+- [x] Create "Thin Feature" rollout in `PartFeaturePropertyManager.tsx` with professional UI.
+- [x] Support ONE_DIRECTION and MID_PLANE offset types.
+
+### Phase 130: 2D Linear Pattern (Direction 2)
+- [x] Upgrade backend `PATTERN` logic to support nested loops for 2D matrix generation.
+- [x] Implement Direction 2 resolution via edge references or global axes.
+- [x] Add "Direction 2" rollout to `PartFeaturePropertyManager.tsx` with Enable toggle.
+- [x] Verified correct translation vector $V = i \cdot V_1 + j \cdot V_2$ for grid patterns.

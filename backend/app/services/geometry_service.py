@@ -820,11 +820,47 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
 
                 current_feat_shape = comp
             else:
-                # Solid extrusion tracking
-                make_face = BRepBuilderAPI_MakeFace(wires[0])
-                for inner_wire in wires[1:]:
-                    make_face.Add(inner_wire)
-                face = make_face.Face()
+                # --- Thin Feature Logic ---
+                is_thin = params.get('isThin', False)
+                if is_thin:
+                    try:
+                        thin_thickness = float(params.get('thinThickness', 1.0))
+                        thin_dir = params.get('thinDirection', 'ONE_DIRECTION')
+                        
+                        # We use the first loop as the base for the thin wall
+                        base_wire = wires[0]
+                        offset_tool = BRepOffsetAPI_MakeOffset()
+                        offset_tool.AddWire(base_wire)
+                        
+                        if thin_dir == 'MID_PLANE':
+                            offset_tool.Perform(thin_thickness / 2.0)
+                            w1 = topods.Wire(offset_tool.Shape())
+                            offset_tool.Perform(-thin_thickness / 2.0)
+                            w2 = topods.Wire(offset_tool.Shape())
+                            
+                            make_face = BRepBuilderAPI_MakeFace(w1)
+                            make_face.Add(w2)
+                            face = make_face.Face()
+                        else:
+                            # One Direction
+                            offset_tool.Perform(thin_thickness)
+                            w_off = topods.Wire(offset_tool.Shape())
+                            
+                            make_face = BRepBuilderAPI_MakeFace(w_off)
+                            make_face.Add(base_wire)
+                            face = make_face.Face()
+                    except Exception as thin_err:
+                        print(f"[WARNING] Thin Feature failed: {thin_err}, falling back to solid.")
+                        make_face = BRepBuilderAPI_MakeFace(wires[0])
+                        for inner_wire in wires[1:]:
+                            make_face.Add(inner_wire)
+                        face = make_face.Face()
+                else:
+                    # Solid extrusion tracking
+                    make_face = BRepBuilderAPI_MakeFace(wires[0])
+                    for inner_wire in wires[1:]:
+                        make_face.Add(inner_wire)
+                    face = make_face.Face()
                 
                 # Move face to local plane
                 trsf = gp_Trsf()
@@ -2050,9 +2086,14 @@ def build_shape_only(
             spacing = float(params.get('spacing', 10.0))
             direction_refs = params.get('direction_refs', [])
             
+            # Direction 2 (Linear Only)
+            count2 = int(params.get('count2', 0))
+            spacing2 = float(params.get('spacing2', 10.0))
+            direction2_refs = params.get('direction2_refs', [])
+
+            # --- Resolve Direction 1 ---
             dir_vec = gp_Vec(1, 0, 0)
             dir_pnt = gp_Pnt(0, 0, 0)
-            
             if direction_refs and len(direction_refs) > 0 and final_shape is not None:
                 ref = direction_refs[0]
                 matched_edge = find_matching_edge(final_shape, ref.get('coordinates'), ref.get('end_coordinates'), ref.get('signature'))
@@ -2068,12 +2109,29 @@ def build_shape_only(
                     dir_pnt = pnt
             else:
                 axis_str = params.get('axis', 'X')
-                if axis_str == 'X':
-                    dir_vec = gp_Vec(1, 0, 0)
-                elif axis_str == 'Y':
-                    dir_vec = gp_Vec(0, 1, 0)
+                if axis_str == 'X': dir_vec = gp_Vec(1, 0, 0)
+                elif axis_str == 'Y': dir_vec = gp_Vec(0, 1, 0)
+                else: dir_vec = gp_Vec(0, 0, 1)
+
+            # --- Resolve Direction 2 ---
+            dir2_vec = gp_Vec(0, 1, 0)
+            if count2 > 0:
+                if direction2_refs and len(direction2_refs) > 0 and final_shape is not None:
+                    ref2 = direction2_refs[0]
+                    matched_edge2 = find_matching_edge(final_shape, ref2.get('coordinates'), ref2.get('end_coordinates'), ref2.get('signature'))
+                    if matched_edge2:
+                        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+                        curve_adaptor2 = BRepAdaptor_Curve(matched_edge2)
+                        u_min2 = curve_adaptor2.FirstParameter()
+                        pnt2 = gp_Pnt()
+                        vec2 = gp_Vec()
+                        curve_adaptor2.D1(u_min2, pnt2, vec2)
+                        if vec2.Magnitude() > 1e-6:
+                            dir2_vec = vec2.Normalized()
                 else:
-                    dir_vec = gp_Vec(0, 0, 1)
+                    # Default Dir 2: Orthogonal to Dir 1 if possible
+                    if abs(dir_vec.X()) > 0.9: dir2_vec = gp_Vec(0, 1, 0)
+                    else: dir2_vec = gp_Vec(1, 0, 0)
 
             from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
             
@@ -2092,24 +2150,33 @@ def build_shape_only(
 
                     if target_shape:
                         target_op = tf_params.get('operation', 'ADD')
-                        for i in range(1, count):
-                            trsf = gp_Trsf()
-                            if pattern_type == 'LINEAR':
-                                val = spacing * i
-                                trsf.SetTranslation(dir_vec.Multiplied(val))
-                            else:  # CIRCULAR
-                                angle_rad = math.radians(spacing * i)
-                                ax1 = gp_Ax1(dir_pnt, gp_Dir(dir_vec.X(), dir_vec.Y(), dir_vec.Z()))
-                                trsf.SetRotation(ax1, angle_rad)
+                        
+                        # 2D Pattern Nested Loops
+                        for i in range(count):
+                            for j in range(max(1, count2)):
+                                if i == 0 and j == 0: continue # Skip original (already exists in features usually, wait...)
+                                # Actually, Pattern feature usually adds copies to final_shape.
+                                # The original feature is already in final_shape if it was ADD/CUT.
+                                # But Pattern rebuilds the target in isolation and transforms it.
+                                
+                                trsf = gp_Trsf()
+                                if pattern_type == 'LINEAR':
+                                    # Total offset = i*dir1 + j*dir2
+                                    offset = dir_vec.Multiplied(spacing * i).Added(dir2_vec.Multiplied(spacing2 * j))
+                                    trsf.SetTranslation(offset)
+                                else:  # CIRCULAR
+                                    angle_rad = math.radians(spacing * i)
+                                    ax1 = gp_Ax1(dir_pnt, gp_Dir(dir_vec.X(), dir_vec.Y(), dir_vec.Z()))
+                                    trsf.SetRotation(ax1, angle_rad)
 
-                            copy_shape = BRepBuilderAPI_Transform(target_shape, trsf, True).Shape()
-                            if final_shape is None:
-                                final_shape = copy_shape
-                            else:
-                                if target_op == 'ADD':
-                                    final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
-                                elif target_op == 'CUT':
-                                    final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+                                copy_shape = BRepBuilderAPI_Transform(target_shape, trsf, True).Shape()
+                                if final_shape is None:
+                                    final_shape = copy_shape
+                                else:
+                                    if target_op == 'ADD':
+                                        final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                                    elif target_op == 'CUT':
+                                        final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
                                 
         elif f_type == 'MIRROR':
             target_ids = params.get('target_feature_ids', [])

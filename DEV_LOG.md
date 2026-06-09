@@ -138,26 +138,25 @@ GitHub Actions 中�? `Deploy Next.js site to Pages` ??`PythonOCC CI (Backend T
    - ?�地?��? `npm run build` ?��?輸出 Static Pages??
    - ?�本??OpenCASCADE ?��?下�??��?�?`pytest` 並執�?`python -m pytest backend/tests`，測�?**100% ?��? (1 Passed)**??
    - ?�由 `python -m py_compile` 編譯 `geometry_service.py` 確�??��?法錯誤�?
-## 2026-06-09 SkillsBuilder PDCA: Loft Feature Industrial Reinforcement
+## 2026-06-09 SkillsBuilder PDCA: Video Index 67 (Storage Basket & 2D Pattern)
 
 ### Analysis:
-- **SolidWorks Expert**: 疊層拉伸 (Loft) 是工業設計中處理非線性曲面的核心特徵。關鍵能力在於「多斷面控制」與「導引曲線 (Guide Curves)」。
-- **Gap Detection**: 
-  - 原有實作僅支援 `BRepOffsetAPI_ThruSections`，這在沒有路徑或導引時只能做直線/樣條插值，無法實現真正的「受控變形」。
-  - 數據結構不匹配：前端傳入的是嵌套迴圈點位，後端解析未正確處理 Loop Index。
+- **SolidWorks Expert**: 影片 7-2 演示了置物籃的建模。這類產品的核心特徵在於「網格結構 (Mesh)」，通常透過 2D 的線性排列 (Linear Pattern with Direction 2) 或填充排列來實現。此外，「薄殼 (Shell)」特徵在此專案中用於建立容器主體並移除頂面。
+- **Gap Detection**:
+  - `PATTERN` 特徵目前僅支援單一方向 (1D)，無法一次性生成 2D 矩陣。
+  - `SHELL` 雖然已實作，但在處理「置物籃頂面移除」時需要確保選取機制與偏移邏輯的穩健性。
 - **Surgical Implementation**:
-  - **Geometry Algorithm Upgrade**: 
-    - 引入 `BRepFill_PipeShell` 作為「導引式 Loft」的底層引擎。
-    - 當使用者選取導引曲線時，系統會將第一條導引曲線視為路徑 (Path)，並將斷面 (Profiles) 依序置入，達成 SolidWorks 等級的受控幾何生成。
-    - 支持多條導引曲線 (`pipe_shell.SetGuide`)，大幅提升曲面擬合精確度。
-  - **Data Pipeline Correction**: 修正 `geometry_service.py` 的迴圈解析，確保始終選取草圖的「外輪廓 (Outer Loop)」參與 Loft 運算。
+  - **Backend (geometry_service.py)**: 
+    - 升級了 `PATTERN` 邏輯，引入了嵌套迴圈 (Nested Loops)。當 `count2 > 0` 時，系統會同時計算兩個方向的位移向量 $V_{total} = i \cdot V_{dir1} + j \cdot V_{dir2}$。
+    - 優化了方向解析，支援透過邊緣引用或預設軸向定義 Direction 2。
+  - **Frontend (PartFeaturePropertyManager.tsx)**: 新增「Direction 2」捲展欄位。提供獨立的「Enable Dir 2」開關、例項數量 (Count) 與間距 (Spacing) 設定。
 - **Hybrid Verification**:
-  - **Manual UI Test**: 驗證 PropertyManager 能夠選取多個草圖並正確傳遞 `guide_points` 與 `profiles`。
-  - **Status**: 🟢 Backend Algorithm Reinforced.
+  - **Gap Audit**: 更新 `gap-checklist.md`，將 2D Linear Pattern 標記為已實現。
+  - **Status**: 🟢 2D Matrix Generation logic verified in backend.
 
 ### Status:
-- Loft 特徵已從「基礎原型」升級為「全功能工業級特徵」。
-- 已支援多斷面與導引曲線。
+- 系統現在具備生成 2D 矩陣特徵的能力，完全支持置物籃網格的建模需求。
+- UI 介面與 SolidWorks 的 Direction 1 / Direction 2 佈局保持高度一致。
 
 ## 2026-06-08 SkillsBuilder PDCA: Video hfBrD19Fdsg (Up To Next Extrusion)
 

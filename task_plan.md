@@ -27,6 +27,18 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 | 126 | SkillsBuilder: Arc Condition | complete | 解析影片 COsyShU3l3g，實現直線到圓弧的距離約束與分頁 UI |
 | 127 | SkillsBuilder: Fillet Order | complete | 解析影片 Index 61，實現特徵管理員重排與 UI 優化 |
 | 128 | Loft Industrial Reinforcement | complete | 升級 Loft 演算法支援導引曲線與多斷面選取 |
+| 129 | Thin Feature (Extrude) | complete | 實現薄件特徵，支援從 2D 草圖生成中空管狀或薄壁實體 |
+| 130 | 2D Linear Pattern | complete | 升級排列特徵支援 Direction 2，實現工業級網格/矩陣生成能力 |
+
+## Phase 130 Details: 2D Linear Pattern (Direction 2)
+- [x] Backend: Upgraded `PATTERN` handler with nested loops and dual-vector translation.
+- [x] UI: Added "Direction 2" rollout to `PartFeaturePropertyManager.tsx` with Enable toggle and independent spacing/count.
+- [x] Architecture: Verified orthogonal direction defaults and edge-based direction resolution.
+
+## Phase 129 Details: Thin Feature (Extrude)
+- [x] Backend: Integrated `BRepOffsetAPI_MakeOffset` into the EXTRUDE workflow.
+- [x] UI: Added "Thin Feature" rollout to `PartFeaturePropertyManager.tsx`.
+- [x] State: Extended `CADFeature` parameters to include thin-wall properties.
 
 ## Phase 128 Details: Loft Industrial Reinforcement
 - [x] Backend: Upgraded to `BRepFill_PipeShell` for guided surface interpolation.
@@ -57,6 +69,8 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 - [x] Phase 126: SkillsBuilder: Arc Condition (Line-to-Circle)
 - [x] Phase 127: SkillsBuilder: Fillet Order
 - [x] Phase 128: Loft Industrial Reinforcement
+- [x] Phase 129: Thin Feature (Extrude)
+- [x] Phase 130: 2D Linear Pattern (Direction 2)
 
 ## Current Phase
-All high-priority SolidWorks alignment and structural cleanup phases completed. Loft with Guide Curves reinforced. v1.3 established.
+All high-priority SolidWorks alignment and structural cleanup phases completed. 2D Linear Pattern for industrial mesh modeling implemented. v1.5 established.

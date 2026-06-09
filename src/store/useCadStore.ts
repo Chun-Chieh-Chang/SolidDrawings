@@ -36,12 +36,21 @@ export interface CADFeature {
   id: string;
   type: string;
   name: string;
-  parameters: { 
-    [key: string]: any; 
-    draftAngle?: number; 
+  parameters: {
+    [key: string]: any;
+    draftAngle?: number;
     draftOutward?: boolean;
     isSurfaceOnly?: boolean;
+    isThin?: boolean;
+    thinThickness?: number;
+    thinDirection?: 'ONE_DIRECTION' | 'MID_PLANE' | 'TWO_DIRECTIONS';
+    
+    // Pattern Direction 2
+    count2?: number;
+    spacing2?: number;
+    direction2_refs?: any[];
   };
+
   isSuppressed?: boolean;
   isBroken?: boolean;
   color?: string;

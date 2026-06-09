@@ -216,6 +216,39 @@ export function PartFeaturePropertyManager({
                   </div>
                 </Rollout>
 
+                {(selectedFeature.parameters.pattern_type || 'LINEAR') === 'LINEAR' && (
+                  <Rollout title="Direction 2" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>}>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Enable Dir 2</label>
+                        <button 
+                          onClick={() => onParamChange('count2', selectedFeature.parameters.count2 ? 0 : 2)}
+                          className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.count2 && selectedFeature.parameters.count2 > 0 ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-slate-400 border-slate-200'}`}
+                        >
+                          {selectedFeature.parameters.count2 && selectedFeature.parameters.count2 > 0 ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+
+                      {selectedFeature.parameters.count2 !== undefined && selectedFeature.parameters.count2 > 0 && (
+                        <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
+                          <SelectionBox 
+                            label="Direction 2"
+                            items={(selectedFeature.parameters.direction2_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: `Edge ${idx + 1}` }))}
+                            onRemove={(id) => onParamChange('direction2_refs', (selectedFeature.parameters.direction2_refs || []).filter((r: any) => r.id !== id))}
+                            onClear={() => onParamChange('direction2_refs', [])}
+                            placeholder="Select edge for Dir 2"
+                            maxHeight="60px"
+                          />
+                          <div className="grid grid-cols-2 gap-2">
+                            <ParamInput label="Spacing 2" value={selectedFeature.parameters.spacing2 || 10} onChange={(v) => onParamChange('spacing2', v)} />
+                            <ParamInput label="Instances 2" value={selectedFeature.parameters.count2} onChange={(v) => onParamChange('count2', v)} unit="pcs" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </Rollout>
+                )}
+
                 <Rollout title="Pattern Type" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>}>
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Method</label>
@@ -325,6 +358,51 @@ export function PartFeaturePropertyManager({
                       </div>
                     )}
                   </div>
+                </Rollout>
+
+                <Rollout title="Thin Feature" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>}>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase">Thin Feature On/Off</label>
+                       <button
+                         onClick={() => onParamChange('isThin', !selectedFeature.parameters.isThin)}
+                         className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.isThin ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200'}`}
+                       >
+                         {selectedFeature.parameters.isThin ? 'ON' : 'OFF'}
+                       </button>
+                     </div>
+
+                     {selectedFeature.parameters.isThin && (
+                       <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                         <div className="space-y-1">
+                           <label className="text-[10px] font-bold text-slate-500 uppercase">Type</label>
+                           <select
+                             value={selectedFeature.parameters.thinDirection || 'ONE_DIRECTION'}
+                             onChange={(e) => onParamChange('thinDirection', e.target.value)}
+                             className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                           >
+                             <option value="ONE_DIRECTION">One-Direction</option>
+                             <option value="MID_PLANE">Mid-Plane</option>
+                             <option value="TWO_DIRECTIONS">Two-Directions</option>
+                           </select>
+                         </div>
+                         <ParamInput 
+                           label="Thickness" 
+                           value={selectedFeature.parameters.thinThickness || 1.0} 
+                           onChange={(v) => onParamChange('thinThickness', v)} 
+                           badge="T1" 
+                         />
+                         {selectedFeature.parameters.thinDirection === 'TWO_DIRECTIONS' && (
+                           <ParamInput 
+                             label="Thickness 2" 
+                             value={selectedFeature.parameters.thinThickness2 || 1.0} 
+                             onChange={(v) => onParamChange('thinThickness2', v)} 
+                             badge="T2" 
+                           />
+                         )}
+                       </div>
+                     )}
+                   </div>
                 </Rollout>
               </>
             )}
