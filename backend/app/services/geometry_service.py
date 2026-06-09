@@ -2090,6 +2090,10 @@ def build_shape_only(
             count2 = int(params.get('count2', 0))
             spacing2 = float(params.get('spacing2', 10.0))
             direction2_refs = params.get('direction2_refs', [])
+            
+            flip1 = params.get('flip1', False)
+            flip2 = params.get('flip2', False)
+            pattern_seed_only = params.get('patternSeedOnly', False)
 
             # Circular specific
             equal_spacing = params.get('equalSpacing', False)
@@ -2140,6 +2144,9 @@ def build_shape_only(
                 elif axis_str == 'Y': dir_vec = gp_Vec(0, 1, 0)
                 else: dir_vec = gp_Vec(0, 0, 1)
 
+            if flip1:
+                dir_vec.Reverse()
+
             # --- Resolve Direction 2 ---
             dir2_vec = gp_Vec(0, 1, 0)
             if count2 > 0:
@@ -2158,6 +2165,9 @@ def build_shape_only(
                 else:
                     if abs(dir_vec.X()) > 0.9: dir2_vec = gp_Vec(0, 1, 0)
                     else: dir2_vec = gp_Vec(1, 0, 0)
+            
+            if flip2:
+                dir2_vec.Reverse()
 
             from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
             
@@ -2186,6 +2196,10 @@ def build_shape_only(
                                 instance_idx = i + j * count
                                 if instance_idx in instances_to_skip: continue
                                 
+                                # Pattern Seed Only logic
+                                if pattern_seed_only and i > 0 and j > 0:
+                                    continue
+
                                 trsf = gp_Trsf()
                                 if pattern_type == 'LINEAR':
                                     offset = dir_vec.Multiplied(spacing * i).Added(dir2_vec.Multiplied(spacing2 * j))

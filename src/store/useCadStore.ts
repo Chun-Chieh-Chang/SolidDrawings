@@ -49,6 +49,9 @@ export interface CADFeature {
     count2?: number;
     spacing2?: number;
     direction2_refs?: any[];
+    flip1?: boolean;
+    flip2?: boolean;
+    patternSeedOnly?: boolean;
 
     // Circular Pattern specific
     equalSpacing?: boolean;

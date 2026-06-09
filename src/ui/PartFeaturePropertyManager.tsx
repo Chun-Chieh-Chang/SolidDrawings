@@ -220,14 +220,25 @@ export function PartFeaturePropertyManager({
 
                 <Rollout title="Direction 1" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>}>
                   <div className="space-y-3">
-                    <SelectionBox 
-                      label={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "Rotation Axis" : "Pattern Direction"}
-                      items={(selectedFeature.parameters.direction_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: ref.type === 'FACE' ? `Face ${ref.id.slice(0,4)}` : `Edge ${idx + 1}` }))}
-                      onRemove={() => onParamChange('direction_refs', [])}
-                      onClear={() => onParamChange('direction_refs', [])}
-                      placeholder={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "Select circular edge or face" : "Select edge for direction"}
-                      maxHeight="60px"
-                    />
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1">
+                        <SelectionBox 
+                          label={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "Rotation Axis" : "Pattern Direction"}
+                          items={(selectedFeature.parameters.direction_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: ref.type === 'FACE' ? `Face ${ref.id.slice(0,4)}` : `Edge ${idx + 1}` }))}
+                          onRemove={() => onParamChange('direction_refs', [])}
+                          onClear={() => onParamChange('direction_refs', [])}
+                          placeholder={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "Select circular edge or face" : "Select edge for direction"}
+                          maxHeight="60px"
+                        />
+                      </div>
+                      <button 
+                        onClick={() => onParamChange('flip1', !selectedFeature.parameters.flip1)}
+                        className={`mt-4 p-1.5 border rounded transition-all ${selectedFeature.parameters.flip1 ? 'bg-[#005B9A] border-[#004A7C] text-white shadow-inner' : 'bg-white border-slate-300 text-slate-400 hover:text-slate-600'}`}
+                        title="Reverse Direction"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m7 11-5 5 5 5v-4h10v4l5-5-5-5v4H7Z"/></svg>
+                      </button>
+                    </div>
 
                     {selectedFeature.parameters.pattern_type === 'CIRCULAR' && (
                       <div className="flex items-center justify-between">
@@ -250,38 +261,6 @@ export function PartFeaturePropertyManager({
                       />
                       <ParamInput label="Instances" value={selectedFeature.parameters.count} onChange={(v) => onParamChange('count', v)} unit="pcs" />
                     </div>
-
-                    {selectedFeature.parameters.pattern_type === 'CIRCULAR' && (
-                      <div className="space-y-1 pt-1 border-t border-slate-100">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase">Instances to Skip</label>
-                        <div className="flex flex-wrap gap-1 min-h-[24px]">
-                          {(selectedFeature.parameters.instancesToSkip || []).map((idx: number) => (
-                            <button 
-                              key={idx}
-                              onClick={() => onParamChange('instancesToSkip', selectedFeature.parameters.instancesToSkip.filter((i: number) => i !== idx))}
-                              className="bg-slate-200 hover:bg-red-100 hover:text-red-700 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-black transition-colors"
-                            >
-                              #{idx} ×
-                            </button>
-                          ))}
-                          <button 
-                            onClick={() => {
-                              const input = prompt('Enter instance index to skip (starting from 0):');
-                              if (input !== null) {
-                                const idx = parseInt(input);
-                                if (!isNaN(idx)) {
-                                  const current = selectedFeature.parameters.instancesToSkip || [];
-                                  if (!current.includes(idx)) onParamChange('instancesToSkip', [...current, idx].sort((a,b) => a-b));
-                                }
-                              }
-                            }}
-                            className="bg-white border border-dashed border-slate-300 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold hover:border-slate-400 hover:text-slate-600"
-                          >
-                            + Skip
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </Rollout>
 
@@ -300,23 +279,77 @@ export function PartFeaturePropertyManager({
 
                       {selectedFeature.parameters.count2 !== undefined && selectedFeature.parameters.count2 > 0 && (
                         <div className="space-y-3 animate-in fade-in slide-in-from-top-1">
-                          <SelectionBox 
-                            label="Direction 2"
-                            items={(selectedFeature.parameters.direction2_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: `Edge ${idx + 1}` }))}
-                            onRemove={(id) => onParamChange('direction2_refs', (selectedFeature.parameters.direction2_refs || []).filter((r: any) => r.id !== id))}
-                            onClear={() => onParamChange('direction2_refs', [])}
-                            placeholder="Select edge for Dir 2"
-                            maxHeight="60px"
-                          />
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1">
+                              <SelectionBox 
+                                label="Direction 2"
+                                items={(selectedFeature.parameters.direction2_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: `Edge ${idx + 1}` }))}
+                                onRemove={(id) => onParamChange('direction2_refs', (selectedFeature.parameters.direction2_refs || []).filter((r: any) => r.id !== id))}
+                                onClear={() => onParamChange('direction2_refs', [])}
+                                placeholder="Select edge for Dir 2"
+                                maxHeight="60px"
+                              />
+                            </div>
+                            <button 
+                              onClick={() => onParamChange('flip2', !selectedFeature.parameters.flip2)}
+                              className={`mt-4 p-1.5 border rounded transition-all ${selectedFeature.parameters.flip2 ? 'bg-[#005B9A] border-[#004A7C] text-white shadow-inner' : 'bg-white border-slate-300 text-slate-400 hover:text-slate-600'}`}
+                              title="Reverse Direction 2"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m7 11-5 5 5 5v-4h10v4l5-5-5-5v4H7Z"/></svg>
+                            </button>
+                          </div>
+
                           <div className="grid grid-cols-2 gap-2">
                             <ParamInput label="Spacing 2" value={selectedFeature.parameters.spacing2 || 10} onChange={(v) => onParamChange('spacing2', v)} />
                             <ParamInput label="Instances 2" value={selectedFeature.parameters.count2} onChange={(v) => onParamChange('count2', v)} unit="pcs" />
+                          </div>
+
+                          <div className="flex items-center justify-between pt-1">
+                            <label className="text-[10px] font-bold text-slate-500 uppercase">Pattern Seed Only</label>
+                            <button 
+                              onClick={() => onParamChange('patternSeedOnly', !selectedFeature.parameters.patternSeedOnly)}
+                              className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.patternSeedOnly ? 'bg-amber-600 text-white border-amber-700' : 'bg-white text-slate-400 border-slate-200'}`}
+                            >
+                              {selectedFeature.parameters.patternSeedOnly ? 'ON' : 'OFF'}
+                            </button>
                           </div>
                         </div>
                       )}
                     </div>
                   </Rollout>
                 )}
+
+                <Rollout title="Instances to Skip" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6M9 9l6 6"/></svg>}>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Excluded Copies</label>
+                    <div className="flex flex-wrap gap-1 min-h-[24px]">
+                      {(selectedFeature.parameters.instancesToSkip || []).map((idx: number) => (
+                        <button 
+                          key={idx}
+                          onClick={() => onParamChange('instancesToSkip', (selectedFeature.parameters.instancesToSkip || []).filter((i: number) => i !== idx))}
+                          className="bg-slate-200 hover:bg-red-100 hover:text-red-700 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-black transition-colors"
+                        >
+                          #{idx} ×
+                        </button>
+                      ))}
+                      <button 
+                        onClick={() => {
+                          const input = prompt('Enter instance index to skip (starting from 0):');
+                          if (input !== null) {
+                            const idx = parseInt(input);
+                            if (!isNaN(idx)) {
+                              const current = selectedFeature.parameters.instancesToSkip || [];
+                              if (!current.includes(idx)) onParamChange('instancesToSkip', [...current, idx].sort((a,b) => a-b));
+                            }
+                          }
+                        }}
+                        className="bg-white border border-dashed border-slate-300 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold hover:border-slate-400 hover:text-slate-600"
+                      >
+                        + Skip
+                      </button>
+                    </div>
+                  </div>
+                </Rollout>
 
                 <Rollout title="Pattern Type" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>}>
                   <div className="space-y-1">
