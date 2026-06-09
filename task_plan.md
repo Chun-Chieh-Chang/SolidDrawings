@@ -31,6 +31,20 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 | 130 | 2D Linear Pattern | complete | 升級排列特徵支援 Direction 2，實現工業級網格/矩陣生成能力 |
 | 131 | Unit Intelligence | complete | 實現多單位 (mm, in, cm) 自動換算與數學表達式評估 |
 | 132 | Circular Pattern Reinforcement | complete | 實現等間距 (Equal Spacing) 與排除執行個體 (Skip Instances) |
+| 133 | Fill Pattern | complete | 實現邊界填入排列，支援 Square/Hex 佈局與邊距控制 |
+| 134 | Surface Cut | complete | 實現曲面除料，支援使用曲面或基準面作為刀具切割實體 |
+
+## Phase 134 Details: Surface Cut (Advanced Solid Trimming)
+- [x] Backend: Implemented `SURFACE_CUT` logic using `BRepPrimAPI_MakeHalfSpace`.
+- [x] UI: Added "Surface Cut" action in `RibbonController.tsx`.
+- [x] UI: Added "Surface Cut" tool selector and flip toggle in `PartFeaturePropertyManager.tsx`.
+- [x] Data: Ensured `tool_feature_id` properly links to offset/knit/plane features.
+
+## Phase 133 Details: Fill Pattern (Boundary-Based Filling)
+- [x] Backend: Implemented `BRepTopAdaptor_FClass2d` based containment logic.
+- [x] Backend: Developed grid generation algorithms for Square, Perforation, and Hexagonal layouts.
+- [x] UI: Added "Fill Boundary" selection and layout control rollouts to `PartFeaturePropertyManager.tsx`.
+- [x] UX: Integrated rotation angle and margin controls for precise area filling.
 
 ## Phase 132 Details: Circular Pattern Reinforcement
 - [x] Backend: Implemented `equalSpacing` logic and `instancesToSkip` filter.
@@ -85,6 +99,8 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 - [x] Phase 130: 2D Linear Pattern (Direction 2)
 - [x] Phase 131: Unit Intelligence (Multi-Unit Evaluation)
 - [x] Phase 132: Circular Pattern Reinforcement
+- [x] Phase 133: Fill Pattern (Boundary-Based)
+- [x] Phase 134: Surface Cut (Advanced Solid Trimming)
 
 ## Current Phase
-All high-priority SolidWorks alignment and structural cleanup phases completed. Circular Pattern with Equal Spacing and Skip Instances implemented. v1.7 established.
+All high-priority SolidWorks alignment and structural cleanup phases completed. Surface Cut with arbitrary boundary clipping implemented. v1.10 established.

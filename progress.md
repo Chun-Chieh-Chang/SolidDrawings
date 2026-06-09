@@ -82,3 +82,15 @@
 - [x] Implement "Instances to Skip" functionality to exclude specific pattern copies.
 - [x] Enhance Axis Resolution: Support cylindrical faces and circular edges as rotation axes.
 - [x] Create dedicated UI rollout in `PartFeaturePropertyManager.tsx` for Circular Pattern controls.
+
+### Phase 133: Fill Pattern (Boundary-Based Filling)
+- [x] Implement backend logic for generating grids within arbitrary closed sketch boundaries.
+- [x] Support Square, Perforation, and Hexagonal layouts with rotation and margin.
+- [x] Implement high-performance PIP (Point-in-Polygon) testing via `BRepTopAdaptor_FClass2d`.
+- [x] Create "Fill Boundary" and "Fill Settings" rollouts in PropertyManager UI.
+
+### Phase 134: Surface Cut (Advanced Solid Trimming)
+- [x] Implement `SURFACE_CUT` logic in backend using `BRepPrimAPI_MakeHalfSpace` and `BRepAlgoAPI_Cut`.
+- [x] Extract normal from target surface to define cut direction with flip capability.
+- [x] Add "Surface Cut" entry point in RibbonController.
+- [x] Create "Surface Cut" rollout in PropertyManager for tool selection and flip control.

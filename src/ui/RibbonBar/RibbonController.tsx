@@ -546,7 +546,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Offset<br/>Surface</span>
             </button>
-            <button onClick={() => { 
+            <button onClick={() => {
                 const featId = `feat_${uuidv4()}`;
                 addFeature({
                   id: featId,
@@ -561,6 +561,23 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Knit<br/>Surface</span>
             </button>
+            <button onClick={() => {
+                const featId = `feat_${uuidv4()}`;
+                addFeature({
+                  id: featId,
+                  type: 'SURFACE_CUT',
+                  name: `Surf-Cut ${features.filter(f => f.type === 'SURFACE_CUT').length + 1}`,
+                  parameters: { tool_feature_id: '', flip: false }
+                });
+                setPendingFeatureCommand('SURFACE_CUT');
+                setHint('Select a surface to cut the solid body.');
+             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Surface Cut">
+              <div className="w-10 h-10 flex items-center justify-center text-amber-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Surface<br/>Cut</span>
+            </button>
+
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button onClick={() => { pushToast('Boundary Surface requires multi-directional curves.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Boundary Surface">
               <div className="w-10 h-10 flex items-center justify-center text-orange-400 transition-transform group-hover:scale-110">

@@ -56,6 +56,15 @@ export interface CADFeature {
     // Circular Pattern specific
     equalSpacing?: boolean;
     instancesToSkip?: number[];
+
+    // Fill Pattern specific
+    boundary_id?: string;
+    fill_layout?: 'SQUARE' | 'PERFORATION' | 'HEXAGON';
+    margin?: number;
+    fill_angle?: number;
+
+    // Surface Cut specific
+    tool_feature_id?: string;
   };
 
   isSuppressed?: boolean;
@@ -351,8 +360,8 @@ export interface CadState {
   pushToast: (message: string, type?: CadToastType) => void;
   dismissToast: (id: string) => void;
 
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   

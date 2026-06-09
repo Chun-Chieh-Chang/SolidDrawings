@@ -184,6 +184,39 @@ export function PartFeaturePropertyManager({
               </Rollout>
             )}
 
+            {selectedFeature.type === 'SURFACE_CUT' && (
+              <Rollout title="Surface Cut" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>}>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Cutting Tool</label>
+                    <select
+                      value={selectedFeature.parameters.tool_feature_id || ''}
+                      onChange={(e) => onParamChange('tool_feature_id', e.target.value)}
+                      className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                    >
+                      <option value="">— Select Surface Feature —</option>
+                      {features.filter(f => f.type === 'SURFACE_OFFSET' || f.type === 'SURFACE_KNIT' || f.type === 'REFERENCE_PLANE').map(f => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Flip Direction</label>
+                    <button 
+                      onClick={() => onParamChange('flip', !selectedFeature.parameters.flip)}
+                      className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.flip ? 'bg-amber-600 text-white border-amber-700' : 'bg-white text-slate-400 border-slate-200'}`}
+                    >
+                      {selectedFeature.parameters.flip ? 'REVERSE' : 'NORMAL'}
+                    </button>
+                  </div>
+                  <div className="p-2 bg-amber-50 border border-amber-100 rounded text-[10px] text-amber-700 font-bold">
+                    Removes material from the side indicated by the surface normal.
+                  </div>
+                </div>
+              </Rollout>
+            )}
+
             {selectedFeature.type === 'PATTERN' && (
               <>
                 <Rollout title="Features to Pattern" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>}>
@@ -361,9 +394,50 @@ export function PartFeaturePropertyManager({
                     >
                       <option value="LINEAR">Linear Pattern</option>
                       <option value="CIRCULAR">Circular Pattern</option>
+                      <option value="FILL">Fill Pattern</option>
                     </select>
                   </div>
                 </Rollout>
+
+                {selectedFeature.parameters.pattern_type === 'FILL' && (
+                  <>
+                    <Rollout title="Fill Boundary" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}>
+                      <div className="space-y-2">
+                        <select
+                          value={selectedFeature.parameters.boundary_id || ''}
+                          onChange={(e) => onParamChange('boundary_id', e.target.value)}
+                          className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                        >
+                          <option value="">— Select Boundary Sketch —</option>
+                          {features.filter(f => f.type === 'SKETCH').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </select>
+                        <div className="p-2 bg-emerald-50 border border-emerald-100 rounded text-[10px] text-emerald-700 font-bold">
+                          The pattern will be contained within the selected closed sketch.
+                        </div>
+                      </div>
+                    </Rollout>
+
+                    <Rollout title="Fill Settings" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6v6H9z"/></svg>}>
+                      <div className="space-y-3">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Layout</label>
+                          <select
+                            value={selectedFeature.parameters.fill_layout || 'SQUARE'}
+                            onChange={(e) => onParamChange('fill_layout', e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                          >
+                            <option value="SQUARE">Square / Grid</option>
+                            <option value="PERFORATION">Perforation</option>
+                            <option value="HEXAGON">Hexagonal / Honeycomb</option>
+                          </select>
+                        </div>
+                        <ParamInput label="Instance Spacing" value={selectedFeature.parameters.spacing} onChange={(v) => onParamChange('spacing', v)} badge="SP" />
+                        <ParamInput label="Margin" value={selectedFeature.parameters.margin || 2.0} onChange={(v) => onParamChange('margin', v)} badge="MG" />
+                        <ParamInput label="Rotation" value={selectedFeature.parameters.fill_angle || 0} onChange={(v) => onParamChange('fill_angle', v)} unit="deg" badge="ROT" />
+                      </div>
+                    </Rollout>
+                  </>
+                )}
               </>
             )}
 

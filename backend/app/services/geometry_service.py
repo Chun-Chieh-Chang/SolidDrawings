@@ -6,7 +6,7 @@ from collections import OrderedDict
 try:
     from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
     from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln
-    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
+    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
     from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
     from OCC.Core.TopExp import TopExp_Explorer, topexp
     from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED
@@ -1728,6 +1728,47 @@ def process_features(features, deflection=0.01):
                 print(f"[ERROR] SURFACE_KNIT failed: {knit_err}")
             continue
 
+        elif f_type == 'SURFACE_CUT':
+            if final_shape is not None:
+                tool_id = params.get('tool_feature_id')
+                flip = params.get('flip', False)
+                
+                # Try both features and all_features contexts
+                feat_list = locals().get('features', []) or locals().get('all_features', [])
+                tool_feat = next((f for f in feat_list if (f.id if hasattr(f, 'id') else f.get('id')) == tool_id), None)
+                if tool_feat:
+                    tf_type = tool_feat.type if hasattr(tool_feat, 'type') else tool_feat.get('type')
+                    tf_params = tool_feat.parameters if hasattr(tool_feat, 'parameters') else tool_feat.get('parameters', {})
+                    tool_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, feat_list)
+                    
+                    if tool_shape and not tool_shape.IsNull():
+                        try:
+                            exp = TopExp_Explorer(tool_shape, TopAbs_FACE)
+                            if exp.More():
+                                face = topods.Face(exp.Current())
+                                adaptor = BRepAdaptor_Surface(face)
+                                u_mid = (adaptor.FirstUParameter() + adaptor.LastUParameter()) / 2.0
+                                v_mid = (adaptor.FirstVParameter() + adaptor.LastVParameter()) / 2.0
+                                props = BRepLProp_SLProps(adaptor, u_mid, v_mid, 1, 1e-6)
+                                
+                                if props.IsNormalDefined():
+                                    normal = props.Normal()
+                                    if flip: normal.Reverse()
+                                    p_ref = props.Value()
+                                    p_in = gp_Pnt(p_ref.X() + normal.X()*10.0, p_ref.Y() + normal.Y()*10.0, p_ref.Z() + normal.Z()*10.0)
+                                    hs_tool = BRepPrimAPI_MakeHalfSpace(face, p_in)
+                                    hs_solid = hs_tool.Solid()
+                                    
+                                    cut_tool = BRepAlgoAPI_Cut(final_shape, hs_solid)
+                                    cut_tool.Build()
+                                    if cut_tool.IsDone():
+                                        if 'linker' in globals():
+                                            linker.record_evolution(cut_tool, [final_shape])
+                                        final_shape = cut_tool.Shape()
+                        except Exception as sc_err:
+                            print(f"[ERROR] SURFACE_CUT logic failed: {sc_err}")
+            continue
+
         if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
@@ -2071,6 +2112,47 @@ def build_shape_only(
                 print(f"[ERROR] SURFACE_KNIT failed: {knit_err}")
             continue
 
+        elif f_type == 'SURFACE_CUT':
+            if final_shape is not None:
+                tool_id = params.get('tool_feature_id')
+                flip = params.get('flip', False)
+                
+                # Try both features and all_features contexts
+                feat_list = locals().get('features', []) or locals().get('all_features', [])
+                tool_feat = next((f for f in feat_list if (f.id if hasattr(f, 'id') else f.get('id')) == tool_id), None)
+                if tool_feat:
+                    tf_type = tool_feat.type if hasattr(tool_feat, 'type') else tool_feat.get('type')
+                    tf_params = tool_feat.parameters if hasattr(tool_feat, 'parameters') else tool_feat.get('parameters', {})
+                    tool_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, feat_list)
+                    
+                    if tool_shape and not tool_shape.IsNull():
+                        try:
+                            exp = TopExp_Explorer(tool_shape, TopAbs_FACE)
+                            if exp.More():
+                                face = topods.Face(exp.Current())
+                                adaptor = BRepAdaptor_Surface(face)
+                                u_mid = (adaptor.FirstUParameter() + adaptor.LastUParameter()) / 2.0
+                                v_mid = (adaptor.FirstVParameter() + adaptor.LastVParameter()) / 2.0
+                                props = BRepLProp_SLProps(adaptor, u_mid, v_mid, 1, 1e-6)
+                                
+                                if props.IsNormalDefined():
+                                    normal = props.Normal()
+                                    if flip: normal.Reverse()
+                                    p_ref = props.Value()
+                                    p_in = gp_Pnt(p_ref.X() + normal.X()*10.0, p_ref.Y() + normal.Y()*10.0, p_ref.Z() + normal.Z()*10.0)
+                                    hs_tool = BRepPrimAPI_MakeHalfSpace(face, p_in)
+                                    hs_solid = hs_tool.Solid()
+                                    
+                                    cut_tool = BRepAlgoAPI_Cut(final_shape, hs_solid)
+                                    cut_tool.Build()
+                                    if cut_tool.IsDone():
+                                        if 'linker' in globals():
+                                            linker.record_evolution(cut_tool, [final_shape])
+                                        final_shape = cut_tool.Shape()
+                        except Exception as sc_err:
+                            print(f"[ERROR] SURFACE_CUT logic failed: {sc_err}")
+            continue
+
         if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
@@ -2082,6 +2164,107 @@ def build_shape_only(
                 target_ids.append(single_target)
                 
             pattern_type = params.get('pattern_type', 'LINEAR')
+            
+            # --- Fill Pattern Logic ---
+            if pattern_type == 'FILL':
+                boundary_id = params.get('boundary_id')
+                fill_layout = params.get('fill_layout', 'SQUARE')
+                spacing = float(params.get('spacing', 10.0))
+                margin = float(params.get('margin', 2.0))
+                angle = math.radians(float(params.get('fill_angle', 0.0)))
+                
+                # 1. Find Boundary Shape
+                boundary_feat = next((f for f in features if (f.id if hasattr(f, 'id') else f.get('id')) == boundary_id), None)
+                if not boundary_feat: return None
+                
+                bf_type = boundary_feat.type if hasattr(boundary_feat, 'type') else boundary_feat.get('type')
+                bf_params = boundary_feat.parameters if hasattr(boundary_feat, 'parameters') else boundary_feat.get('parameters', {})
+                boundary_shape = build_feature_shape_in_isolation(bf_type, bf_params, None, features)
+                if not boundary_shape: return None
+                
+                # 2. Extract Planar Context
+                from OCC.Core.BRepTools import breptools
+                from OCC.Core.Bnd import Bnd_Box
+                from OCC.Core.BRepBndLib import brepbndlib
+                from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
+                from OCC.Core.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+                from OCC.Core.TopExp import TopExp_Explorer
+                from OCC.Core.TopAbs import TopAbs_FACE
+                from OCC.Core.gp import gp_Pnt2d, gp_Trsf2d
+                
+                bbox = Bnd_Box()
+                brepbndlib.Add(boundary_shape, bbox)
+                xmin, ymin, zmin, xmax, ymax, zmax = bbox.Get()
+                
+                # For Fill, we assume a dominant plane (usually XY local to sketch)
+                # We'll use a simpler BBox-based grid and PIP test on the first face found
+                face_explorer = TopExp_Explorer(boundary_shape, TopAbs_FACE)
+                if not face_explorer.More(): return None
+                target_face = topods.Face(face_explorer.Current())
+                classifier = BRepTopAdaptor_FClass2d(target_face, 1e-4)
+
+                # 3. Build Target Shapes
+                target_shapes = []
+                for tid in target_ids:
+                    tf = next((f for f in features if (f.id if hasattr(f, 'id') else f.get('id')) == tid), None)
+                    if tf:
+                        t_type = tf.type if hasattr(tf, 'type') else tf.get('type')
+                        t_params = tf.parameters if hasattr(tf, 'parameters') else tf.get('parameters', {})
+                        ts = build_feature_shape_in_isolation(t_type, t_params, None, features)
+                        if ts: target_shapes.append((ts, t_params.get('operation', 'ADD')))
+                
+                if not target_shapes: return None
+
+                # 4. Grid Generation & PIP Filtering
+                # Scan a wider grid to account for rotation
+                diag = math.sqrt((xmax-xmin)**2 + (ymax-ymin)**2)
+                cx, cy = (xmin+xmax)/2.0, (ymin+ymax)/2.0
+                
+                from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+                
+                grid_pts = []
+                steps_x = int(diag / spacing) + 4
+                steps_y = int(diag / spacing) + 4
+                
+                for i in range(-steps_x, steps_x):
+                    for j in range(-steps_y, steps_y):
+                        # Base local grid point
+                        lx = i * spacing
+                        ly = j * spacing
+                        
+                        if fill_layout == 'PERFORATION':
+                            if j % 2 != 0: lx += spacing / 2.0
+                        elif fill_layout == 'HEXAGON':
+                            ly = j * spacing * math.sqrt(3)/2.0
+                            if j % 2 != 0: lx += spacing / 2.0
+                            
+                        # Apply rotation around center
+                        rx = lx * math.cos(angle) - ly * math.sin(angle) + cx
+                        ry = lx * math.sin(angle) + ly * math.cos(angle) + cy
+                        
+                        # Check PIP (in UV space of the face - simplified to XY if planar)
+                        # BRepTopAdaptor_FClass2d expects UV. For planar sketch faces, XY maps to UV.
+                        state = classifier.Perform(gp_Pnt2d(rx, ry))
+                        from OCC.Core.TopAbs import TopAbs_IN, TopAbs_ON
+                        if state in [TopAbs_IN, TopAbs_ON]:
+                            # TODO: Implement margin by checking distance to boundary edges
+                            grid_pts.append((rx, ry))
+
+                # 5. Transform & Combine
+                for gx, gy in grid_pts:
+                    trsf = gp_Trsf()
+                    # Offset from seed location (assuming seed is at origin or first profile pt)
+                    trsf.SetTranslation(gp_Vec(gx, gy, (zmin+zmax)/2.0)) 
+                    
+                    for ts, op in target_shapes:
+                        copy_shape = BRepBuilderAPI_Transform(ts, trsf, True).Shape()
+                        if final_shape is None: final_shape = copy_shape
+                        else:
+                            if op == 'ADD': final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
+                            elif op == 'CUT': final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+                return final_shape
+
+            # --- Standard Patterns (Linear/Circular) ---
             count = int(params.get('count', 2))
             spacing = float(params.get('spacing', 10.0))
             direction_refs = params.get('direction_refs', [])

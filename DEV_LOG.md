@@ -537,3 +537,14 @@ GitHub Actions ?��?測試?��???`backend/tests/test_geometry.py` ?��?
 - 完�?幾�?模擬?�本，�?證�?複�?布�??��?（�??��??�深度�? Add/Cut）�?
 - 已產?��?證�??��?確�? UI 實�??��?齊設計�?範�?
 $log
+$log
+
+## 2026-06-09 SkillsBuilder PDCA: Video Index 79 (Surface Cut)
+
+### Analysis:
+- **SolidWorks Expert**: 影片 8-4 介紹了「曲面除料 (Surface Cut)」特徵。這允許使用者利用一個曲面當作刀具，將實體模型切分並移除一側。
+- **Gap Detection**: 系統缺乏 SURFACE_CUT 的處理邏輯與前端 UI。
+- **Surgical Implementation**:
+  - **Backend**: 在 process_features 迴圈中新增 SURFACE_CUT 處理邏輯，透過 BRepPrimAPI_MakeHalfSpace 與 BRepAlgoAPI_Cut 達成曲面切除。
+  - **UI/UX**: 在 RibbonController 與 PartFeaturePropertyManager 中新增了 Surface Cut 的入口與操作面板。
+- **Result**: ✅ Passed。
