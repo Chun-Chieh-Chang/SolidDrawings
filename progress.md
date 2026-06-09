@@ -47,3 +47,8 @@
 - [x] Create `DistanceUtils.ts` for specialized geometry projections.
 - [x] Implement "Leaders" tabbed UI in `SketchPropertyManager.tsx` for Arc Condition selection.
 - [x] Verify with 100% precision via `test_line_to_circle_distance.ts`.
+
+### Phase 127: Fillet Order & Feature Reordering
+- [x] Implement visual Drag Handles in `FeatureManagerPanel.tsx` for reordering.
+- [x] Optimize `ShortcutBox.tsx` with high-fidelity SVG icons for Fillet/Chamfer.
+- [x] Audit backend feature loop to ensure sequential B-Rep generation matches history order.

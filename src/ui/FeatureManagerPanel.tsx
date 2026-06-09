@@ -170,6 +170,10 @@ function SortableFeatureItem({
         title={feature.type === 'SKETCH' ? '雙擊進入草圖編輯' : '雙擊編輯特徵草圖'}
       >
         <div className="flex items-center gap-2 truncate">
+          {/* Drag Handle Visual */}
+          <div className="shrink-0 opacity-0 group-hover:opacity-40 transition-opacity cursor-grab">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="9" cy="5" r="1"/><circle cx="9" cy="12" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="19" r="1"/></svg>
+          </div>
           <div className={`shrink-0 transition-colors ${feature.isSuppressed ? 'text-slate-400' : isSelected ? 'text-white' : 'text-[#005B9A]'}`}>
             {FEATURE_ICONS[feature.type] || FEATURE_ICONS.EXTRUDE}
           </div>

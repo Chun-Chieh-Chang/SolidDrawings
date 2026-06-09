@@ -25,12 +25,12 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 | 124 | SkillsBuilder: Exercise 11 | complete | 解析影片 -LL3eSTyWe8，驗證圓柱特徵、同心約束與環狀陣列 |
 | 125 | SkillsBuilder: Plummer Block Base | complete | 解析影片 mOU5bb50pgs，驗證相切約束與多重輪廓擠出 |
 | 126 | SkillsBuilder: Arc Condition | complete | 解析影片 COsyShU3l3g，實現直線到圓弧的距離約束與分頁 UI |
+| 127 | SkillsBuilder: Fillet Order | complete | 解析影片 Index 61，實現特徵管理員重排與 UI 優化 |
 
-## Phase 126 Details: Smart Dimension Arc Condition (Line-to-Circle)
-- [x] Backend: Implement Line-to-Circle PBD projection logic in `ConstraintSolver.ts`.
-- [x] UI: Implement `Tabs` and `Tab` components for PropertyManager.
-- [x] UI: Refactor `SketchPropertyManager.tsx` to include "Leaders" tab and Arc Condition selection.
-- [x] Verification: Automated test `test_line_to_circle_distance.ts` passes with high precision.
+## Phase 127 Details: Fillet Order & Feature Reordering
+- [x] UI: Added visual Drag Handles to `FeatureManagerPanel.tsx`.
+- [x] UI: Optimized `ShortcutBox.tsx` with premium SVG icons for Fillet/Chamfer.
+- [x] Architecture: Verified that reordering triggers a full B-Rep rebuild in history order.
 
 ## Phase 118 Details: UI 模組化與交接基準點建立
 - [x] Plan: 拆解 `page.tsx` 冗餘邏輯，建立 v1.1 交接文檔與開發日誌。

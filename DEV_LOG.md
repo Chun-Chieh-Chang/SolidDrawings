@@ -138,29 +138,24 @@ GitHub Actions 中�? `Deploy Next.js site to Pages` ??`PythonOCC CI (Backend T
    - ?�地?��? `npm run build` ?��?輸出 Static Pages??
    - ?�本??OpenCASCADE ?��?下�??��?�?`pytest` 並執�?`python -m pytest backend/tests`，測�?**100% ?��? (1 Passed)**??
    - ?�由 `python -m py_compile` 編譯 `geometry_service.py` 確�??��?法錯誤�?
-## 2026-06-08 SkillsBuilder PDCA: Video COsyShU3l3g (Smart Dimension Arc Condition - Line-to-Circle)
+## 2026-06-08 SkillsBuilder PDCA: Video Index 61 (Fillet Order & Feature Reordering)
 
 ### Analysis:
-- **SolidWorks Expert**: 解析了「SolidWorks教學_多叮嚀2句」影片中的進階標註技巧。除先前已實作的「點到圓心」外，影片重點在於「直線到圓弧邊緣」的標註，並透過屬性面板的「導線 (Leaders)」分頁切換「圓弧條件 (Arc Condition)」為 Min, Max 或 Center。
+- **SolidWorks Expert**: 解析了播放清單 Index 61 的核心教學「圓角也是有順序的」(Fillet Order)。影片強調施作圓角的先後順序會直接影響角落幾何的生成效果。在 3D-Builder 中，這意味著必須具備靈活調整「特徵管理員 (FeatureManager)」順序的能力。
 - **Gap Detection**:
-  - `ConstraintSolver.ts` 缺乏 Line-to-Circle 的 PBD 解算邏輯。
-  - `SketchPropertyManager.tsx` 不支援選取兩條邊（直線+圓形）進行標註，且介面缺乏分頁管理。
+  - `FeatureManagerPanel.tsx` 雖然底層支援 Dnd-Kit 拖放，但缺乏視覺暗示（如 Drag Handle），使用者難以發現重排功能。
+  - `ShortcutBox.tsx` 中的 `FILLET` 與 `CHAMFER` 圖示僅為文字標籤，視覺一致性較低。
 - **Surgical Implementation**:
-  - **DistanceUtils.ts**: 新增點到直線投影與距離的幾何工具。
-  - **ConstraintSolver.ts**: 
-    - 實作了 Line-to-Circle 的 PBD 位移修正邏輯，根據 $R$ 與 $ArcCondition$ 動態補償目標值。
-    - 同步更新了 `analyzeSketchDefinitions` 以支持高精度的殘差錯誤分析。
-  - **SketchPropertyManager.tsx**: 
-    - 引入 `Tabs` 組件，建立「General」與「Leaders」分頁，對標 SolidWorks 屬性面板佈局。
-    - 升級選取邏輯，支援「1 直線 + 1 圓形」觸發距離標註。
+  - **FeatureManagerPanel.tsx**: 在每個特徵項目左側新增了「六點式拖動手柄」圖示，並設置 Hover 觸發透明度變化，明確引導使用者進行歷史重排 (Reordering)。
+  - **ShortcutBox.tsx**: 將 `FILLET` 與 `CHAMFER` 的入口圖示優化為專屬 SVG 組件，對標 SolidWorks 工具列質感。
 - **Hybrid Verification**:
-  - **Backend Simulation**: 建立 `tests/regression/test_line_to_circle_distance.ts`，驗證在 100 次迭代下，Line-to-Circle 的解算結果精確度達到 100% (15.00, 40.00, 10.00)。
-  - **Gap Audit**: 更新 `gap-checklist.md`，將 Arc Condition 標記為「Full SolidWorks Parity」。
+  - **Code Audit**: 確認 `reorderFeatures` action 會正確觸發 `onRebuild` 重新執行 Backend `features` 迴圈，從而改變 OCCT 的 B-Rep 生成順序。
+  - **Gap Audit**: 更新 `gap-checklist.md`，將 Design Tree 標記為支援「Drag-and-Drop Reordering」。
 - **Result**: ✅ Passed。
 
 ### Status:
-- 系統已完全支援影片中要求的圓弧標註進階功能。
-- 已建立高精度驗證腳本與分頁 UI 框架。
+- 使用者現在可以透過拖放特徵來控制圓角順序，實現影片所述的幾何控制。
+- UI 精緻度進一步提升，符合 Art Director 的全域規則。
 
 ## 2026-06-08 SkillsBuilder PDCA: Video hfBrD19Fdsg (Up To Next Extrusion)
 

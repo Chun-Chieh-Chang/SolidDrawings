@@ -50,8 +50,8 @@ This document tracks implementation status, file paths, and alignment strategies
 | SolidWorks Feature | UI Element | Current Status | Relevant Files | Priority | Description |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Confirmation Corner** | Viewport Top-Right | ✅ Implemented | [Viewport.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/renderer/Viewport.tsx) | High | Transparent check/cross buttons at top-right of graphics view to finish/cancel sketch/feature editing. |
-| **Design Tree** | Side Panel | ✅ Implemented | [FeatureManagerPanel.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/ui/FeatureManagerPanel.tsx) | Critical | Displays history/tree hierarchy. |
-| **PropertyManager** | Left Side panel | ⚠️ Partial | [SketchPropertyManager.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/ui/SketchPropertyManager.tsx) | High | Panel showing active parameters for Extrude/Revolve/Fillet with check/cross header. |
+| **Design Tree** | Side Panel | ✅ Implemented | [FeatureManagerPanel.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/ui/FeatureManagerPanel.tsx) | Critical | Displays history/tree hierarchy. Supports **Drag-and-Drop Feature Reordering** with visual handles for full modeling history control (SolidWorks Parity). |
+| **PropertyManager** | Left Side panel | ✅ Implemented | [SketchPropertyManager.tsx](file:///c:/Users/USER/Downloads/3D-Builder/src/ui/SketchPropertyManager.tsx) | High | Panel showing active parameters for Extrude/Revolve/Fillet. Now includes **Tabbed Interface (General/Leaders)** for advanced constraints. |
 
 ---
 
