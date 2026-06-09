@@ -2091,22 +2091,49 @@ def build_shape_only(
             spacing2 = float(params.get('spacing2', 10.0))
             direction2_refs = params.get('direction2_refs', [])
 
-            # --- Resolve Direction 1 ---
+            # Circular specific
+            equal_spacing = params.get('equalSpacing', False)
+            instances_to_skip = params.get('instancesToSkip', [])
+
+            # --- Resolve Direction 1 / Axis ---
             dir_vec = gp_Vec(1, 0, 0)
             dir_pnt = gp_Pnt(0, 0, 0)
             if direction_refs and len(direction_refs) > 0 and final_shape is not None:
                 ref = direction_refs[0]
-                matched_edge = find_matching_edge(final_shape, ref.get('coordinates'), ref.get('end_coordinates'), ref.get('signature'))
-                if matched_edge:
-                    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-                    curve_adaptor = BRepAdaptor_Curve(matched_edge)
-                    u_min = curve_adaptor.FirstParameter()
-                    pnt = gp_Pnt()
-                    vec = gp_Vec()
-                    curve_adaptor.D1(u_min, pnt, vec)
-                    if vec.Magnitude() > 1e-6:
-                        dir_vec = vec.Normalized()
-                    dir_pnt = pnt
+                if ref.get('type') == 'FACE':
+                    matched_face = find_matching_face(final_shape, ref.get('coordinates'), ref.get('normal'), ref.get('signature'))
+                    if matched_face:
+                        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+                        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus
+                        surf_adaptor = BRepAdaptor_Surface(matched_face)
+                        stype = surf_adaptor.GetType()
+                        if stype in [GeomAbs_Cylinder, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus]:
+                            if stype == GeomAbs_Cylinder: ax = surf_adaptor.Cylinder().Axis()
+                            elif stype == GeomAbs_Cone: ax = surf_adaptor.Cone().Axis()
+                            elif stype == GeomAbs_Sphere: ax = surf_adaptor.Sphere().Position().Axis()
+                            elif stype == GeomAbs_Torus: ax = surf_adaptor.Torus().Axis()
+                            dir_pnt = ax.Location()
+                            dir_vec = gp_Vec(ax.Direction())
+                else:
+                    matched_edge = find_matching_edge(final_shape, ref.get('coordinates'), ref.get('end_coordinates'), ref.get('signature'))
+                    if matched_edge:
+                        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
+                        from OCC.Core.GeomAbs import GeomAbs_Circle, GeomAbs_Ellipse
+                        curve_adaptor = BRepAdaptor_Curve(matched_edge)
+                        ctype = curve_adaptor.GetType()
+                        if ctype in [GeomAbs_Circle, GeomAbs_Ellipse]:
+                            if ctype == GeomAbs_Circle: circ = curve_adaptor.Circle()
+                            else: circ = curve_adaptor.Ellipse()
+                            dir_pnt = circ.Location()
+                            dir_vec = gp_Vec(circ.Axis().Direction())
+                        else:
+                            u_min = curve_adaptor.FirstParameter()
+                            pnt = gp_Pnt()
+                            vec = gp_Vec()
+                            curve_adaptor.D1(u_min, pnt, vec)
+                            if vec.Magnitude() > 1e-6:
+                                dir_vec = vec.Normalized()
+                            dir_pnt = pnt
             else:
                 axis_str = params.get('axis', 'X')
                 if axis_str == 'X': dir_vec = gp_Vec(1, 0, 0)
@@ -2129,7 +2156,6 @@ def build_shape_only(
                         if vec2.Magnitude() > 1e-6:
                             dir2_vec = vec2.Normalized()
                 else:
-                    # Default Dir 2: Orthogonal to Dir 1 if possible
                     if abs(dir_vec.X()) > 0.9: dir2_vec = gp_Vec(0, 1, 0)
                     else: dir2_vec = gp_Vec(1, 0, 0)
 
@@ -2151,21 +2177,22 @@ def build_shape_only(
                     if target_shape:
                         target_op = tf_params.get('operation', 'ADD')
                         
-                        # 2D Pattern Nested Loops
+                        # Pattern Loops
                         for i in range(count):
                             for j in range(max(1, count2)):
-                                if i == 0 and j == 0: continue # Skip original (already exists in features usually, wait...)
-                                # Actually, Pattern feature usually adds copies to final_shape.
-                                # The original feature is already in final_shape if it was ADD/CUT.
-                                # But Pattern rebuilds the target in isolation and transforms it.
+                                if i == 0 and j == 0: continue
+                                
+                                # Skip specific instances
+                                instance_idx = i + j * count
+                                if instance_idx in instances_to_skip: continue
                                 
                                 trsf = gp_Trsf()
                                 if pattern_type == 'LINEAR':
-                                    # Total offset = i*dir1 + j*dir2
                                     offset = dir_vec.Multiplied(spacing * i).Added(dir2_vec.Multiplied(spacing2 * j))
                                     trsf.SetTranslation(offset)
                                 else:  # CIRCULAR
-                                    angle_rad = math.radians(spacing * i)
+                                    step_angle = spacing / count if equal_spacing else spacing
+                                    angle_rad = math.radians(step_angle * i)
                                     ax1 = gp_Ax1(dir_pnt, gp_Dir(dir_vec.X(), dir_vec.Y(), dir_vec.Z()))
                                     trsf.SetRotation(ax1, angle_rad)
 

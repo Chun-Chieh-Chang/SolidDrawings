@@ -76,3 +76,9 @@
 - [x] Implement unit-preprocessing logic to convert suffixes to base units (mm) before evaluation.
 - [x] Create `SmartNumericInput` in `SketchPropertyManager.tsx` for intelligent text-to-number conversion.
 - [x] Upgrade `PartFeaturePropertyManager.tsx`'s `ParamInput` to support consistent unit-aware evaluation.
+
+### Phase 132: Circular Pattern Reinforcement
+- [x] Implement "Equal Spacing" logic in backend for automatic angular step calculation.
+- [x] Implement "Instances to Skip" functionality to exclude specific pattern copies.
+- [x] Enhance Axis Resolution: Support cylindrical faces and circular edges as rotation axes.
+- [x] Create dedicated UI rollout in `PartFeaturePropertyManager.tsx` for Circular Pattern controls.

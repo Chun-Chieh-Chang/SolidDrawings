@@ -18,9 +18,12 @@ const ParamInput: React.FC<{
 }> = ({ label, value, onChange, unit = 'mm', badge }) => {
   const { evaluatedVariables } = useCadStore();
   const [localValue, setLocalValue] = React.useState(value?.toString() || '0');
+  const isEditing = React.useRef(false);
 
   React.useEffect(() => {
-    setLocalValue(value?.toString() || '0');
+    if (!isEditing.current) {
+      setLocalValue(value?.toString() || '0');
+    }
   }, [value]);
 
   const isFormula = localValue.startsWith('=');
@@ -29,6 +32,7 @@ const ParamInput: React.FC<{
     : EquationEngine.evaluate(localValue, evaluatedVariables);
 
   const handleBlur = () => {
+    isEditing.current = false;
     if (isFormula) {
       onChange(localValue);
     } else {
@@ -36,6 +40,10 @@ const ParamInput: React.FC<{
       onChange(solved);
       setLocalValue(solved.toFixed(3));
     }
+  };
+
+  const handleFocus = () => {
+    isEditing.current = true;
   };
 
   return (
@@ -213,18 +221,67 @@ export function PartFeaturePropertyManager({
                 <Rollout title="Direction 1" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m5 12 7-7 7 7"/><path d="M12 19V5"/></svg>}>
                   <div className="space-y-3">
                     <SelectionBox 
-                      label="Pattern Direction"
-                      items={(selectedFeature.parameters.direction_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: `Edge ${idx + 1}` }))}
+                      label={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "Rotation Axis" : "Pattern Direction"}
+                      items={(selectedFeature.parameters.direction_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: ref.type === 'FACE' ? `Face ${ref.id.slice(0,4)}` : `Edge ${idx + 1}` }))}
                       onRemove={() => onParamChange('direction_refs', [])}
                       onClear={() => onParamChange('direction_refs', [])}
-                      placeholder="Select edge for direction"
+                      placeholder={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "Select circular edge or face" : "Select edge for direction"}
                       maxHeight="60px"
                     />
 
+                    {selectedFeature.parameters.pattern_type === 'CIRCULAR' && (
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Equal Spacing</label>
+                        <button 
+                          onClick={() => onParamChange('equalSpacing', !selectedFeature.parameters.equalSpacing)}
+                          className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.equalSpacing ? 'bg-[#005B9A] text-white border-[#004A7C]' : 'bg-white text-slate-400 border-slate-200'}`}
+                        >
+                          {selectedFeature.parameters.equalSpacing ? 'ON' : 'OFF'}
+                        </button>
+                      </div>
+                    )}
+
                     <div className="grid grid-cols-2 gap-2">
-                      <ParamInput label="Spacing" value={selectedFeature.parameters.spacing} onChange={(v) => onParamChange('spacing', v)} />
+                      <ParamInput 
+                        label={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? (selectedFeature.parameters.equalSpacing ? "Total Angle" : "Step Angle") : "Spacing"} 
+                        value={selectedFeature.parameters.spacing} 
+                        onChange={(v) => onParamChange('spacing', v)} 
+                        unit={selectedFeature.parameters.pattern_type === 'CIRCULAR' ? "deg" : "mm"}
+                      />
                       <ParamInput label="Instances" value={selectedFeature.parameters.count} onChange={(v) => onParamChange('count', v)} unit="pcs" />
                     </div>
+
+                    {selectedFeature.parameters.pattern_type === 'CIRCULAR' && (
+                      <div className="space-y-1 pt-1 border-t border-slate-100">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Instances to Skip</label>
+                        <div className="flex flex-wrap gap-1 min-h-[24px]">
+                          {(selectedFeature.parameters.instancesToSkip || []).map((idx: number) => (
+                            <button 
+                              key={idx}
+                              onClick={() => onParamChange('instancesToSkip', selectedFeature.parameters.instancesToSkip.filter((i: number) => i !== idx))}
+                              className="bg-slate-200 hover:bg-red-100 hover:text-red-700 text-slate-600 px-1.5 py-0.5 rounded text-[10px] font-black transition-colors"
+                            >
+                              #{idx} ×
+                            </button>
+                          ))}
+                          <button 
+                            onClick={() => {
+                              const input = prompt('Enter instance index to skip (starting from 0):');
+                              if (input !== null) {
+                                const idx = parseInt(input);
+                                if (!isNaN(idx)) {
+                                  const current = selectedFeature.parameters.instancesToSkip || [];
+                                  if (!current.includes(idx)) onParamChange('instancesToSkip', [...current, idx].sort((a,b) => a-b));
+                                }
+                              }
+                            }}
+                            className="bg-white border border-dashed border-slate-300 text-slate-400 px-2 py-0.5 rounded text-[10px] font-bold hover:border-slate-400 hover:text-slate-600"
+                          >
+                            + Skip
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Rollout>
 

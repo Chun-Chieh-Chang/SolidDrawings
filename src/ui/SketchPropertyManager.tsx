@@ -18,21 +18,20 @@ const SmartNumericInput: React.FC<{
   unit?: string;
 }> = ({ label, value, onChange, badge, unit = 'mm' }) => {
   const [inputValue, setInputValue] = useState(value.toString());
-  const globalVariables = useCadStore(state => state.globalVariables);
+  const evaluatedVariables = useCadStore(state => state.evaluatedVariables);
+  const isEditing = React.useRef(false);
 
   // Sync internal state when external value changes (e.g., from solver)
+  // But only if we are not currently focused/editing
   useEffect(() => {
-    // Only update if the user isn't actively typing or if the numeric difference is significant
-    const num = parseFloat(inputValue);
-    if (Math.abs(num - value) > 0.001 && !isNaN(num)) {
-       setInputValue(value.toFixed(2));
-    } else if (inputValue === '' || isNaN(num)) {
-       setInputValue(value.toFixed(2));
+    if (!isEditing.current) {
+      setInputValue(value.toFixed(2));
     }
   }, [value]);
 
   const handleBlur = () => {
-    const solved = EquationEngine.evaluate(inputValue, globalVariables);
+    isEditing.current = false;
+    const solved = EquationEngine.evaluate(inputValue, evaluatedVariables);
     onChange(solved);
     setInputValue(solved.toFixed(2));
   };
@@ -53,6 +52,7 @@ const SmartNumericInput: React.FC<{
         <input 
           type="text"
           value={inputValue}
+          onFocus={() => { isEditing.current = true; }}
           onChange={(e) => setInputValue(e.target.value)}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}

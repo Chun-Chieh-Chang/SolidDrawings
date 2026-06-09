@@ -30,6 +30,12 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 | 129 | Thin Feature (Extrude) | complete | 實現薄件特徵，支援從 2D 草圖生成中空管狀或薄壁實體 |
 | 130 | 2D Linear Pattern | complete | 升級排列特徵支援 Direction 2，實現工業級網格/矩陣生成能力 |
 | 131 | Unit Intelligence | complete | 實現多單位 (mm, in, cm) 自動換算與數學表達式評估 |
+| 132 | Circular Pattern Reinforcement | complete | 實現等間距 (Equal Spacing) 與排除執行個體 (Skip Instances) |
+
+## Phase 132 Details: Circular Pattern Reinforcement
+- [x] Backend: Implemented `equalSpacing` logic and `instancesToSkip` filter.
+- [x] Backend: Enhanced axis resolution to support Face (Cylindrical) and Edge (Circular) types.
+- [x] UI: Added dedicated rollout with skip management and spacing toggles.
 
 ## Phase 131 Details: Unit Intelligence (Multi-Unit Evaluation)
 - [x] Logic: Upgraded `EquationEngine` with automated unit suffix preprocessing.
@@ -78,6 +84,7 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 - [x] Phase 129: Thin Feature (Extrude)
 - [x] Phase 130: 2D Linear Pattern (Direction 2)
 - [x] Phase 131: Unit Intelligence (Multi-Unit Evaluation)
+- [x] Phase 132: Circular Pattern Reinforcement
 
 ## Current Phase
-All high-priority SolidWorks alignment and structural cleanup phases completed. Unit Intelligence for multi-unit modeling implemented. v1.6 established.
+All high-priority SolidWorks alignment and structural cleanup phases completed. Circular Pattern with Equal Spacing and Skip Instances implemented. v1.7 established.
