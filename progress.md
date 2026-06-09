@@ -52,3 +52,9 @@
 - [x] Implement visual Drag Handles in `FeatureManagerPanel.tsx` for reordering.
 - [x] Optimize `ShortcutBox.tsx` with high-fidelity SVG icons for Fillet/Chamfer.
 - [x] Audit backend feature loop to ensure sequential B-Rep generation matches history order.
+
+### Phase 128: Loft Industrial Reinforcement
+- [x] Implement `BRepFill_PipeShell` logic in `geometry_service.py` for guided lofting.
+- [x] Support multiple guide curves and robust profile-to-path interpolation.
+- [x] Upgrade PropertyManager UI to handle multi-sketch selection for Guide Curves.
+- [x] Fix profile loop indexing to always select outer loops for stable B-Rep.

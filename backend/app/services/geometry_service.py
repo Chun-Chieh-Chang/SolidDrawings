@@ -1232,26 +1232,59 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             print(f"[ERROR] HOLE_WIZARD feature failed: {hole_err}")
             return None
     elif f_type == 'LOFT':
-        profiles_data = params.get('profiles', []) # List of point arrays
+        profiles_data = params.get('profiles', []) # List of point loops: List[List[List[Point]]]
+        guide_data = params.get('guide_points', []) # List of point loops
         is_surface = params.get('isSurfaceOnly', False)
+        
         if len(profiles_data) < 2:
             return None
             
         try:
+            # Extract outer loops for each profile
+            profile_wires = []
+            for sketch_loops in profiles_data:
+                if not sketch_loops or not sketch_loops[0]: continue
+                # Use the first (outer) loop of the sketch
+                wire = _build_wire_from_points(sketch_loops[0], is_closed=not is_surface)
+                profile_wires.append(wire)
+            
+            if len(profile_wires) < 2: return None
+
+            # --- Advanced Logic: Guided Loft via PipeShell ---
+            if guide_data and len(guide_data) > 0 and guide_data[0]:
+                from OCC.Core.BRepFill import BRepFill_PipeShell
+                from OCC.Core.GeomFill import GeomFill_IsFrenet
+                
+                # Use the first guide curve as the primary path
+                path_wire = _build_wire_from_points(guide_data[0][0], is_closed=False)
+                pipe_shell = BRepFill_PipeShell(path_wire)
+                
+                # Add sections
+                for pw in profile_wires:
+                    pipe_shell.Add(pw)
+                
+                # Add additional guides if any
+                for i in range(1, len(guide_data)):
+                    if not guide_data[i] or not guide_data[i][0]: continue
+                    g_wire = _build_wire_from_points(guide_data[i][0], is_closed=False)
+                    pipe_shell.SetGuide(g_wire)
+                
+                pipe_shell.Build()
+                if pipe_shell.IsDone():
+                    if not is_surface:
+                        pipe_shell.MakeSolid()
+                    return pipe_shell.Shape()
+
+            # --- Fallback: Standard Loft via ThruSections ---
             from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections
-            
-            # isSolid depends on is_surface flag
             loft_tool = BRepOffsetAPI_ThruSections(not is_surface, False) 
-            
-            for profile_pts in profiles_data:
-                if not profile_pts: continue
-                # Profiles in Loft are expected to be closed for solid, can be open for surface
-                wire = _build_wire_from_points(profile_pts, is_closed=not is_surface)
-                loft_tool.AddWire(wire)
+            for pw in profile_wires:
+                loft_tool.AddWire(pw)
             
             loft_tool.Build()
             if loft_tool.IsDone():
                 return loft_tool.Shape()
+                
         except Exception as loft_err:
             print(f"[ERROR] LOFT feature failed: {loft_err}")
             return None

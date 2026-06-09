@@ -26,6 +26,12 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 | 125 | SkillsBuilder: Plummer Block Base | complete | 解析影片 mOU5bb50pgs，驗證相切約束與多重輪廓擠出 |
 | 126 | SkillsBuilder: Arc Condition | complete | 解析影片 COsyShU3l3g，實現直線到圓弧的距離約束與分頁 UI |
 | 127 | SkillsBuilder: Fillet Order | complete | 解析影片 Index 61，實現特徵管理員重排與 UI 優化 |
+| 128 | Loft Industrial Reinforcement | complete | 升級 Loft 演算法支援導引曲線與多斷面選取 |
+
+## Phase 128 Details: Loft Industrial Reinforcement
+- [x] Backend: Upgraded to `BRepFill_PipeShell` for guided surface interpolation.
+- [x] UI: Implemented "Guide Curves" rollout in `PartFeaturePropertyManager.tsx`.
+- [x] Data: Fixed loop indexing and multi-sketch point extraction.
 
 ## Phase 127 Details: Fillet Order & Feature Reordering
 - [x] UI: Added visual Drag Handles to `FeatureManagerPanel.tsx`.
@@ -49,6 +55,8 @@ Transform 3D-Builder from a functional prototype into a 1:1 SolidWorks 2000 indu
 - [x] Phase 119: Project Cleanup & MECE
 - [x] Phase 120-125: SkillsBuilder Video Verification Series
 - [x] Phase 126: SkillsBuilder: Arc Condition (Line-to-Circle)
+- [x] Phase 127: SkillsBuilder: Fillet Order
+- [x] Phase 128: Loft Industrial Reinforcement
 
 ## Current Phase
-All high-priority SolidWorks alignment and structural cleanup phases completed. Arc Condition (Line-to-Circle) implemented and verified. v1.1 established.
+All high-priority SolidWorks alignment and structural cleanup phases completed. Loft with Guide Curves reinforced. v1.3 established.

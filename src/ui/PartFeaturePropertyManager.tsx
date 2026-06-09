@@ -467,26 +467,49 @@ export function PartFeaturePropertyManager({
             )}
 
             {selectedFeature.type === 'LOFT' && (
-              <Rollout title="Loft Profiles" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M4 20h16"/><path d="M6 12h12"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>}>
-                <div className="space-y-2">
-                  <select
-                    value=""
-                    onChange={(e) => {
-                      const id = e.target.value;
-                      if (!id) return;
-                      const current = selectedFeature.parameters.profile_ids || [];
-                      if (!current.includes(id)) onParamChange('profile_ids', [...current, id]);
-                    }}
-                    className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
-                  >
-                    <option value="">+ Add Profile Sketch...</option>
-                    {features.filter((f) => f.type === 'SKETCH' && !(selectedFeature.parameters.profile_ids || []).includes(f.id)).map((f) => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
-                  </select>
-                  <SelectionBox label="Profiles" items={(selectedFeature.parameters.profile_ids || []).map((id: string) => ({ id, name: features.find(f => f.id === id)?.name || id }))} onRemove={(id) => onParamChange('profile_ids', selectedFeature.parameters.profile_ids.filter((tid: string) => tid !== id))} onClear={() => onParamChange('profile_ids', [])} />
-                </div>
-              </Rollout>
+              <>
+                <Rollout title="Loft Profiles" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M4 20h16"/><path d="M6 12h12"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>}>
+                  <div className="space-y-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (!id) return;
+                        const current = selectedFeature.parameters.profile_ids || [];
+                        if (!current.includes(id)) onParamChange('profile_ids', [...current, id]);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                    >
+                      <option value="">+ Add Profile Sketch...</option>
+                      {features.filter((f) => f.type === 'SKETCH' && !(selectedFeature.parameters.profile_ids || []).includes(f.id)).map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <SelectionBox label="Profiles" items={(selectedFeature.parameters.profile_ids || []).map((id: string) => ({ id, name: features.find(f => f.id === id)?.name || id }))} onRemove={(id) => onParamChange('profile_ids', selectedFeature.parameters.profile_ids.filter((tid: string) => tid !== id))} onClear={() => onParamChange('profile_ids', [])} />
+                  </div>
+                </Rollout>
+
+                <Rollout title="Guide Curves" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M4 22C4 13 14 13 14 4"/><circle cx="14" cy="4" r="2"/><circle cx="4" cy="22" r="2"/></svg>}>
+                  <div className="space-y-2">
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const id = e.target.value;
+                        if (!id) return;
+                        const current = selectedFeature.parameters.guide_ids || [];
+                        if (!current.includes(id)) onParamChange('guide_ids', [...current, id]);
+                      }}
+                      className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                    >
+                      <option value="">+ Add Guide Sketch...</option>
+                      {features.filter((f) => f.type === 'SKETCH' && !(selectedFeature.parameters.guide_ids || []).includes(f.id)).map((f) => (
+                        <option key={f.id} value={f.id}>{f.name}</option>
+                      ))}
+                    </select>
+                    <SelectionBox label="Guide Curves" items={(selectedFeature.parameters.guide_ids || []).map((id: string) => ({ id, name: features.find(f => f.id === id)?.name || id }))} onRemove={(id) => onParamChange('guide_ids', selectedFeature.parameters.guide_ids.filter((tid: string) => tid !== id))} onClear={() => onParamChange('guide_ids', [])} />
+                  </div>
+                </Rollout>
+              </>
             )}
 
             {(selectedFeature.type === 'REFERENCE_PLANE' || selectedFeature.type === 'PLANE') && (

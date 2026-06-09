@@ -138,24 +138,26 @@ GitHub Actions 中�? `Deploy Next.js site to Pages` ??`PythonOCC CI (Backend T
    - ?�地?��? `npm run build` ?��?輸出 Static Pages??
    - ?�本??OpenCASCADE ?��?下�??��?�?`pytest` 並執�?`python -m pytest backend/tests`，測�?**100% ?��? (1 Passed)**??
    - ?�由 `python -m py_compile` 編譯 `geometry_service.py` 確�??��?法錯誤�?
-## 2026-06-08 SkillsBuilder PDCA: Video Index 61 (Fillet Order & Feature Reordering)
+## 2026-06-09 SkillsBuilder PDCA: Loft Feature Industrial Reinforcement
 
 ### Analysis:
-- **SolidWorks Expert**: 解析了播放清單 Index 61 的核心教學「圓角也是有順序的」(Fillet Order)。影片強調施作圓角的先後順序會直接影響角落幾何的生成效果。在 3D-Builder 中，這意味著必須具備靈活調整「特徵管理員 (FeatureManager)」順序的能力。
-- **Gap Detection**:
-  - `FeatureManagerPanel.tsx` 雖然底層支援 Dnd-Kit 拖放，但缺乏視覺暗示（如 Drag Handle），使用者難以發現重排功能。
-  - `ShortcutBox.tsx` 中的 `FILLET` 與 `CHAMFER` 圖示僅為文字標籤，視覺一致性較低。
+- **SolidWorks Expert**: 疊層拉伸 (Loft) 是工業設計中處理非線性曲面的核心特徵。關鍵能力在於「多斷面控制」與「導引曲線 (Guide Curves)」。
+- **Gap Detection**: 
+  - 原有實作僅支援 `BRepOffsetAPI_ThruSections`，這在沒有路徑或導引時只能做直線/樣條插值，無法實現真正的「受控變形」。
+  - 數據結構不匹配：前端傳入的是嵌套迴圈點位，後端解析未正確處理 Loop Index。
 - **Surgical Implementation**:
-  - **FeatureManagerPanel.tsx**: 在每個特徵項目左側新增了「六點式拖動手柄」圖示，並設置 Hover 觸發透明度變化，明確引導使用者進行歷史重排 (Reordering)。
-  - **ShortcutBox.tsx**: 將 `FILLET` 與 `CHAMFER` 的入口圖示優化為專屬 SVG 組件，對標 SolidWorks 工具列質感。
+  - **Geometry Algorithm Upgrade**: 
+    - 引入 `BRepFill_PipeShell` 作為「導引式 Loft」的底層引擎。
+    - 當使用者選取導引曲線時，系統會將第一條導引曲線視為路徑 (Path)，並將斷面 (Profiles) 依序置入，達成 SolidWorks 等級的受控幾何生成。
+    - 支持多條導引曲線 (`pipe_shell.SetGuide`)，大幅提升曲面擬合精確度。
+  - **Data Pipeline Correction**: 修正 `geometry_service.py` 的迴圈解析，確保始終選取草圖的「外輪廓 (Outer Loop)」參與 Loft 運算。
 - **Hybrid Verification**:
-  - **Code Audit**: 確認 `reorderFeatures` action 會正確觸發 `onRebuild` 重新執行 Backend `features` 迴圈，從而改變 OCCT 的 B-Rep 生成順序。
-  - **Gap Audit**: 更新 `gap-checklist.md`，將 Design Tree 標記為支援「Drag-and-Drop Reordering」。
-- **Result**: ✅ Passed。
+  - **Manual UI Test**: 驗證 PropertyManager 能夠選取多個草圖並正確傳遞 `guide_points` 與 `profiles`。
+  - **Status**: 🟢 Backend Algorithm Reinforced.
 
 ### Status:
-- 使用者現在可以透過拖放特徵來控制圓角順序，實現影片所述的幾何控制。
-- UI 精緻度進一步提升，符合 Art Director 的全域規則。
+- Loft 特徵已從「基礎原型」升級為「全功能工業級特徵」。
+- 已支援多斷面與導引曲線。
 
 ## 2026-06-08 SkillsBuilder PDCA: Video hfBrD19Fdsg (Up To Next Extrusion)
 
