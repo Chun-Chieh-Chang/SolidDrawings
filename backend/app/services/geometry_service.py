@@ -1200,7 +1200,7 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             # Add profile (closed) at the start of the path
             edge_map = {}
             profile_wire = _build_wire_from_points(profile_points, is_closed=True, edge_map=edge_map)
-            sweep_tool.Add(profile_wire, build_face=True)
+            sweep_tool.Add(profile_wire)
             
             # Add guide curves if provided
             for guide_pts in guide_points_list:
@@ -1366,7 +1366,7 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 
                 # Add sections
                 for pw in profile_wires:
-                    pipe_shell.Add(pw, build_face=True)
+                    pipe_shell.Add(pw)
                 
                 # Add additional guides if any
                 for i in range(1, len(guide_data)):
