@@ -4,36 +4,101 @@ import hashlib
 from collections import OrderedDict
 
 try:
-    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln
-    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
-    from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
-    from OCC.Core.TopExp import TopExp_Explorer, topexp
-    from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED
-    from OCC.Core.BRep import BRep_Tool, BRep_Builder
-    from OCC.Core.TopLoc import TopLoc_Location
-    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
-    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
-    from OCC.Core.BRepFill import BRepFill_PipeShell
-    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
-    from OCC.Core.GC import GC_MakeArcOfCircle
-    from OCC.Core.TopoDS import topods, TopoDS_Compound
-    from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
-    from OCC.Core.GProp import GProp_GProps
-    from OCC.Core.BRepGProp import brepgprop
-    from OCC.Core.IGESControl import IGESControl_Writer
-    from OCC.Core.StlAPI import StlAPI_Writer
-    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
-    from OCC.Core.BRepLProp import BRepLProp_SLProps
-    from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line
-    from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
-    from OCC.Core.BRepOffset import BRepOffset_Skin
-    from OCC.Core.TColgp import TColgp_HArray1OfPnt
-    from OCC.Core.GeomAPI import GeomAPI_Interpolate
-    from OCC.Core.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
-    from OCC.Core.Geom2d import Geom2d_Line
-    from OCC.Core.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
-    from OCC.Core.IFSelect import IFSelect_RetDone
+    try:
+        from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+        from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
+        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
+        from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+        from OCC.Core.TopExp import TopExp_Explorer, topexp
+        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
+        from OCC.Core.BRep import BRep_Tool, BRep_Builder
+        from OCC.Core.TopLoc import TopLoc_Location
+        from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
+        from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
+        from OCC.Core.BRepFill import BRepFill_PipeShell
+        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
+        from OCC.Core.GC import GC_MakeArcOfCircle
+        from OCC.Core.TopoDS import topods, TopoDS_Compound
+        from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
+        from OCC.Core.GProp import GProp_GProps
+        from OCC.Core.BRepGProp import brepgprop
+        from OCC.Core.IGESControl import IGESControl_Writer
+        from OCC.Core.StlAPI import StlAPI_Writer
+        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
+        from OCC.Core.BRepLProp import BRepLProp_SLProps
+        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Ellipse
+        from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
+        from OCC.Core.BRepOffset import BRepOffset_Skin
+        from OCC.Core.TColgp import TColgp_HArray1OfPnt
+        from OCC.Core.GeomAPI import GeomAPI_Interpolate
+        from OCC.Core.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
+        from OCC.Core.Geom2d import Geom2d_Line
+        from OCC.Core.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
+        from OCC.Core.IFSelect import IFSelect_RetDone
+        from OCC.Core.BRepCheck import BRepCheck_Analyzer
+        from OCC.Core.IntCurvesFace import IntCurvesFace_ShapeIntersector
+        from OCC.Core.GeomFill import GeomFill_IsFrenet
+        from OCC.Core.BRepTools import breptools
+        from OCC.Core.Bnd import Bnd_Box
+        from OCC.Core.BRepBndLib import brepbndlib
+        from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
+        from OCC.Core.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+        from OCC.Core.HLRAlgo import HLRAlgo_Projector
+        from OCC.Core.TDocStd import TDocStd_Document
+        from OCC.Core.XCAFApp import XCAFApp_Application
+        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
+        from OCC.Core.TDataStd import TDataStd_Name
+        from OCC.Core.TCollection import TCollection_ExtendedString
+        from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
+        from OCC.Core.STEPCAFControl import STEPCAFControl_Writer
+    except ImportError:
+        # Fallback to OCP if OCC is not available
+        from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+        from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
+        from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
+        from OCP.BRepMesh import BRepMesh_IncrementalMesh
+        from OCP.TopExp import TopExp_Explorer, topexp
+        from OCP.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
+        from OCP.BRep import BRep_Tool, BRep_Builder
+        from OCP.TopLoc import TopLoc_Location
+        from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
+        from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
+        from OCP.BRepFill import BRepFill_PipeShell
+        from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
+        from OCP.GC import GC_MakeArcOfCircle
+        from OCP.TopoDS import topods, TopoDS_Compound
+        from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
+        from OCP.GProp import GProp_GProps
+        from OCP.BRepGProp import brepgprop
+        from OCP.IGESControl import IGESControl_Writer
+        from OCP.StlAPI import StlAPI_Writer
+        from OCP.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
+        from OCP.BRepLProp import BRepLProp_SLProps
+        from OCP.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Ellipse
+        from OCP.TopTools import TopTools_ListOfShape, TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
+        from OCP.BRepOffset import BRepOffset_Skin
+        from OCP.TColgp import TColgp_HArray1OfPnt
+        from OCP.GeomAPI import GeomAPI_Interpolate
+        from OCP.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
+        from OCP.Geom2d import Geom2d_Line
+        from OCP.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
+        from OCP.IFSelect import IFSelect_RetDone
+        from OCP.BRepCheck import BRepCheck_Analyzer
+        from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
+        from OCP.GeomFill import GeomFill_IsFrenet
+        from OCP.BRepTools import breptools
+        from OCP.Bnd import Bnd_Box
+        from OCP.BRepBndLib import brepbndlib
+        from OCP.BRepClass3d import BRepClass3d_SolidClassifier
+        from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+        from OCP.HLRAlgo import HLRAlgo_Projector
+        from OCP.TDocStd import TDocStd_Document
+        from OCP.XCAFApp import XCAFApp_Application
+        from OCP.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
+        from OCP.TDataStd import TDataStd_Name
+        from OCP.TCollection import TCollection_ExtendedString
+        from OCP.Quantity import Quantity_Color, Quantity_TOC_RGB
+        from OCP.STEPCAFControl import STEPCAFControl_Writer
     
     HAS_OCC = True
 except ImportError as e:
@@ -69,15 +134,6 @@ def _shape_to_mesh(shape, deflection=0.01):
     colors = [] # New colors array
     face_metadata = []
     edge_metadata = []
-
-    from OCC.Core.TopAbs import TopAbs_REVERSED, TopAbs_FACE, TopAbs_EDGE
-    from OCC.Core.TopoDS import topods
-    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
-    from OCC.Core.BRepLProp import BRepLProp_SLProps
-    from OCC.Core.GProp import GProp_GProps
-    from OCC.Core.BRepGProp import brepgprop
-    from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane
-    from OCC.Core.BRep import BRep_Tool
 
     # Extract Face Metadata
     explorer = TopExp_Explorer(shape, TopAbs_FACE)
@@ -300,15 +356,6 @@ def find_matching_edge(shape, target_start, target_end, signature=None):
     return None
 
 def get_tangent_edges(shape, start_edge, angular_tolerance=0.01):
-    from OCC.Core.TopExp import topexp, TopExp_Explorer
-    from OCC.Core.TopTools import TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
-    from OCC.Core.TopAbs import TopAbs_VERTEX, TopAbs_EDGE
-    from OCC.Core.BRep import BRep_Tool
-    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-    from OCC.Core.TopoDS import topods
-    from OCC.Core.gp import gp_Pnt, gp_Vec
-    import math
-
     tangent_edges = [start_edge]
     visited_hashes = set([get_shape_hash(start_edge, 2**31 - 1)])
     
@@ -409,9 +456,6 @@ def _build_wire_from_points(points, is_closed=True, edge_map=None):
             perim_pnt = get_gp_pnt(p_perimeter)
             radius = center_pnt.Distance(perim_pnt)
             if radius > 1e-6:
-                from OCC.Core.gp import gp_Circ, gp_Ax2, gp_Dir
-                from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge
-                
                 # Fetch normal from metadata or default to Z-up for 2D profiles
                 normal_vec = metadata.get('planeNormal', [0.0, 0.0, 1.0])
                 nx, ny, nz = float(normal_vec[0]), float(normal_vec[1]), float(normal_vec[2])
@@ -443,9 +487,6 @@ def _build_wire_from_points(points, is_closed=True, edge_map=None):
             
             p_end = points[curr_idx]
             spline_pts.append(p_end)
-            
-            from OCC.Core.TColgp import TColgp_HArray1OfPnt
-            from OCC.Core.GeomAPI import GeomAPI_Interpolate
             
             h_array = TColgp_HArray1OfPnt(1, len(spline_pts))
             for idx, pt in enumerate(spline_pts):
@@ -556,11 +597,9 @@ def import_step_file(filepath):
     if not HAS_OCC:
         return None
     try:
-        from OCC.Core.STEPControl import STEPControl_Reader
         reader = STEPControl_Reader()
         status = reader.ReadFile(filepath)
         
-        from OCC.Core.IFSelect import IFSelect_RetDone
         if status == IFSelect_RetDone:
             reader.TransferRoots()
             shape = reader.OneShape()
@@ -580,9 +619,6 @@ def detect_interference(component_shapes):
     
     interferences = []
     try:
-        from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Common
-        from OCC.Core.BRepCheck import BRepCheck_Analyzer
-        
         c_ids = list(component_shapes.keys())
         for i in range(len(c_ids)):
             for j in range(i + 1, len(c_ids)):
@@ -600,8 +636,6 @@ def detect_interference(component_shapes):
                     inter_shape = common_tool.Shape()
                     
                     # Verify if it's a real solid intersection
-                    from OCC.Core.GProp import GProp_GProps
-                    from OCC.Core.BRepGProp import brepgprop
                     props = GProp_GProps()
                     brepgprop.VolumeProperties(inter_shape, props)
                     
@@ -622,9 +656,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
     if not HAS_OCC:
         return None
 
-    # Defensive re-import to avoid UnboundLocalError in some environments
-    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1
-    
     current_feat_shape = None
 
     if f_type == 'DUMB_SOLID':
@@ -745,9 +776,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         # --- Up To Next / Up To Surface implementation via Raycasting ---
         if end_cond in ['UP_TO_NEXT', 'UP_TO_SURFACE'] and parent_shape and not parent_shape.IsNull():
             try:
-                from OCC.Core.IntCurvesFace import IntCurvesFace_ShapeIntersector
-                from OCC.Core.gp import gp_Lin, gp_Dir, gp_Pnt, gp_Trsf, gp_Ax3
-                
                 # Use centroid of the first sketch loop as ray origin
                 cx, cy, cz = 0.0, 0.0, 0.0
                 pts_count = 0
@@ -797,8 +825,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
 
             if params.get('operation') == 'SURFACE':
                 # Surface extrusion tracking
-                from OCC.Core.TopoDS import TopoDS_Compound
-                from OCC.Core.BRep import BRep_Builder
                 builder = BRep_Builder()
                 comp = TopoDS_Compound()
                 builder.MakeCompound(comp)
@@ -806,7 +832,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 for w in wires:
                     trsf = gp_Trsf()
                     trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
-                    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
                     moved_wire = BRepBuilderAPI_Transform(w, trsf).Shape()
                     prism_tool = BRepPrimAPI_MakePrism(moved_wire, vec)
                     prism_shape = prism_tool.Shape()
@@ -874,7 +899,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 draft_angle = float(params.get('draftAngle', 0.0))
                 if draft_angle > 0.1:
                     try:
-                        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
                         draft_tool = BRepOffsetAPI_DraftAngle(current_feat_shape)
                         angle_rad = math.radians(draft_angle)
                         if params.get('draftOutward'): angle_rad = -angle_rad
@@ -897,8 +921,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 # --- Surface Mode Check ---
                 if params.get('isSurfaceOnly'):
                     # Remove start/end caps if surface mode
-                    from OCC.Core.TopExp import TopExp_Explorer
-                    from OCC.Core.TopAbs import TopAbs_FACE
                     explorer = TopExp_Explorer(current_feat_shape, TopAbs_FACE)
                     side_faces = []
                     while explorer.More():
@@ -907,8 +929,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                     
                     # Logic to identify side vs caps
                     # We'll just return the compound of all faces for now as a "Surface"
-                    from OCC.Core.TopoDS import TopoDS_Compound
-                    from OCC.Core.BRep import BRep_Builder
                     builder = BRep_Builder()
                     comp_surf = TopoDS_Compound()
                     builder.MakeCompound(comp_surf)
@@ -1053,7 +1073,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             elif axis_edge_id and edge_map and axis_edge_id in edge_map:
                 # Find the axis in the local edge_map
                 axis_edge = edge_map[axis_edge_id]
-                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
                 adaptor = BRepAdaptor_Curve(axis_edge)
                 axis_origin = adaptor.Value(adaptor.FirstParameter())
                 p_end = adaptor.Value(adaptor.LastParameter())
@@ -1126,8 +1145,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             return None
             
         try:
-            from OCC.Core.BRepFill import BRepFill_PipeShell
-            
             # Construct path wire (open)
             path_wire = _build_wire_from_points(path_points, is_closed=False)
             
@@ -1175,11 +1192,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         axis_points = params.get('axis_points', [])
         
         try:
-            from OCC.Core.Geom import Geom_CylindricalSurface, Geom_ConicalSurface
-            from OCC.Core.Geom2d import Geom2d_Line
-            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire
-            from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakePipe
-            
             # 1. Setup axis (gp_Ax2)
             if len(axis_points) >= 2:
                 p1 = gp_Pnt(axis_points[0][0], axis_points[0][1], axis_points[0][2])
@@ -1288,9 +1300,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
 
             # --- Advanced Logic: Guided Loft via PipeShell ---
             if guide_data and len(guide_data) > 0 and guide_data[0]:
-                from OCC.Core.BRepFill import BRepFill_PipeShell
-                from OCC.Core.GeomFill import GeomFill_IsFrenet
-                
                 # Use the first guide curve as the primary path
                 path_wire = _build_wire_from_points(guide_data[0][0], is_closed=False)
                 pipe_shell = BRepFill_PipeShell(path_wire)
@@ -1312,7 +1321,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                     return pipe_shell.Shape()
 
             # --- Fallback: Standard Loft via ThruSections ---
-            from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections
             loft_tool = BRepOffsetAPI_ThruSections(not is_surface, False) 
             for pw in profile_wires:
                 loft_tool.AddWire(pw)
@@ -1442,8 +1450,6 @@ class TopologicalLinker:
 
     def record_evolution(self, tool, original_shapes):
         """Records Generated and Modified shapes from an OCC tool (e.g. BRepAlgoAPI)."""
-        from OCC.Core.TopExp import TopExp_Explorer
-        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE
         
         for orig in original_shapes:
             if orig is None or (HAS_OCC and orig.IsNull()): continue
@@ -1557,7 +1563,6 @@ def process_features(features, deflection=0.01):
                 
                 if refs:
                     try:
-                        from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet
                         fillet_tool = BRepFilletAPI_MakeFillet(final_shape)
                         edges_added = 0
                         visited_hashes = set()
@@ -1606,17 +1611,12 @@ def process_features(features, deflection=0.01):
             if final_shape is not None:
                 thickness = float(params.get('thickness', 1.0))
                 try:
-                    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
-                    from OCC.Core.TopTools import TopTools_ListOfShape
-                    from OCC.Core.GeomAbs import GeomAbs_Arc
                     
                     # MakeThickSolid requires a solid, but for a surface we can use BRepOffsetAPI_MakeOffsetShape
                     # Actually BRepOffsetAPI_MakeOffsetShape creates a solid from a face if the offset is non-zero
-                    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
                     
                     offset_maker = BRepOffsetAPI_MakeOffsetShape()
                     # PerformByJoin(Shape, OffsetValue, Tolerance, Mode, Intersection, SelfInter, JoinType)
-                    from OCC.Core.BRepOffset import BRepOffset_Skin
                     offset_maker.PerformByJoin(final_shape, thickness, 1e-3, BRepOffset_Skin, False, False, GeomAbs_Arc)
                     if offset_maker.IsDone():
                         final_shape = offset_maker.Shape()
@@ -1633,8 +1633,6 @@ def process_features(features, deflection=0.01):
                 
                 faces_to_remove_params = params.get('faces_to_remove_refs', [])
                 
-                from OCC.Core.TopTools import TopTools_ListOfShape
-                from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
                 
                 removed_faces = TopTools_ListOfShape()
                 for f_ref in faces_to_remove_params:
@@ -1650,7 +1648,6 @@ def process_features(features, deflection=0.01):
                 try:
                     # Create the hollow solid
                     # Tolerance (1e-3), JoinType (GeomAbs_Arc), Inside(False)
-                    from OCC.Core.GeomAbs import GeomAbs_Arc
                     shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, removed_faces, actual_offset, 1e-3, GeomAbs_Arc, False)
                     shell_tool.Build()
                     if shell_tool.IsDone():
@@ -1683,14 +1680,8 @@ def process_features(features, deflection=0.01):
                 faces_refs = params.get('refs', [])
                 if faces_refs:
                     try:
-                        from OCC.Core.TopTools import TopTools_ListOfShape
-                        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
-                        from OCC.Core.GeomAbs import GeomAbs_Arc
-                        from OCC.Core.BRepOffset import BRepOffset_Skin
                         
                         # Extract specific faces to offset
-                        from OCC.Core.TopoDS import TopoDS_Compound
-                        from OCC.Core.BRep import BRep_Builder
                         builder = BRep_Builder()
                         comp_to_offset = TopoDS_Compound()
                         builder.MakeCompound(comp_to_offset)
@@ -1718,7 +1709,6 @@ def process_features(features, deflection=0.01):
 
         elif f_type == 'SURFACE_KNIT':
             try:
-                from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Sewing
                 sewer = BRepBuilderAPI_Sewing(1e-3)
                 if final_shape:
                     sewer.Add(final_shape)
@@ -1929,8 +1919,6 @@ def build_shape_only(
                 
                 faces_to_remove_params = params.get('faces_to_remove_refs', [])
                 
-                from OCC.Core.TopTools import TopTools_ListOfShape
-                from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
                 
                 removed_faces = TopTools_ListOfShape()
                 for f_ref in faces_to_remove_params:
@@ -1946,7 +1934,6 @@ def build_shape_only(
                 try:
                     # Create the hollow solid
                     # Tolerance (1e-3), JoinType (GeomAbs_Arc), Inside(False)
-                    from OCC.Core.GeomAbs import GeomAbs_Arc
                     shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, removed_faces, actual_offset, 1e-3, GeomAbs_Arc, False)
                     shell_tool.Build()
                     if shell_tool.IsDone():
@@ -1969,7 +1956,6 @@ def build_shape_only(
                 
                 if refs:
                     try:
-                        from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeChamfer
                         chamfer_tool = BRepFilletAPI_MakeChamfer(final_shape)
                         edges_added = 0
                         visited_hashes = set()
@@ -2016,7 +2002,6 @@ def build_shape_only(
                 
                 if refs:
                     try:
-                        from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet
                         fillet_tool = BRepFilletAPI_MakeFillet(final_shape)
                         edges_added = 0
                         visited_hashes = set()
@@ -2067,14 +2052,8 @@ def build_shape_only(
                 faces_refs = params.get('refs', [])
                 if faces_refs:
                     try:
-                        from OCC.Core.TopTools import TopTools_ListOfShape
-                        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
-                        from OCC.Core.GeomAbs import GeomAbs_Arc
-                        from OCC.Core.BRepOffset import BRepOffset_Skin
                         
                         # Extract specific faces to offset
-                        from OCC.Core.TopoDS import TopoDS_Compound
-                        from OCC.Core.BRep import BRep_Builder
                         builder = BRep_Builder()
                         comp_to_offset = TopoDS_Compound()
                         builder.MakeCompound(comp_to_offset)
@@ -2102,7 +2081,6 @@ def build_shape_only(
 
         elif f_type == 'SURFACE_KNIT':
             try:
-                from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Sewing
                 sewer = BRepBuilderAPI_Sewing(1e-3)
                 if final_shape:
                     sewer.Add(final_shape)
@@ -2183,14 +2161,6 @@ def build_shape_only(
                 if not boundary_shape: return None
                 
                 # 2. Extract Planar Context
-                from OCC.Core.BRepTools import breptools
-                from OCC.Core.Bnd import Bnd_Box
-                from OCC.Core.BRepBndLib import brepbndlib
-                from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
-                from OCC.Core.BRepTopAdaptor import BRepTopAdaptor_FClass2d
-                from OCC.Core.TopExp import TopExp_Explorer
-                from OCC.Core.TopAbs import TopAbs_FACE
-                from OCC.Core.gp import gp_Pnt2d, gp_Trsf2d
                 
                 bbox = Bnd_Box()
                 brepbndlib.Add(boundary_shape, bbox)
@@ -2220,7 +2190,6 @@ def build_shape_only(
                 diag = math.sqrt((xmax-xmin)**2 + (ymax-ymin)**2)
                 cx, cy = (xmin+xmax)/2.0, (ymin+ymax)/2.0
                 
-                from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
                 
                 grid_pts = []
                 steps_x = int(diag / spacing) + 4
@@ -2245,7 +2214,6 @@ def build_shape_only(
                         # Check PIP (in UV space of the face - simplified to XY if planar)
                         # BRepTopAdaptor_FClass2d expects UV. For planar sketch faces, XY maps to UV.
                         state = classifier.Perform(gp_Pnt2d(rx, ry))
-                        from OCC.Core.TopAbs import TopAbs_IN, TopAbs_ON
                         if state in [TopAbs_IN, TopAbs_ON]:
                             # TODO: Implement margin by checking distance to boundary edges
                             grid_pts.append((rx, ry))
@@ -2290,8 +2258,6 @@ def build_shape_only(
                 if ref.get('type') == 'FACE':
                     matched_face = find_matching_face(final_shape, ref.get('coordinates'), ref.get('normal'), ref.get('signature'))
                     if matched_face:
-                        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
-                        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus
                         surf_adaptor = BRepAdaptor_Surface(matched_face)
                         stype = surf_adaptor.GetType()
                         if stype in [GeomAbs_Cylinder, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus]:
@@ -2304,8 +2270,6 @@ def build_shape_only(
                 else:
                     matched_edge = find_matching_edge(final_shape, ref.get('coordinates'), ref.get('end_coordinates'), ref.get('signature'))
                     if matched_edge:
-                        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-                        from OCC.Core.GeomAbs import GeomAbs_Circle, GeomAbs_Ellipse
                         curve_adaptor = BRepAdaptor_Curve(matched_edge)
                         ctype = curve_adaptor.GetType()
                         if ctype in [GeomAbs_Circle, GeomAbs_Ellipse]:
@@ -2337,7 +2301,6 @@ def build_shape_only(
                     ref2 = direction2_refs[0]
                     matched_edge2 = find_matching_edge(final_shape, ref2.get('coordinates'), ref2.get('end_coordinates'), ref2.get('signature'))
                     if matched_edge2:
-                        from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
                         curve_adaptor2 = BRepAdaptor_Curve(matched_edge2)
                         u_min2 = curve_adaptor2.FirstParameter()
                         pnt2 = gp_Pnt()
@@ -2352,7 +2315,6 @@ def build_shape_only(
             if flip2:
                 dir2_vec.Reverse()
 
-            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
             
             for target_id in target_ids:
                 target_feat = None
@@ -2431,7 +2393,6 @@ def build_shape_only(
             trsf = gp_Trsf()
             trsf.SetMirror(ax2)
             
-            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
             
             if target_ids:
                 for target_id in target_ids:
@@ -2482,10 +2443,8 @@ def build_shape_only(
                     n_norm_vec = gp_Vec(0,0,1)
                 pull_dir = gp_Dir(n_norm_vec.X(), n_norm_vec.Y(), n_norm_vec.Z())
                 
-                from OCC.Core.Geom import Geom_Plane
                 neutral_plane_geom = Geom_Plane(gp_Pnt(*matched_n_origin), pull_dir)
                 
-                from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
                 draft_tool = BRepOffsetAPI_DraftAngle(final_shape)
                 
                 faces_added = 0
@@ -2513,8 +2472,6 @@ def build_shape_only(
             faces_refs = params.get('faces_to_remove_refs', [])
             
             if final_shape:
-                from OCC.Core.TopTools import TopTools_ListOfShape
-                from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeThickSolid
                 
                 faces_to_remove = TopTools_ListOfShape()
                 for ref in faces_refs:
@@ -2526,7 +2483,6 @@ def build_shape_only(
                         faces_to_remove.Append(matched_face)
                 
                 try:
-                    from OCC.Core.GeomAbs import GeomAbs_Arc
                     shell_tool = BRepOffsetAPI_MakeThickSolid(final_shape, faces_to_remove, actual_offset, 1e-3, GeomAbs_Arc, False)
                     shell_tool.Build()
                     if shell_tool.IsDone():
@@ -2939,9 +2895,6 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
     # --- P5-2 Section View Support ---
     if section_plane and HAS_OCC:
         try:
-            from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Section
-            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-            from OCC.Core.gp import gp_Pln, gp_Pnt, gp_Dir
             
             p_ori = section_plane.get('origin', [0,0,0])
             p_norm = section_plane.get('normal', [0,0,1])
@@ -2985,8 +2938,6 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
         return projected_lines
 
     # --- Full HLR Algorithm for Production ---
-    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt
-    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
     
     # Default camera orientation
     eye = gp_Dir(0, 0, 1)
@@ -3008,7 +2959,6 @@ def project_2d(features, plane_type='FRONT', section_plane=None):
             up = gp_Dir(*custom_basis['yDir'])
     
     # Setup HLR Projector
-    from OCC.Core.HLRAlgo import HLRAlgo_Projector
     projector = HLRAlgo_Projector(gp_Ax2(gp_Pnt(0,0,0), eye, up))
     
     hlr = HLRBRep_Algo()
@@ -3060,16 +3010,6 @@ def project_assembly_2d(components_data, plane_type='FRONT'):
     if not HAS_OCC:
         return []
     
-    from OCC.Core.TopoDS import TopoDS_Compound
-    from OCC.Core.BRep import BRep_Builder
-    from OCC.Core.TopLoc import TopLoc_Location
-    from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Ax1, gp_Pnt, gp_Dir, gp_Ax2
-    from OCC.Core.TopExp import TopExp_Explorer
-    from OCC.Core.TopAbs import TopAbs_EDGE
-    from OCC.Core.TopoDS import topods
-    from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-    from OCC.Core.HLRAlgo import HLRAlgo_Projector
 
     builder = BRep_Builder()
     compound = TopoDS_Compound()
@@ -3322,14 +3262,12 @@ def find_matching_face(shape, ref_origin, ref_normal, signature=None):
         # Resolve normal direction of surface using Adaptor
         surf_normal = None
         try:
-            from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
             adaptor = BRepAdaptor_Surface(face)
             surf_type = adaptor.GetType()
             if surf_type == 0: # GeomAbs_Plane
                 gp_pln = adaptor.Plane()
                 gp_dir = gp_pln.Position().Direction()
                 surf_normal = [gp_dir.X(), gp_dir.Y(), gp_dir.Z()]
-                from OCC.Core.TopAbs import TopAbs_REVERSED
                 if face.Orientation() == TopAbs_REVERSED:
                     surf_normal = [-surf_normal[0], -surf_normal[1], -surf_normal[2]]
         except Exception:
@@ -3376,7 +3314,6 @@ def find_matching_face(shape, ref_origin, ref_normal, signature=None):
         c["area"] = c_props.Mass()
         c_surf = BRepAdaptor_Surface(c_face)
         c_stype = c_surf.GetType()
-        from OCC.Core.GeomAbs import GeomAbs_Plane, GeomAbs_Cylinder, GeomAbs_Sphere, GeomAbs_Cone, GeomAbs_Torus
         c["curvature"] = "PLANE" if c_stype == GeomAbs_Plane else "CYLINDER" if c_stype == GeomAbs_Cylinder else "SPHERE" if c_stype == GeomAbs_Cylinder else "UNKNOWN"
         c["dist"] = math.dist(c["center"], r_ori)
         print(f"  - Candidate: center={c['center']}, dist={c['dist']:.4f}")
@@ -3398,9 +3335,6 @@ def convert_entities(features, topology, plane_type, face_origin=None, face_norm
     # --- P5-2 Section View Support ---
     if section_plane and HAS_OCC:
         try:
-            from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Section
-            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-            from OCC.Core.gp import gp_Pln, gp_Pnt, gp_Dir
             
             p_ori = section_plane.get('origin', [0,0,0])
             p_norm = section_plane.get('normal', [0,0,1])
@@ -3432,8 +3366,6 @@ def convert_entities(features, topology, plane_type, face_origin=None, face_norm
             matched_edge = find_matching_edge(shape, t_start, t_end)
             
             if matched_edge:
-                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-                from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
                 
                 curve = BRepAdaptor_Curve(matched_edge)
                 c_type = curve.GetType()
@@ -3463,8 +3395,6 @@ def convert_entities(features, topology, plane_type, face_origin=None, face_norm
     elif topo_type == 'FACE':
         matched_face = find_closest_face(shape, coords)
         if matched_face:
-            from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-            from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
             
             edge_exp = TopExp_Explorer(matched_face, TopAbs_EDGE)
             while edge_exp.More():
@@ -3501,8 +3431,6 @@ def offset_entities(points_2d, distance, plane_type, face_origin=None, face_norm
         return []
         
     try:
-        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_MakeOffset
-        from OCC.Core.GeomAbs import GeomAbs_Arc
         
         make_wire = BRepBuilderAPI_MakeWire()
         
@@ -3553,8 +3481,6 @@ def offset_entities(points_2d, distance, plane_type, face_origin=None, face_norm
             explorer = TopExp_Explorer(offset_shape, TopAbs_EDGE)
             while explorer.More():
                 edge = topods.Edge(explorer.Current())
-                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-                from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
                 
                 curve = BRepAdaptor_Curve(edge)
                 c_type = curve.GetType()
@@ -3602,9 +3528,6 @@ def get_intersection_curve(features, plane_type, face_origin=None, face_normal=N
     # --- P5-2 Section View Support ---
     if section_plane and HAS_OCC:
         try:
-            from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Section
-            from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeFace
-            from OCC.Core.gp import gp_Pln, gp_Pnt, gp_Dir
             
             p_ori = section_plane.get('origin', [0,0,0])
             p_norm = section_plane.get('normal', [0,0,1])
@@ -3624,8 +3547,6 @@ def get_intersection_curve(features, plane_type, face_origin=None, face_normal=N
             print(f"[ERROR] Section generation failed: {sec_err}")
         
     try:
-        from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Section
-        from OCC.Core.gp import gp_Pln
         
         x_origin = 0.0
         y_origin = 0.0
@@ -3705,8 +3626,6 @@ def get_intersection_curve(features, plane_type, face_origin=None, face_normal=N
             explorer = TopExp_Explorer(section_shape, TopAbs_EDGE)
             while explorer.More():
                 edge = topods.Edge(explorer.Current())
-                from OCC.Core.BRepAdaptor import BRepAdaptor_Curve
-                from OCC.Core.GeomAbs import GeomAbs_Line, GeomAbs_Circle
                 
                 curve = BRepAdaptor_Curve(edge)
                 c_type = curve.GetType()
@@ -3888,8 +3807,6 @@ def generate_reference_axis(axis_type, refs, features=[]):
             if shape and not shape.IsNull():
                 face = find_closest_face(shape, coords)
                 if face:
-                    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
-                    from OCC.Core.GeomAbs import GeomAbs_Cylinder
                     
                     surf = BRepAdaptor_Surface(face)
                     if surf.GetType() == GeomAbs_Cylinder:
@@ -4127,7 +4044,6 @@ def export_cad_file(features, format_type, filepath):
 
         format_type = format_type.upper()
         if format_type == 'STEP':
-            from OCC.Core.STEPControl import STEPControl_Writer, STEPControl_AsIs
             writer = STEPControl_Writer()
             writer.Transfer(shape, STEPControl_AsIs)
             status = writer.Write(filepath)
@@ -4164,11 +4080,6 @@ def check_interferences(components_data):
         return []
 
     interferences = []
-    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Common
-    from OCC.Core.GProp import GProp_GProps
-    from OCC.Core.BRepGProp import brepgprop
-    from OCC.Core.gp import gp_Trsf, gp_Pnt, gp_Dir, gp_Ax1, gp_Vec
-    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
     import math
 
     # 1. Rebuild and transform all component shapes
@@ -4242,11 +4153,6 @@ def analyze_topology(shape, subshape_id):
         return {"type": "UNKNOWN"}
 
     try:
-        from OCC.Core.TopExp import TopExp_Explorer
-        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_EDGE
-        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
-        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Circle
-        from OCC.Core.gp import gp_Pnt, gp_Dir
         
         # 1. Find the subshape in the main shape
         explorer = TopExp_Explorer(shape, TopAbs_FACE)
@@ -4300,15 +4206,6 @@ def export_assembly_step(components_data, filepath):
         return False
 
     try:
-        from OCC.Core.TDocStd import TDocStd_Document
-        from OCC.Core.XCAFApp import XCAFApp_Application
-        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
-        from OCC.Core.TDataStd import TDataStd_Name
-        from OCC.Core.TCollection import TCollection_ExtendedString
-        from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
-        from OCC.Core.TopLoc import TopLoc_Location
-        from OCC.Core.gp import gp_Trsf, gp_Vec, gp_Ax1, gp_Pnt, gp_Dir
-        from OCC.Core.STEPCAFControl import STEPCAFControl_Writer
         
         # Initialize XDE application and document
         app = XCAFApp_Application.GetApplication()
