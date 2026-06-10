@@ -908,22 +908,19 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                         draft_tool = BRepOffsetAPI_DraftAngle(current_feat_shape)
                         angle_rad = math.radians(draft_angle)
                         if params.get('draftOutward'): angle_rad = -angle_rad
-                        
+
                         # Use history to find only the side faces generated from sketch edges
-                        for eid in sketch_edges:
-                            moved_edge = moved_edges.get(eid)
-                            if moved_edge:
-                                gen_face = prism_tool.Generated(moved_edge)
-                                if not gen_face.IsNull():
-                                    # Identify the specific face in the compound shape
-                                    # draft_tool.Add(face, direction, angle, neutral_plane)
-                                    draft_tool.Add(gen_face, normal_dir, angle_rad, gp_Pln(ax2))
-                        
+                        for eid, local_edge in edge_map.items():
+                            moved_edge = topods.Edge(BRepBuilderAPI_Transform(local_edge, trsf).Shape())
+                            gen_face = prism_tool.Generated(moved_edge)
+                            if gen_face and not gen_face.IsNull():
+                                # draft_tool.Add(face, direction, angle, neutral_plane)
+                                draft_tool.Add(gen_face, normal_dir, angle_rad, gp_Pln(ax2))
+
                         if draft_tool.IsDone():
                             current_feat_shape = draft_tool.Shape()
                     except Exception as draft_err:
                         print(f"[WARNING] Draft failed: {draft_err}")
-
                 # --- Surface Mode Check ---
                 if params.get('isSurfaceOnly'):
                     # Remove start/end caps if surface mode
