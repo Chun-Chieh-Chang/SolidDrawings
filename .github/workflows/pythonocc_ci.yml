@@ -20,16 +20,29 @@ jobs:
         with:
           python-version: "3.10"
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libopencascade-dev \
+            libtbb-dev \
+            libfreetype6-dev \
+            libx11-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxrender-dev \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev
+
       - name: Install Python Dependencies
         run: |
           pip install --upgrade pip
-          pip install pytest fastapi pydantic httpx uvicorn python-multipart
-          # Install pythonocc-core from conda-forge using pip-compatible wheel
           pip install pythonocc-core
+          pip install pytest fastapi pydantic httpx uvicorn python-multipart
 
       - name: Verify pythonocc-core Installation
         run: |
-          python -c "from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox; print('pythonocc-core OK')"
+          python -c "from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox; box = BRepPrimAPI_MakeBox(10,20,30).Shape(); print('pythonocc-core OK')"
 
       - name: Run Backend Tests
         working-directory: ./backend
