@@ -9,38 +9,36 @@ on:
 jobs:
   test:
     name: Backend Pytest with PythonOCC
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Setup Miniforge (Mamba)
+        uses: conda-incubator/setup-miniconda@v3
         with:
+          miniforge-version: latest
           python-version: "3.10"
+          activate-environment: test-env
+          use-mamba: true
+          channels: conda-forge
+          channel-priority: true
+          conda-remove-defaults: "true"
 
-      - name: Install system dependencies
+      - name: Install Dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libopencascade-dev \
-            libtbb-dev \
-            libfreetype6-dev \
-            libx11-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libxrender-dev \
-            libgl1-mesa-dev \
-            libglu1-mesa-dev
+          mamba install -y \
+            pythonocc-core \
+            pytest \
+            fastapi \
+            pydantic \
+            httpx \
+            uvicorn \
+            python-multipart
+          echo "pythonocc-core installed successfully"
 
-      - name: Install Python Dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pythonocc-core
-          pip install pytest fastapi pydantic httpx uvicorn python-multipart
-
-      - name: Verify pythonocc-core Installation
+      - name: Verify pythonocc-core
         run: |
           python -c "from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox; box = BRepPrimAPI_MakeBox(10,20,30).Shape(); print('pythonocc-core OK')"
 
