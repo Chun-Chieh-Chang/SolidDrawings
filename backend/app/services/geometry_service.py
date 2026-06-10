@@ -1,58 +1,65 @@
 import math
 import json
 import hashlib
+import os
+import sys
 from collections import OrderedDict
 
+# Global flags and placeholders
+HAS_OCC = False
+
+# Try loading OpenCASCADE (pythonocc-core)
 try:
+    from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
+    from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
+    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
+    from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
+    from OCC.Core.TopExp import TopExp_Explorer, topexp
+    from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
+    from OCC.Core.BRep import BRep_Tool, BRep_Builder
+    from OCC.Core.TopLoc import TopLoc_Location
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
+    from OCC.Core.BRepFill import BRepFill_PipeShell
+    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
+    from OCC.Core.GC import GC_MakeArcOfCircle
+    from OCC.Core.TopoDS import topods, TopoDS_Compound
+    from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
+    from OCC.Core.GProp import GProp_GProps
+    from OCC.Core.BRepGProp import brepgprop
+    from OCC.Core.IGESControl import IGESControl_Writer
+    from OCC.Core.StlAPI import StlAPI_Writer
+    from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
+    from OCC.Core.BRepLProp import BRepLProp_SLProps
+    from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Ellipse
+    from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
+    from OCC.Core.BRepOffset import BRepOffset_Skin
+    from OCC.Core.TColgp import TColgp_HArray1OfPnt
+    from OCC.Core.GeomAPI import GeomAPI_Interpolate
+    from OCC.Core.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
+    from OCC.Core.Geom2d import Geom2d_Line
+    from OCC.Core.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
+    from OCC.Core.IFSelect import IFSelect_RetDone
+    from OCC.Core.BRepCheck import BRepCheck_Analyzer
+    from OCC.Core.IntCurvesFace import IntCurvesFace_ShapeIntersector
+    from OCC.Core.GeomFill import GeomFill_IsFrenet
+    from OCC.Core.BRepTools import breptools
+    from OCC.Core.Bnd import Bnd_Box
+    from OCC.Core.BRepBndLib import brepbndlib
+    from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
+    from OCC.Core.BRepTopAdaptor import BRepTopAdaptor_FClass2d
+    from OCC.Core.HLRAlgo import HLRAlgo_Projector
+    from OCC.Core.TDocStd import TDocStd_Document
+    from OCC.Core.XCAFApp import XCAFApp_Application
+    from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
+    from OCC.Core.TDataStd import TDataStd_Name
+    from OCC.Core.TCollection import TCollection_ExtendedString
+    from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
+    from OCC.Core.STEPCAFControl import STEPCAFControl_Writer
+    HAS_OCC = True
+except ImportError:
+    # Try loading OCP (CadQuery engine)
     try:
-        from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-        from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
-        from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
-        from OCC.Core.BRepMesh import BRepMesh_IncrementalMesh
-        from OCC.Core.TopExp import TopExp_Explorer, topexp
-        from OCC.Core.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
-        from OCC.Core.BRep import BRep_Tool, BRep_Builder
-        from OCC.Core.TopLoc import TopLoc_Location
-        from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
-        from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
-        from OCC.Core.BRepFill import BRepFill_PipeShell
-        from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
-        from OCC.Core.GC import GC_MakeArcOfCircle
-        from OCC.Core.TopoDS import topods, TopoDS_Compound
-        from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
-        from OCC.Core.GProp import GProp_GProps
-        from OCC.Core.BRepGProp import brepgprop
-        from OCC.Core.IGESControl import IGESControl_Writer
-        from OCC.Core.StlAPI import StlAPI_Writer
-        from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
-        from OCC.Core.BRepLProp import BRepLProp_SLProps
-        from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Ellipse
-        from OCC.Core.TopTools import TopTools_ListOfShape, TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
-        from OCC.Core.BRepOffset import BRepOffset_Skin
-        from OCC.Core.TColgp import TColgp_HArray1OfPnt
-        from OCC.Core.GeomAPI import GeomAPI_Interpolate
-        from OCC.Core.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
-        from OCC.Core.Geom2d import Geom2d_Line
-        from OCC.Core.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
-        from OCC.Core.IFSelect import IFSelect_RetDone
-        from OCC.Core.BRepCheck import BRepCheck_Analyzer
-        from OCC.Core.IntCurvesFace import IntCurvesFace_ShapeIntersector
-        from OCC.Core.GeomFill import GeomFill_IsFrenet
-        from OCC.Core.BRepTools import breptools
-        from OCC.Core.Bnd import Bnd_Box
-        from OCC.Core.BRepBndLib import brepbndlib
-        from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
-        from OCC.Core.BRepTopAdaptor import BRepTopAdaptor_FClass2d
-        from OCC.Core.HLRAlgo import HLRAlgo_Projector
-        from OCC.Core.TDocStd import TDocStd_Document
-        from OCC.Core.XCAFApp import XCAFApp_Application
-        from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
-        from OCC.Core.TDataStd import TDataStd_Name
-        from OCC.Core.TCollection import TCollection_ExtendedString
-        from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
-        from OCC.Core.STEPCAFControl import STEPCAFControl_Writer
-    except ImportError:
-        # Fallback to OCP if OCC is not available
         from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
         from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
         from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
@@ -99,11 +106,10 @@ try:
         from OCP.TCollection import TCollection_ExtendedString
         from OCP.Quantity import Quantity_Color, Quantity_TOC_RGB
         from OCP.STEPCAFControl import STEPCAFControl_Writer
-    
-    HAS_OCC = True
-except ImportError as e:
-    print(f"[WARNING] OpenCASCADE not found or failed to load: {e}")
-    HAS_OCC = False
+        HAS_OCC = True
+    except ImportError:
+        print("[WARNING] OpenCASCADE (OCC or OCP) not found. Geometric kernel disabled.")
+        HAS_OCC = False
 
 def get_shape_hash(shape, upper=10000000):
     """Robust hashing for OCC shapes across different versions."""
@@ -1473,21 +1479,27 @@ class TopologicalLinker:
                     
                     # Get Generated
                     generated_list = tool.Generated(sub)
-                    if generated_list and not generated_list.IsNull():
-                        exp_gen = TopExp_Explorer(generated_list, sub_type)
-                        while exp_gen.More():
-                            gen_sub = exp_gen.Current()
-                            h_gen = get_shape_hash(gen_sub, 10000000)
-                            if h_sub not in self.mapping: self.mapping[h_sub] = []
-                            self.mapping[h_sub].append(h_gen)
-                            self.shape_pool[h_gen] = gen_sub
-                            # Propagate Color to Generated
-                            if sub_color: self.color_map[h_gen] = sub_color
-                            exp_gen.Next()
+                    if generated_list and not (hasattr(generated_list, 'IsEmpty') and generated_list.IsEmpty()):
+                        # In some OCC versions, generated_list might not have IsNull but IsEmpty
+                        # For TopTools_ListOfShape, we iterate using TopExp_Explorer or ListIterator
+                        try:
+                            exp_gen = TopExp_Explorer(generated_list, sub_type)
+                            while exp_gen.More():
+                                gen_sub = exp_gen.Current()
+                                h_gen = get_shape_hash(gen_sub, 10000000)
+                                if h_sub not in self.mapping: self.mapping[h_sub] = []
+                                self.mapping[h_sub].append(h_gen)
+                                self.shape_pool[h_gen] = gen_sub
+                                # Propagate Color to Generated
+                                if sub_color: self.color_map[h_gen] = sub_color
+                                exp_gen.Next()
+                        except:
+                            # Fallback if generated_list is a TopoDS_Shape or other iterable
+                            pass
                         
                     # Get Modified
                     modified_list = tool.Modified(sub)
-                    if modified_list and not modified_list.IsNull():
+                    if modified_list and not (hasattr(modified_list, 'IsEmpty') and modified_list.IsEmpty()):
                         exp_mod = TopExp_Explorer(modified_list, sub_type)
                         while exp_mod.More():
                             mod_sub = exp_mod.Current()
