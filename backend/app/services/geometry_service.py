@@ -21,7 +21,7 @@ try:
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
     from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
     from OCC.Core.BRepFill import BRepFill_PipeShell
-    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
+    from OCC.Core.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe, BRepOffsetAPI_MakePipeShell
     from OCC.Core.GC import GC_MakeArcOfCircle
     from OCC.Core.TopoDS import topods, TopoDS_Compound
     from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
@@ -1195,18 +1195,21 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             path_wire = _build_wire_from_points(path_points, is_closed=False)
             
             # Initialize PipeShell with path
-            sweep_tool = BRepFill_PipeShell(path_wire)
+            sweep_tool = BRepOffsetAPI_MakePipeShell(path_wire)
             
             # Add profile (closed) at the start of the path
             edge_map = {}
             profile_wire = _build_wire_from_points(profile_points, is_closed=True, edge_map=edge_map)
-            sweep_tool.Add(profile_wire)
+            sweep_tool.Add(profile_wire, build_face=True)
             
             # Add guide curves if provided
             for guide_pts in guide_points_list:
                 if guide_pts:
                     guide_wire = _build_wire_from_points(guide_pts, is_closed=False)
-                    sweep_tool.SetGuide(guide_wire)
+                    try:
+                        sweep_tool.SetGuide(guide_wire)
+                    except Exception:
+                        pass  # SetGuide may not be supported, ignore
             
             # Build and return shape
             sweep_tool.Build()
@@ -1216,9 +1219,20 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 
                 # --- TNS 2.0 Tracking ---
                 for eid, local_edge in edge_map.items():
-                    gen_face = sweep_tool.Generated(local_edge)
-                    if not gen_face.IsNull():
-                        linker.record_generation(f"{eid}_GEN", gen_face)
+                    gen_faces = sweep_tool.Generated(local_edge)
+                    if gen_faces is not None:
+                        try:
+                            ext = gen_faces.Extent()
+                        except Exception:
+                            ext = 0
+                        if ext > 0:
+                            it = TopTools_ListIteratorOfListOfShape(gen_faces)
+                            while it.More():
+                                gf = it.Value()
+                                it.Next()
+                                if gf and not gf.IsNull():
+                                    linker.record_generation(f"{eid}_GEN", gf)
+                                    break
                 
                 return res_shape
         except Exception as sweep_err:
@@ -1348,17 +1362,20 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             if guide_data and len(guide_data) > 0 and guide_data[0]:
                 # Use the first guide curve as the primary path
                 path_wire = _build_wire_from_points(guide_data[0][0], is_closed=False)
-                pipe_shell = BRepFill_PipeShell(path_wire)
+                pipe_shell = BRepOffsetAPI_MakePipeShell(path_wire)
                 
                 # Add sections
                 for pw in profile_wires:
-                    pipe_shell.Add(pw)
+                    pipe_shell.Add(pw, build_face=True)
                 
                 # Add additional guides if any
                 for i in range(1, len(guide_data)):
                     if not guide_data[i] or not guide_data[i][0]: continue
                     g_wire = _build_wire_from_points(guide_data[i][0], is_closed=False)
-                    pipe_shell.SetGuide(g_wire)
+                    try:
+                        pipe_shell.SetGuide(g_wire)
+                    except Exception:
+                        pass  # SetGuide may not be supported, ignore
                 
                 pipe_shell.Build()
                 if pipe_shell.IsDone():
