@@ -73,7 +73,7 @@ export class TrimToolHandler implements SketchToolHandler {
     if (!nStart || !nEnd) return;
 
     // 1. Find all intersection points with OTHER edges
-    let intersectionPoints: { x: number, y: number, dist: number }[] = [];
+    const intersectionPoints: { x: number, y: number, dist: number }[] = [];
     
     Object.values(state.sketchEdges).forEach(other => {
       if (other.id === edgeId) return;
