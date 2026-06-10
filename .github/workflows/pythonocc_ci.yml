@@ -30,12 +30,12 @@ jobs:
           echo "CONDA_PREFIX=$HOME/miniforge3/envs/test-env" >> $GITHUB_ENV
           echo "PATH=$HOME/miniforge3/envs/test-env/bin:$HOME/miniforge3/condabin:$HOME/miniforge3/bin:$PATH" >> $GITHUB_ENV
 
-      - name: Install PythonOCC
+      - name: Install PythonOCC and dependencies
         run: |
           source $HOME/miniforge3/etc/profile.d/conda.sh
           conda activate test-env
           python --version
-          conda install -c conda-forge pythonocc-core=7.8.1 pytest fastapi pydantic httpx uvicorn python-multipart -y
+          conda install -c conda-forge pythonocc-core=7.8.1 pytest fastapi pydantic httpx uvicorn python-multipart scipy -y
           python -c "import OCC; print('OCC loaded')"
 
       - name: Verify pythonocc-core
