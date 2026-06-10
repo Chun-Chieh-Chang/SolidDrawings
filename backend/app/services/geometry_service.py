@@ -949,7 +949,8 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 for eid, local_edge in edge_map.items():
                     # The edge in edge_map is in local sketch space (2D plane at origin).
                     # We need to transform it to match the 'face' passed to prism_tool.
-                    moved_edge = BRepBuilderAPI_Transform(local_edge, trsf).Edge()
+                    # BRepBuilderAPI_Transform doesn't have .Edge() in all versions; use .Shape() + cast
+                    moved_edge = topods.Edge(BRepBuilderAPI_Transform(local_edge, trsf).Shape())
                     gen_face = prism_tool.Generated(moved_edge)
                     if not gen_face.IsNull():
                         linker.record_generation(f"{eid}_GEN", gen_face)
@@ -1500,16 +1501,19 @@ class TopologicalLinker:
                     # Get Modified
                     modified_list = tool.Modified(sub)
                     if modified_list and not (hasattr(modified_list, 'IsEmpty') and modified_list.IsEmpty()):
-                        exp_mod = TopExp_Explorer(modified_list, sub_type)
-                        while exp_mod.More():
-                            mod_sub = exp_mod.Current()
-                            h_mod = get_shape_hash(mod_sub, 10000000)
-                            if h_sub not in self.mapping: self.mapping[h_sub] = []
-                            self.mapping[h_sub].append(h_mod)
-                            self.shape_pool[h_mod] = mod_sub
-                            # Propagate Color to Modified
-                            if sub_color: self.color_map[h_mod] = sub_color
-                            exp_mod.Next()
+                        try:
+                            exp_mod = TopExp_Explorer(modified_list, sub_type)
+                            while exp_mod.More():
+                                mod_sub = exp_mod.Current()
+                                h_mod = get_shape_hash(mod_sub, 10000000)
+                                if h_sub not in self.mapping: self.mapping[h_sub] = []
+                                self.mapping[h_sub].append(h_mod)
+                                self.shape_pool[h_mod] = mod_sub
+                                # Propagate Color to Modified
+                                if sub_color: self.color_map[h_mod] = sub_color
+                                exp_mod.Next()
+                        except:
+                            pass
                     exp.Next()
 
 linker = TopologicalLinker()
