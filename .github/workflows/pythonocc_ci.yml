@@ -9,8 +9,8 @@ on:
 jobs:
   test:
     name: Backend Pytest with PythonOCC
-    runs-on: ubuntu-latest
-
+    runs-on: ubuntu-22.04
+    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -20,16 +20,12 @@ jobs:
         with:
           python-version: "3.10"
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libopencascade-dev
-
       - name: Install Python Dependencies
         run: |
           pip install --upgrade pip
-          pip install pythonocc-core==7.7.2
           pip install pytest fastapi pydantic httpx uvicorn python-multipart
+          # Install pythonocc-core from conda-forge using pip-compatible wheel
+          pip install pythonocc-core
 
       - name: Verify pythonocc-core Installation
         run: |
