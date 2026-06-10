@@ -20,7 +20,7 @@ jobs:
           wget -qO Miniforge.sh https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh
           bash Miniforge.sh -b -p $HOME/miniforge3
           export PATH="$HOME/miniforge3/bin:$PATH"
-          conda --version
+          conda init bash
           echo "$HOME/miniforge3/bin" >> $GITHUB_PATH
 
       - name: Create Python 3.10 environment with pythonocc-core
@@ -35,7 +35,6 @@ jobs:
       - name: Verify pythonocc-core
         run: |
           export PATH="$HOME/miniforge3/bin:$PATH"
-          source $HOME/miniforge3/etc/profile.d/conda.sh
           conda activate test-env
           python --version
           python -c "from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox; box = BRepPrimAPI_MakeBox(10,20,30).Shape(); print('pythonocc-core OK')"
@@ -44,7 +43,6 @@ jobs:
         working-directory: ./backend
         run: |
           export PATH="$HOME/miniforge3/bin:$PATH"
-          source $HOME/miniforge3/etc/profile.d/conda.sh
           conda activate test-env
           export PYTHONPATH=$(pwd)
           pytest tests/ -v --maxfail=2 --durations=5
