@@ -845,9 +845,11 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                     
                     # Track generated faces for surface sweep/extrude
                     for eid, edge in edge_map.items():
-                        gen_face = prism_tool.Generated(edge)
-                        if not gen_face.IsNull():
-                            linker.mapping[f"{eid}_GEN"] = get_shape_hash(gen_face, 10000000)
+                        gen_faces = prism_tool.Generated(edge)
+                        for gf in gen_faces:
+                            if not gf.IsNull():
+                                linker.mapping[f"{eid}_GEN"] = get_shape_hash(gf, 10000000)
+                                break
 
                 current_feat_shape = comp
             else:
@@ -912,10 +914,11 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                         # Use history to find only the side faces generated from sketch edges
                         for eid, local_edge in edge_map.items():
                             moved_edge = topods.Edge(BRepBuilderAPI_Transform(local_edge, trsf).Shape())
-                            gen_face = prism_tool.Generated(moved_edge)
-                            if gen_face and not gen_face.IsNull():
-                                # draft_tool.Add(face, direction, angle, neutral_plane)
-                                draft_tool.Add(gen_face, normal_dir, angle_rad, gp_Pln(ax2))
+                            gen_faces = prism_tool.Generated(moved_edge)
+                            for gf in gen_faces:
+                                if gf and not gf.IsNull():
+                                    # draft_tool.Add(face, direction, angle, neutral_plane)
+                                    draft_tool.Add(gf, normal_dir, angle_rad, gp_Pln(ax2))
 
                         if draft_tool.IsDone():
                             current_feat_shape = draft_tool.Shape()
@@ -948,14 +951,18 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                     # We need to transform it to match the 'face' passed to prism_tool.
                     # BRepBuilderAPI_Transform doesn't have .Edge() in all versions; use .Shape() + cast
                     moved_edge = topods.Edge(BRepBuilderAPI_Transform(local_edge, trsf).Shape())
-                    gen_face = prism_tool.Generated(moved_edge)
-                    if not gen_face.IsNull():
-                        linker.record_generation(f"{eid}_GEN", gen_face)
+                    gen_faces = prism_tool.Generated(moved_edge)
+                    for gf in gen_faces:
+                        if not gf.IsNull():
+                            linker.record_generation(f"{eid}_GEN", gf)
+                            break
                 
                 # 2. Track Top Face (from the sketch face)
-                top_face = prism_tool.Generated(face)
-                if not top_face.IsNull():
-                    linker.record_generation(f"{feat_id}_TOP", top_face)
+                gen_top_faces = prism_tool.Generated(face)
+                for gf in gen_top_faces:
+                    if not gf.IsNull():
+                        linker.record_generation(f"{feat_id}_TOP", gf)
+                        break
                     
                 # 3. Track Bottom Face (the original face itself is the bottom)
                 linker.record_generation(f"{feat_id}_BOT", face)
