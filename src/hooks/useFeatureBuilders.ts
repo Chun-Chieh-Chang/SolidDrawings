@@ -269,11 +269,24 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
 
     if (!activePlane) return;
 
+    // Collect Text Entities
+    const textEntities = Object.values(sketchEdges)
+      .filter(e => e.type === 'TEXT')
+      .map(e => ({
+        text: e.parameters?.text || '3D Builder',
+        height: e.parameters?.height || 10,
+        font: e.parameters?.font || 'Arial',
+        isSingleLine: e.parameters?.isSingleLine ?? true,
+        x: sketchNodes[e.nodeIds[0]]?.x || 0,
+        y: sketchNodes[e.nodeIds[0]]?.y || 0
+      }));
+
     const existingFeature = editingFeatureId ? features.find(f => f.id === editingFeatureId) : null;
     const existingParams = existingFeature?.parameters ?? {};
     const nextParams = {
       ...existingParams,
       points: pointsToExtrude,
+      textEntities,
       sketchNodes: { ...sketchNodes },
       sketchEdges: { ...sketchEdges },
       sketchConstraints: { ...sketchConstraints },
@@ -309,7 +322,7 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     setTimeout(handleRebuild, 50);
   }, [sketchNodes, sketchEdges, activePlane, editingFeatureId, features, updateFeatureParams, addFeature, resetSketchSession, setSelectedId, handleRebuild, activeFaceOrigin, activeFaceNormal, activeFaceId, sketchConstraints, setRollbackIndex, pushToast, setDanglingNodes, uvTo3D]);
 
-  const handleRevolveFromSketch = useCallback(() => {
+  const handleRevolveFromSketch = useCallback((operationOverride?: 'ADD' | 'CUT') => {
     const solidLoops = extractAllClosedLoops(sketchNodes, sketchEdges);
     if (solidLoops.length === 0 || solidLoops[0].length < 3) {
       const danglingIds = findDanglingNodes(sketchNodes, sketchEdges);
@@ -323,8 +336,27 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     }
     if (!activePlane) return;
 
+    // --- NEW: Automatic Axis Detection for Revolve ---
+    const constructionEdges = Object.values(sketchEdges).filter(e => e.type === 'CENTER_LINE' || e.isConstruction);
+    let autoAxisEdgeId: string | null = null;
+    let autoAxisPoints: [number, number, number][] | null = null;
+    let autoAxisUVPoints: [number, number][] | null = null;
+
+    if (constructionEdges.length > 0) {
+      const axis = constructionEdges[0];
+      autoAxisEdgeId = axis.id;
+      const n1 = sketchNodes[axis.nodeIds[0]];
+      const n2 = sketchNodes[axis.nodeIds[1]];
+      if (n1 && n2) {
+        autoAxisPoints = [uvTo3D(n1.x, n1.y), uvTo3D(n2.x, n2.y)];
+        autoAxisUVPoints = [[n1.x, n1.y], [n2.x, n2.y]];
+      }
+    }
+
     const existingFeature = editingFeatureId ? features.find(f => f.id === editingFeatureId) : null;
     const existingParams = existingFeature?.parameters ?? {};
+    const op = operationOverride ?? existingParams.operation ?? 'ADD';
+
     const nextParams = {
       ...existingParams,
       points: solidLoops,
@@ -332,10 +364,13 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
       sketchEdges: { ...sketchEdges },
       sketchConstraints: { ...sketchConstraints },
       angle: existingParams.angle ?? 360,
+      axis_edge_id: existingParams.axis_edge_id ?? autoAxisEdgeId,
+      axis_points: existingParams.axis_points ?? autoAxisPoints,
+      axis_uv_points: existingParams.axis_uv_points ?? autoAxisUVPoints,
       x: existingParams.x ?? 0,
       y: existingParams.y ?? 0,
       z: existingParams.z ?? 0,
-      operation: existingParams.operation ?? 'ADD',
+      operation: op,
       plane: activePlane,
       ...(activePlane === 'FACE' ? {
         faceOrigin: activeFaceOrigin,
@@ -352,7 +387,7 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
       addFeature({
         id: featureId,
         type: 'REVOLVE',
-        name: `Revolve ${features.length + 1}`,
+        name: `${op === 'CUT' ? 'Revolve-Cut' : 'Revolve'} ${features.length + 1}`,
         parameters: nextParams,
       });
     }

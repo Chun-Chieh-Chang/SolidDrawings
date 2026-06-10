@@ -77,6 +77,7 @@ export const SketchPropertyManager: React.FC = () => {
     solverReport,
     sketchTool,
     setSketchTool,
+    setHoveredEntityId,
   } = useCadStore();
 
   const [isEditName, setIsEditName] = useState<string | null>(null);
@@ -120,9 +121,10 @@ export const SketchPropertyManager: React.FC = () => {
 
   const selectedConstraints = useMemo(() => {
     return Object.values(sketchConstraints).filter(c => {
+      const isDirectlySelected = selectedEntityIds.includes(c.id);
       const nodeMatch = c.nodeIds?.some(id => selectedEntityIds.includes(id));
       const edgeMatch = c.edgeIds?.some(id => selectedEntityIds.includes(id));
-      return nodeMatch || edgeMatch;
+      return isDirectlySelected || nodeMatch || edgeMatch;
     });
   }, [selectedEntityIds, sketchConstraints]);
 
@@ -131,28 +133,22 @@ export const SketchPropertyManager: React.FC = () => {
     const nextEdges = { ...sketchEdges };
     const nextConstraints = { ...sketchConstraints };
 
-    const nodesToDelete = new Set<string>();
-    const edgesToDelete = new Set<string>();
+    const toDelete = new Set(selectedEntityIds);
 
-    selectedEntityIds.forEach(id => {
-      if (nextNodes[id]) nodesToDelete.add(id);
-      if (nextEdges[id]) edgesToDelete.add(id);
+    toDelete.forEach(id => {
+      if (nextNodes[id]) delete nextNodes[id];
+      if (nextEdges[id]) delete nextEdges[id];
+      if (nextConstraints[id]) delete nextConstraints[id];
     });
 
-    // Also delete dependent edges and constraints
+    // Cleanup orphaned edges and constraints
     Object.values(nextEdges).forEach(edge => {
-      if (edge.nodeIds.some(nid => nodesToDelete.has(nid))) {
-        edgesToDelete.add(edge.id);
-      }
+      if (edge.nodeIds.some(nid => !nextNodes[nid])) delete nextEdges[edge.id];
     });
-
     Object.values(nextConstraints).forEach(c => {
-      if (c.nodeIds?.some(nid => nodesToDelete.has(nid))) delete nextConstraints[c.id];
-      if (c.edgeIds?.some(eid => edgesToDelete.has(eid))) delete nextConstraints[c.id];
+      if (c.nodeIds?.some(nid => !nextNodes[nid])) delete nextConstraints[c.id];
+      if (c.edgeIds?.some(eid => !nextEdges[eid])) delete nextConstraints[c.id];
     });
-
-    nodesToDelete.forEach(id => delete nextNodes[id]);
-    edgesToDelete.forEach(id => delete nextEdges[id]);
 
     setSketchNodes(nextNodes);
     setSketchEdges(nextEdges);
@@ -162,7 +158,42 @@ export const SketchPropertyManager: React.FC = () => {
     triggerRebuild();
   };
 
-  const applyConstraint = async (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE') => {
+  const handleFixSelection = async (fixed: boolean) => {
+    const nextNodes = { ...sketchNodes };
+    let changed = false;
+    
+    selectedNodes.forEach(n => {
+      if (nextNodes[n.id]) {
+        nextNodes[n.id] = { ...nextNodes[n.id], isFixed: fixed };
+        changed = true;
+      }
+    });
+
+    selectedEdges.forEach(e => {
+      e.nodeIds.forEach(nid => {
+        if (nextNodes[nid]) {
+          nextNodes[nid] = { ...nextNodes[nid], isFixed: fixed };
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      setSketchNodes(nextNodes);
+      await commitPreciseSketchSolve();
+      triggerRebuild();
+    }
+  };
+
+  const applyConstraint = async (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR' | 'COLLINEAR' | 'FIX' | 'UNFIX') => {
+    if (type === 'FIX') {
+      handleFixSelection(true);
+      return;
+    }
+    if (type === 'UNFIX') {
+      handleFixSelection(false);
+      return;
+    }
     const cid = `c_${uuidv4().slice(0, 8)}`;
     const newConstraint: any = { id: cid, type };
 
@@ -175,6 +206,9 @@ export const SketchPropertyManager: React.FC = () => {
     } else if (type === 'COINCIDENT') {
       if (selectedNodes.length === 2) {
         newConstraint.nodeIds = [selectedNodes[0].id, selectedNodes[1].id];
+      } else if (selectedNodes.length === 1 && selectedEdges.length === 1) {
+        newConstraint.nodeIds = [selectedNodes[0].id];
+        newConstraint.edgeIds = [selectedEdges[0].id];
       } else {
         return;
       }
@@ -182,6 +216,12 @@ export const SketchPropertyManager: React.FC = () => {
       if (selectedNodes.length === 2) {
         newConstraint.nodeIds = [selectedNodes[0].id, selectedNodes[1].id];
         newConstraint.value = Math.hypot(selectedNodes[0].x - selectedNodes[1].x, selectedNodes[0].y - selectedNodes[1].y);
+      } else if (selectedEdges.length === 1) {
+        newConstraint.edgeIds = [selectedEdges[0].id];
+        const e = selectedEdges[0];
+        const n1 = sketchNodes[e.nodeIds[0]];
+        const n2 = sketchNodes[e.nodeIds[1]];
+        if (n1 && n2) newConstraint.value = Math.hypot(n2.x - n1.x, n2.y - n1.y);
       } else if (selectedNodes.length === 1 && selectedEdges.length === 1) {
         newConstraint.nodeIds = [selectedNodes[0].id];
         newConstraint.edgeIds = [selectedEdges[0].id];
@@ -206,19 +246,38 @@ export const SketchPropertyManager: React.FC = () => {
       }
     } else if (type === 'EQUAL') {
       if (selectedEdges.length === 2) {
-        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+        const t1 = selectedEdges[0].type;
+        const t2 = selectedEdges[1].type;
+        // Equal Length (Lines) or Equal Radius (Circles)
+        if ((t1 === 'LINE' || t1 === 'CENTER_LINE') && (t2 === 'LINE' || t2 === 'CENTER_LINE')) {
+          newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+        } else if (t1 === 'CIRCLE' && t2 === 'CIRCLE') {
+          newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+        } else {
+          return;
+        }
       } else {
         return;
       }
     } else if (type === 'CONCENTRIC') {
-      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'CIRCLE')) {
+      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'CIRCLE' || e.type === 'ARC')) {
         newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
       } else {
         return;
       }
     } else if (type === 'TANGENT') {
       if (selectedEdges.length === 2) {
-        newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+        const t1 = selectedEdges[0].type;
+        const t2 = selectedEdges[1].type;
+        const hasSpline = t1 === 'SPLINE' || t2 === 'SPLINE';
+        const hasLine = t1 === 'LINE' || t1 === 'CENTER_LINE' || t2 === 'LINE' || t2 === 'CENTER_LINE';
+        const hasCircle = t1 === 'CIRCLE' || t1 === 'ARC' || t2 === 'CIRCLE' || t2 === 'ARC';
+
+        if ((hasLine && hasCircle) || (hasCircle && hasCircle) || (hasSpline && (hasLine || hasCircle))) {
+           newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
+        } else {
+           return;
+        }
       } else {
         return;
       }
@@ -229,8 +288,8 @@ export const SketchPropertyManager: React.FC = () => {
       } else {
         return;
       }
-    } else if (type === 'PARALLEL' || type === 'PERPENDICULAR') {
-      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'LINE')) {
+    } else if (type === 'PARALLEL' || type === 'PERPENDICULAR' || type === 'COLLINEAR') {
+      if (selectedEdges.length === 2 && selectedEdges.every(e => e.type === 'LINE' || e.type === 'CENTER_LINE')) {
         newConstraint.edgeIds = [selectedEdges[0].id, selectedEdges[1].id];
       } else {
         return;
@@ -445,6 +504,35 @@ export const SketchPropertyManager: React.FC = () => {
     if (rebuildHook) rebuildHook();
   };
 
+  const handleAutoDefine = async () => {
+    if (!solverReport) return;
+    const nextConstraints = { ...sketchConstraints };
+    let addedCount = 0;
+
+    Object.entries(solverReport.nodes).forEach(([nid, status]) => {
+      if (status === 'UNDER') {
+        const node = sketchNodes[nid];
+        if (!node || node.id === 'origin') return;
+
+        // Add X Dimension (Horizontal distance from origin)
+        const cxId = `dim_fds_x_${nid.slice(-4)}`;
+        nextConstraints[cxId] = { id: cxId, type: 'DISTANCE', nodeIds: [nid], value: node.x, label: 'X' };
+        
+        // Add Y Dimension (Vertical distance from origin)
+        const cyId = `dim_fds_y_${nid.slice(-4)}`;
+        nextConstraints[cyId] = { id: cyId, type: 'DISTANCE', nodeIds: [nid], value: node.y, label: 'Y' };
+        
+        addedCount += 2;
+      }
+    });
+
+    if (addedCount > 0) {
+      setSketchConstraints(nextConstraints);
+      await commitPreciseSketchSolve();
+      triggerRebuild();
+    }
+  };
+
   const definitionStatus = useMemo(() => {
     const nodeIds = Object.keys(sketchNodes);
     if (nodeIds.length === 0) return { text: 'Empty Sketch', color: 'text-slate-400', bg: 'bg-slate-100' };
@@ -468,8 +556,17 @@ export const SketchPropertyManager: React.FC = () => {
       <div className="p-3 bg-white border-b border-slate-300 shadow-sm">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-[13px] font-black text-slate-800 uppercase tracking-tight">PropertyManager</h2>
-          <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${definitionStatus.bg} ${definitionStatus.color}`}>
-            {definitionStatus.text}
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleAutoDefine}
+              className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[9px] font-black uppercase tracking-tighter transition-all shadow-sm active:scale-95"
+              title="Fully Define Sketch (Auto-Dimension)"
+            >
+              Auto-Define
+            </button>
+            <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${definitionStatus.bg} ${definitionStatus.color}`}>
+              {definitionStatus.text}
+            </div>
           </div>
         </div>
         <div className="text-[11px] text-slate-500 font-medium">
@@ -752,6 +849,142 @@ export const SketchPropertyManager: React.FC = () => {
           </div>
         )}
 
+        {/* Text Parameters Rollout */}
+        {sketchTool === 'TEXT' && (
+          <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden animate-in slide-in-from-top-2 duration-200">
+            <div className="px-2 py-1 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tighter flex items-center gap-1.5">
+                <span className="text-blue-600">✍️</span> Text Parameters
+              </span>
+            </div>
+            <div className="p-2 space-y-3">
+              <div className="space-y-1">
+                <label className="text-[9px] font-bold text-slate-500 uppercase">Input Text</label>
+                <input 
+                  type="text" 
+                  defaultValue="3D Builder"
+                  className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                  onChange={(e) => {
+                    // Update all selected text entities
+                    selectedEntityIds.forEach(id => {
+                      if (sketchEdges[id]?.type === 'TEXT') {
+                        updateEntityProperty(id, 'parameters', { ...sketchEdges[id].parameters, text: e.target.value });
+                      }
+                    });
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase">Height (mm)</label>
+                  <input 
+                    type="number" 
+                    defaultValue={10}
+                    className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                    onChange={(e) => {
+                      selectedEntityIds.forEach(id => {
+                        if (sketchEdges[id]?.type === 'TEXT') {
+                          updateEntityProperty(id, 'parameters', { ...sketchEdges[id].parameters, height: parseFloat(e.target.value) });
+                        }
+                      });
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[9px] font-bold text-slate-500 uppercase">Font</label>
+                  <select 
+                    className="w-full bg-white border border-slate-300 rounded px-1 py-1 text-[11px] font-bold"
+                    onChange={(e) => {
+                      selectedEntityIds.forEach(id => {
+                        if (sketchEdges[id]?.type === 'TEXT') {
+                          updateEntityProperty(id, 'parameters', { ...sketchEdges[id].parameters, font: e.target.value });
+                        }
+                      });
+                    }}
+                  >
+                    <option value="SingleLine">Stick (CNC)</option>
+                    <option value="Arial">Arial</option>
+                    <option value="Times New Roman">Times</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input 
+                  type="checkbox" 
+                  defaultChecked={true}
+                  id="single_line_check"
+                  onChange={(e) => {
+                    selectedEntityIds.forEach(id => {
+                      if (sketchEdges[id]?.type === 'TEXT') {
+                        updateEntityProperty(id, 'parameters', { ...sketchEdges[id].parameters, isSingleLine: e.target.checked });
+                      }
+                    });
+                  }}
+                />
+                <label htmlFor="single_line_check" className="text-[10px] font-bold text-slate-600">Single Line (CNC Mode)</label>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Global Relations Rollout (Show when nothing is selected) */}
+        {selectedEntityIds.length === 0 && (
+          <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden animate-in fade-in duration-300">
+            <div className="px-2 py-1 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tighter flex items-center gap-1.5">
+                <span className="text-emerald-600">📋</span> All Relations ({Object.keys(sketchConstraints).length})
+              </span>
+              <button 
+                onClick={() => {
+                  setSketchConstraints({});
+                  commitPreciseSketchSolve().then(() => triggerRebuild());
+                }}
+                className="text-[9px] text-red-600 hover:underline border-none bg-transparent cursor-pointer font-bold"
+              >
+                Delete All
+              </button>
+            </div>
+            <div className="p-2 space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar">
+              {Object.values(sketchConstraints).length === 0 ? (
+                <div className="text-[10px] text-slate-400 italic text-center py-4">No relations in this sketch.</div>
+              ) : (
+                Object.values(sketchConstraints).map(c => (
+                  <div 
+                    key={c.id}
+                    onMouseEnter={() => setHoveredEntityId(c.id)}
+                    onMouseLeave={() => setHoveredEntityId(null)}
+                    onClick={() => setSelectedEntityIds([c.id])}
+                    className="flex items-center justify-between p-1.5 bg-slate-50 border border-slate-200 rounded text-[11px] hover:bg-white hover:border-primary/40 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-[14px] text-emerald-600 font-bold">
+                        {c.type === 'HORIZONTAL' && '—'}
+                        {c.type === 'VERTICAL' && '│'}
+                        {c.type === 'COINCIDENT' && '•'}
+                        {c.type === 'DISTANCE' && '↔'}
+                        {c.type === 'ANGLE' && '∠'}
+                        {c.type === 'EQUAL' && '='}
+                        {c.type === 'PARALLEL' && '∥'}
+                        {c.type === 'PERPENDICULAR' && '⊥'}
+                        {c.type === 'CONCENTRIC' && '◎'}
+                        {c.type === 'COLLINEAR' && '⬌'}
+                        {c.type === 'TANGENT' && '○'}
+                      </span>
+                      <span className="font-bold text-slate-700 uppercase text-[9px]">{c.type}</span>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); deleteConstraint(c.id); }}
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all font-bold"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Selection Rollout */}
         <div className="bg-white border border-slate-300 rounded shadow-sm overflow-hidden">
           <div className="px-2 py-1 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
@@ -792,8 +1025,11 @@ export const SketchPropertyManager: React.FC = () => {
               { type: 'ANGLE', label: 'Angle', icon: '∠' },
               { type: 'PARALLEL', label: 'Parallel', icon: '∥' },
               { type: 'PERPENDICULAR', label: 'Perpend.', icon: '⊥' },
+              { type: 'COLLINEAR', label: 'Collinear', icon: '⬌' },
               { type: 'MIDPOINT', label: 'Midpoint', icon: '⬗' },
-              { type: 'SYMMETRIC', label: 'Symmetric', icon: '|⬵|' }
+              { type: 'SYMMETRIC', label: 'Symmetric', icon: '|⬵|' },
+              { type: 'FIX', label: 'Fix', icon: '🔒' },
+              { type: 'UNFIX', label: 'Unfix', icon: '🔓' }
               ].map(c => (
               <button
                 key={c.type}

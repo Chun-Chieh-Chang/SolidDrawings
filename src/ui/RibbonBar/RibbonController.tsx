@@ -11,7 +11,7 @@ interface RibbonControllerProps {
   engineStatus: 'CONNECTED' | 'DISCONNECTED';
   solidSketchPointCount: number;
   handleExitAndExtrude: (op?: any) => void;
-  handleRevolveFromSketch: () => void;
+  handleRevolveFromSketch: (op?: 'ADD' | 'CUT') => void;
   handleImportStep: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onShowMassProps?: () => void;
   onShowEquations?: () => void;
@@ -210,6 +210,29 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><polyline points="21 3 21 8 16 8"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Revolve</span>
+            </button>
+            <button
+              onClick={() => {
+                const loops = extractAllClosedLoops(sketchNodes, sketchEdges);
+                if (isSketchMode && loops.length > 0 && loops[0].length >= 3) {
+                  handleRevolveFromSketch('CUT');
+                } else { 
+                  setSketchMode(true); 
+                  setSketchTool('SELECT'); 
+                  if (isSketchMode && loops.length === 0) {
+                    pushToast('無法旋轉切除：需要閉合輪廓。', 'warning');
+                  } else {
+                    setHint('Draw closed profile, then Revolved Cut');
+                  }
+                }
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand ? 'border-transparent' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+              title="Revolved Cut"
+            >
+              <div className="w-10 h-10 flex items-center justify-center text-red-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M12 12L3 12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Rev<br/>Cut</span>
             </button>
             <button
               onClick={() => {
@@ -498,6 +521,28 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="2" x2="12" y2="22"/><polyline points="5 12 12 12 19 12"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Axis</span>
+            </button>
+
+            <button 
+              onClick={() => {
+                const featId = `feat_${uuidv4()}`;
+                addFeature({
+                  id: featId,
+                  type: 'REFERENCE_POINT',
+                  name: `Point ${features.filter(f => f.type === 'REFERENCE_POINT').length + 1}`,
+                  parameters: { pointType: 'FACE_CENTER', refs: [] }
+                });
+                setSelectedId(featId);
+                setSelectedSubNodeType('FEATURE');
+                setHint('Select entities to define the reference point.');
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Reference Point"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="3" fill="currentColor"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Point</span>
             </button>
             <button
               onClick={() => {

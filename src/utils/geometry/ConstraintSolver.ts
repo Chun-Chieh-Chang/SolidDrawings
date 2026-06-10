@@ -31,25 +31,48 @@ function applyConstraint(
 ) {
   switch (constraint.type) {
     case 'COINCIDENT': {
-      if (!constraint.nodeIds || constraint.nodeIds.length !== 2) return;
-      const n1 = nodes[constraint.nodeIds[0]];
-      const n2 = nodes[constraint.nodeIds[1]];
-      if (!n1 || !n2) return;
+      if (constraint.nodeIds && constraint.nodeIds.length === 2) {
+        const n1 = nodes[constraint.nodeIds[0]];
+        const n2 = nodes[constraint.nodeIds[1]];
+        if (!n1 || !n2) return;
 
-      const dx = n2.x - n1.x;
-      const dy = n2.y - n1.y;
+        const dx = n2.x - n1.x;
+        const dy = n2.y - n1.y;
 
-      // Determine weights based on fixed status
-      const w1 = n1.isFixed ? 0 : (n2.isFixed ? 1 : 0.5);
-      const w2 = n2.isFixed ? 0 : (n1.isFixed ? 1 : 0.5);
+        const w1 = n1.isFixed ? 0 : (n2.isFixed ? 1 : 0.5);
+        const w2 = n2.isFixed ? 0 : (n1.isFixed ? 1 : 0.5);
 
-      if (w1 > 0) {
-        n1.x += dx * w1;
-        n1.y += dy * w1;
-      }
-      if (w2 > 0) {
-        n2.x -= dx * w2;
-        n2.y -= dy * w2;
+        if (w1 > 0) { n1.x += dx * w1; n1.y += dy * w1; }
+        if (w2 > 0) { n2.x -= dx * w2; n2.y -= dy * w2; }
+      } else if (constraint.nodeIds && constraint.nodeIds.length === 1 && constraint.edgeIds && constraint.edgeIds.length === 1) {
+        // Point on Edge Coincident
+        const node = nodes[constraint.nodeIds[0]];
+        const edge = edges[constraint.edgeIds[0]];
+        if (!node || !edge || node.isFixed) return;
+
+        if (edge.type === 'LINE' || edge.type === 'CENTER_LINE') {
+          const e1 = nodes[edge.nodeIds[0]];
+          const e2 = nodes[edge.nodeIds[1]];
+          if (!e1 || !e2) return;
+          const dx = e2.x - e1.x;
+          const dy = e2.y - e1.y;
+          const l2 = dx*dx + dy*dy;
+          if (l2 < 1e-6) return;
+          const t = ((node.x - e1.x) * dx + (node.y - e1.y) * dy) / l2;
+          // In SolidWorks, Coincident to line usually means infinite line extension
+          node.x = e1.x + t * dx;
+          node.y = e1.y + t * dy;
+        } else if (edge.type === 'CIRCLE' || edge.type === 'ARC') {
+          const center = nodes[edge.nodeIds[0]];
+          const perim = nodes[edge.nodeIds[1]];
+          if (!center || !perim) return;
+          const R = Math.hypot(perim.x - center.x, perim.y - center.y);
+          const dist = Math.hypot(node.x - center.x, node.y - center.y);
+          if (dist < 1e-6) return;
+          const ratio = R / dist;
+          node.x = center.x + (node.x - center.x) * ratio;
+          node.y = center.y + (node.y - center.y) * ratio;
+        }
       }
       break;
     }
@@ -103,6 +126,26 @@ function applyConstraint(
         if (e_circle && e_circle.type === 'CIRCLE' && e_circle.nodeIds.length >= 2) {
            n2 = nodes[e_circle.nodeIds[0]];
         }
+      } else if (constraint.nodeIds && constraint.nodeIds.length === 1) {
+        // Absolute distance from Origin (0,0) or X/Y component
+        const node = nodes[constraint.nodeIds[0]];
+        if (!node || targetValue === undefined) return;
+
+        if (constraint.label === 'X') {
+          if (!node.isFixed) node.x = targetValue;
+        } else if (constraint.label === 'Y') {
+          if (!node.isFixed) node.y = targetValue;
+        } else {
+          // Distance from (0,0)
+          const curr = Math.hypot(node.x, node.y);
+          if (curr < 1e-6) return;
+          const ratio = targetValue / curr;
+          if (!node.isFixed) {
+            node.x *= ratio;
+            node.y *= ratio;
+          }
+        }
+        return;
       } else if (constraint.edgeIds && constraint.edgeIds.length === 2) {
         const e1 = edges[constraint.edgeIds[0]];
         const e2 = edges[constraint.edgeIds[1]];
@@ -198,59 +241,67 @@ function applyConstraint(
     }
 
     case 'EQUAL': {
-      // Equal length constraint between two edges
       if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
-      const e1 = edges[constraint.edgeIds[0]];
-      const e2 = edges[constraint.edgeIds[1]];
+      const e1 = edges[constraint.edgeIds?.[0] || ''];
+      const e2 = edges[constraint.edgeIds?.[1] || ''];
       if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return;
-      
-      const n1a = nodes[e1.nodeIds[0]];
-      const n1b = nodes[e1.nodeIds[1]];
-      const n2a = nodes[e2.nodeIds[0]];
-      const n2b = nodes[e2.nodeIds[1]];
-      if (!n1a || !n1b || !n2a || !n2b) return;
 
-      const l1 = Math.hypot(n1b.x - n1a.x, n1b.y - n1a.y);
-      const l2 = Math.hypot(n2b.x - n2a.x, n2b.y - n2a.y);
-      
-      if (l1 < 1e-6 || l2 < 1e-6) return;
+      if (e1.type === 'CIRCLE' && e2.type === 'CIRCLE') {
+        const c1 = nodes[e1.nodeIds[0]];
+        const p1 = nodes[e1.nodeIds[1]];
+        const c2 = nodes[e2.nodeIds[0]];
+        const p2 = nodes[e2.nodeIds[1]];
+        if (!c1 || !p1 || !c2 || !p2) return;
 
-      const avgLength = (l1 + l2) / 2.0;
+        const r1 = Math.hypot(p1.x - c1.x, p1.y - c1.y);
+        const r2 = Math.hypot(p2.x - c2.x, p2.y - c2.y);
+        const targetR = (r1 + r2) / 2;
 
-      // Relax Edge 1 towards avgLength
-      const diff1 = l1 - avgLength;
-      const ux1 = (n1b.x - n1a.x) / l1;
-      const uy1 = (n1b.y - n1a.y) / l1;
-      
-      const w1a = n1a.isFixed ? 0 : (n1b.isFixed ? 1 : 0.5);
-      const w1b = n1b.isFixed ? 0 : (n1a.isFixed ? 1 : 0.5);
-      
-      if (w1a > 0) {
-        n1a.x += ux1 * diff1 * w1a;
-        n1a.y += uy1 * diff1 * w1a;
+        const relaxRadius = (c: any, p: any, target: number) => {
+          const curr = Math.hypot(p.x - c.x, p.y - c.y);
+          if (curr < 1e-4) return;
+          const ratio = target / curr;
+          const wc = c.isFixed ? 0 : (p.isFixed ? 1 : 0.5);
+          const wp = p.isFixed ? 0 : (c.isFixed ? 1 : 0.5);
+
+          if (wp > 0) {
+            p.x = c.x + (p.x - c.x) * ratio;
+            p.y = c.y + (p.y - c.y) * ratio;
+          } else if (wc > 0) {
+            c.x = p.x - (p.x - c.x) * ratio;
+            c.y = p.y - (p.y - c.y) * ratio;
+          }
+        };
+
+        relaxRadius(c1, p1, targetR);
+        relaxRadius(c2, p2, targetR);
+      } else if ((e1.type === 'LINE' || e1.type === 'CENTER_LINE') && (e2.type === 'LINE' || e2.type === 'CENTER_LINE')) {
+        const n1a = nodes[e1.nodeIds[0]];
+        const n1b = nodes[e1.nodeIds[1]];
+        const n2a = nodes[e2.nodeIds[0]];
+        const n2b = nodes[e2.nodeIds[1]];
+        if (!n1a || !n1b || !n2a || !n2b) return;
+
+        const l1 = Math.hypot(n1b.x - n1a.x, n1b.y - n1a.y);
+        const l2 = Math.hypot(n2b.x - n2a.x, n2b.y - n2a.y);
+        if (l1 < 1e-6 || l2 < 1e-6) return;
+
+        const avgLength = (l1 + l2) / 2.0;
+
+        const relaxLine = (na: any, nb: any, target: number) => {
+          const curr = Math.hypot(nb.x - na.x, nb.y - na.y);
+          const diff = curr - target;
+          const ux = (nb.x - na.x) / curr;
+          const uy = (nb.y - na.y) / curr;
+          const wa = na.isFixed ? 0 : (nb.isFixed ? 1 : 0.5);
+          const wb = nb.isFixed ? 0 : (na.isFixed ? 1 : 0.5);
+          if (wa > 0) { na.x += ux * diff * wa; na.y += uy * diff * wa; }
+          if (wb > 0) { nb.x -= ux * diff * wb; nb.y -= uy * diff * wb; }
+        };
+
+        relaxLine(n1a, n1b, avgLength);
+        relaxLine(n2a, n2b, avgLength);
       }
-      if (w1b > 0) {
-        n1b.x -= ux1 * diff1 * w1b;
-        n1b.y -= uy1 * diff1 * w1b;
-      }
-
-      // Relax Edge 2 towards avgLength
-      const diff2 = l2 - avgLength;
-      const ux2 = (n2b.x - n2a.x) / l2;
-      const uy2 = (n2b.y - n2a.y) / l2;
-
-      const w2a = n2a.isFixed ? 0 : (n2b.isFixed ? 1 : 0.5);
-      const w2b = n2b.isFixed ? 0 : (n2a.isFixed ? 1 : 0.5);
-
-      if (w2a > 0) {
-        n2a.x += ux2 * diff2 * w2a;
-        n2a.y += uy2 * diff2 * w2a;
-      }
-      if (w2b > 0) {
-        n2b.x -= ux2 * diff2 * w2b;
-        n2b.y -= uy2 * diff2 * w2b;
-      }
-
       break;
     }
 
@@ -282,8 +333,8 @@ function applyConstraint(
 
     case 'TANGENT': {
       if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
-      const e1 = edges[constraint.edgeIds[0]];
-      const e2 = edges[constraint.edgeIds[1]];
+      const e1 = edges[constraint.edgeIds?.[0] || ''];
+      const e2 = edges[constraint.edgeIds?.[1] || ''];
       if (!e1 || !e2) return;
       
       const lineEdge = e1.type === 'LINE' ? e1 : (e2.type === 'LINE' ? e2 : null);
@@ -379,13 +430,54 @@ function applyConstraint(
           }
         }
       }
+      
+      // NEW: Spline Tangency
+      const spline = e1.type === 'SPLINE' ? e1 : (e2.type === 'SPLINE' ? e2 : null);
+      if (spline) {
+        const other = e1 === spline ? e2 : e1;
+        const commonId = spline.nodeIds.find(id => other.nodeIds.includes(id));
+        if (commonId) {
+          const common = nodes[commonId];
+          const neighborIdx = spline.nodeIds.indexOf(commonId) === 0 ? 1 : spline.nodeIds.length - 2;
+          const neighbor = nodes[spline.nodeIds[neighborIdx]];
+          if (!common || !neighbor) return;
+
+          let targetAngle = 0;
+          if (other.type === 'LINE' || other.type === 'CENTER_LINE') {
+             const p1 = nodes[other.nodeIds[0]];
+             const p2 = nodes[other.nodeIds[1]];
+             if (!p1 || !p2) return;
+             targetAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+          } else if (other.type === 'CIRCLE' || other.type === 'ARC') {
+             const pc = nodes[other.nodeIds[0]];
+             if (!pc) return;
+             const radialAngle = Math.atan2(common.y - pc.y, common.x - pc.x);
+             targetAngle = radialAngle + Math.PI / 2;
+          } else {
+             return;
+          }
+
+          const sAngle = Math.atan2(neighbor.y - common.y, neighbor.x - common.x);
+          let diff = sAngle - targetAngle;
+          diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+          if (Math.abs(diff) > Math.PI / 2) {
+            diff = diff > 0 ? diff - Math.PI : diff + Math.PI;
+          }
+
+          if (Math.abs(diff) > 1e-6 && !neighbor.isFixed) {
+            const mag = Math.hypot(neighbor.x - common.x, neighbor.y - common.y);
+            neighbor.x = common.x + Math.cos(sAngle - diff) * mag;
+            neighbor.y = common.y + Math.sin(sAngle - diff) * mag;
+          }
+        }
+      }
       break;
     }
 
     case 'ANGLE': {
       if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
-      const e1 = edges[constraint.edgeIds[0]];
-      const e2 = edges[constraint.edgeIds[1]];
+      const e1 = edges[constraint.edgeIds?.[0] || ''];
+      const e2 = edges[constraint.edgeIds?.[1] || ''];
       if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return;
 
       const p1a = nodes[e1.nodeIds[0]];
@@ -433,6 +525,216 @@ function applyConstraint(
 
       rotatePoint(p2a, m2x, m2y, err / 2);
       rotatePoint(p2b, m2x, m2y, err / 2);
+      break;
+    }
+
+    case 'COLLINEAR': {
+      if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
+      const e1 = edges[constraint.edgeIds?.[0] || ''];
+      const e2 = edges[constraint.edgeIds?.[1] || ''];
+      if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return;
+
+      const p1a = nodes[e1.nodeIds[0]];
+      const p1b = nodes[e1.nodeIds[1]];
+      const p2a = nodes[e2.nodeIds[0]];
+      const p2b = nodes[e2.nodeIds[1]];
+      if (!p1a || !p1b || !p2a || !p2b) return;
+
+      const dx1 = p1b.x - p1a.x;
+      const dy1 = p1b.y - p1a.y;
+      const dx2 = p2b.x - p2a.x;
+      const dy2 = p2b.y - p2a.y;
+
+      const len1Sq = dx1*dx1 + dy1*dy1;
+      const len2Sq = dx2*dx2 + dy2*dy2;
+      const len1 = Math.sqrt(len1Sq);
+      const len2 = Math.sqrt(len2Sq);
+      
+      if (len1 < 1e-4 || len2 < 1e-4) return;
+
+      // 1. Parallel enforcement
+      const angle1 = Math.atan2(dy1, dx1);
+      const angle2 = Math.atan2(dy2, dx2);
+      let errAngle = angle2 - angle1;
+      errAngle = Math.atan2(Math.sin(errAngle), Math.cos(errAngle));
+      if (Math.abs(errAngle) > Math.PI / 2) {
+         errAngle = errAngle > 0 ? errAngle - Math.PI : errAngle + Math.PI;
+      }
+
+      const rotatePoint = (pt: any, cx: number, cy: number, dTheta: number) => {
+        if (pt.isFixed) return;
+        const cos = Math.cos(dTheta);
+        const sin = Math.sin(dTheta);
+        const rx = pt.x - cx;
+        const ry = pt.y - cy;
+        pt.x = cx + rx * cos - ry * sin;
+        pt.y = cy + rx * sin + ry * cos;
+      };
+
+      if (Math.abs(errAngle) > 1e-6) {
+        const m1x = (p1a.x + p1b.x) / 2;
+        const m1y = (p1a.y + p1b.y) / 2;
+        const m2x = (p2a.x + p2b.x) / 2;
+        const m2y = (p2a.y + p2b.y) / 2;
+
+        rotatePoint(p1a, m1x, m1y, errAngle / 2);
+        rotatePoint(p1b, m1x, m1y, errAngle / 2);
+        rotatePoint(p2a, m2x, m2y, -errAngle / 2);
+        rotatePoint(p2b, m2x, m2y, -errAngle / 2);
+      }
+
+      // 2. Coincident to line enforcement
+      const nx = -dy1 / len1;
+      const ny = dx1 / len1;
+
+      const distA = (p2a.x - p1a.x) * nx + (p2a.y - p1a.y) * ny;
+      const distB = (p2b.x - p1a.x) * nx + (p2b.y - p1a.y) * ny;
+
+      const w1 = (p1a.isFixed && p1b.isFixed) ? 0 : 0.5;
+      const w2 = (p2a.isFixed && p2b.isFixed) ? 0 : 0.5;
+
+      if (w2 > 0) {
+        if (!p2a.isFixed) { p2a.x -= distA * nx * w2; p2a.y -= distA * ny * w2; }
+        if (!p2b.isFixed) { p2b.x -= distB * nx * w2; p2b.y -= distB * ny * w2; }
+      }
+      if (w1 > 0) {
+        const avgDist = (distA + distB) / 2;
+        if (!p1a.isFixed) { p1a.x += avgDist * nx * w1; p1a.y += avgDist * ny * w1; }
+        if (!p1b.isFixed) { p1b.x += avgDist * nx * w1; p1b.y += avgDist * ny * w1; }
+      }
+      break;
+      }
+
+      case 'PIERCE': {
+      if (!constraint.nodeIds || constraint.nodeIds.length !== 1) return;
+      const node = nodes[constraint.nodeIds[0]];
+      if (!node || node.isFixed) return;
+
+      if (constraint.value !== undefined && constraint.offset !== undefined) {
+        node.x = constraint.value;
+        node.y = constraint.offset;
+      }
+      break;
+      }
+
+      case 'PARALLEL': {
+      if (!constraint.nodeIds || constraint.nodeIds.length !== 1) return;
+      const node = nodes[constraint.nodeIds[0]];
+      if (!node || node.isFixed) return;
+
+      // For Pierce, 'value' and 'offset' in the constraint store the target U and V
+      if (constraint.value !== undefined && constraint.offset !== undefined) {
+        node.x = constraint.value;
+        node.y = constraint.offset;
+      }
+      break;
+    }
+
+    case 'PARALLEL': {
+      const e1 = edges[constraint.edgeIds?.[0] || ''];
+      const e2 = edges[constraint.edgeIds?.[1] || ''];
+      if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return;
+
+      const p1a = nodes[e1.nodeIds[0]];
+      const p1b = nodes[e1.nodeIds[1]];
+      const p2a = nodes[e2.nodeIds[0]];
+      const p2b = nodes[e2.nodeIds[1]];
+      if (!p1a || !p1b || !p2a || !p2b) return;
+
+      const dx1 = p1b.x - p1a.x;
+      const dy1 = p1b.y - p1a.y;
+      const dx2 = p2b.x - p2a.x;
+      const dy2 = p2b.y - p2a.y;
+
+      const len1 = Math.hypot(dx1, dy1);
+      const len2 = Math.hypot(dx2, dy2);
+      if (len1 < 1e-4 || len2 < 1e-4) return;
+
+      const angle1 = Math.atan2(dy1, dx1);
+      const angle2 = Math.atan2(dy2, dx2);
+      let err = angle2 - angle1;
+      
+      // Parallel means angle difference is 0 or PI
+      err = Math.atan2(Math.sin(err), Math.cos(err));
+      if (Math.abs(err) > Math.PI / 2) {
+         err = err > 0 ? err - Math.PI : err + Math.PI;
+      }
+
+      if (Math.abs(err) < 1e-6) return;
+
+      const rotatePoint = (pt: any, cx: number, cy: number, dTheta: number) => {
+        if (pt.isFixed) return;
+        const cos = Math.cos(dTheta);
+        const sin = Math.sin(dTheta);
+        const rx = pt.x - cx;
+        const ry = pt.y - cy;
+        pt.x = cx + rx * cos - ry * sin;
+        pt.y = cy + rx * sin + ry * cos;
+      };
+
+      const m1x = (p1a.x + p1b.x) / 2;
+      const m1y = (p1a.y + p1b.y) / 2;
+      const m2x = (p2a.x + p2b.x) / 2;
+      const m2y = (p2a.y + p2b.y) / 2;
+
+      rotatePoint(p1a, m1x, m1y, err / 2);
+      rotatePoint(p1b, m1x, m1y, err / 2);
+      rotatePoint(p2a, m2x, m2y, -err / 2);
+      rotatePoint(p2b, m2x, m2y, -err / 2);
+      break;
+    }
+
+    case 'PERPENDICULAR': {
+      if (!constraint.edgeIds || constraint.edgeIds.length !== 2) return;
+      const e1 = edges[constraint.edgeIds?.[0] || ''];
+      const e2 = edges[constraint.edgeIds?.[1] || ''];
+      if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return;
+
+      const p1a = nodes[e1.nodeIds[0]];
+      const p1b = nodes[e1.nodeIds[1]];
+      const p2a = nodes[e2.nodeIds[0]];
+      const p2b = nodes[e2.nodeIds[1]];
+      if (!p1a || !p1b || !p2a || !p2b) return;
+
+      const dx1 = p1b.x - p1a.x;
+      const dy1 = p1b.y - p1a.y;
+      const dx2 = p2b.x - p2a.x;
+      const dy2 = p2b.y - p2a.y;
+
+      const len1 = Math.hypot(dx1, dy1);
+      const len2 = Math.hypot(dx2, dy2);
+      if (len1 < 1e-4 || len2 < 1e-4) return;
+
+      const angle1 = Math.atan2(dy1, dx1);
+      const angle2 = Math.atan2(dy2, dx2);
+      let err = angle2 - angle1;
+      
+      // Perpendicular means angle difference is PI/2 or -PI/2
+      err = Math.atan2(Math.sin(err), Math.cos(err));
+      if (err > 0) err -= Math.PI / 2;
+      else err += Math.PI / 2;
+
+      if (Math.abs(err) < 1e-6) return;
+
+      const rotatePoint = (pt: any, cx: number, cy: number, dTheta: number) => {
+        if (pt.isFixed) return;
+        const cos = Math.cos(dTheta);
+        const sin = Math.sin(dTheta);
+        const rx = pt.x - cx;
+        const ry = pt.y - cy;
+        pt.x = cx + rx * cos - ry * sin;
+        pt.y = cy + rx * sin + ry * cos;
+      };
+
+      const m1x = (p1a.x + p1b.x) / 2;
+      const m1y = (p1a.y + p1b.y) / 2;
+      const m2x = (p2a.x + p2b.x) / 2;
+      const m2y = (p2a.y + p2b.y) / 2;
+
+      rotatePoint(p1a, m1x, m1y, err / 2);
+      rotatePoint(p1b, m1x, m1y, err / 2);
+      rotatePoint(p2a, m2x, m2y, -err / 2);
+      rotatePoint(p2b, m2x, m2y, -err / 2);
       break;
     }
 
@@ -543,10 +845,12 @@ export function calculateDOF(
   let dof = nonFixedCount * 2;
 
   for (const c of Object.values(constraints)) {
-    if (c.type === 'COINCIDENT' || c.type === 'CONCENTRIC') {
+    if (c.type === 'COINCIDENT') {
+      if (c.nodeIds?.length === 2) dof -= 2;
+      else if (c.nodeIds?.length === 1 && c.edgeIds?.length === 1) dof -= 1;
+    } else if (c.type === 'CONCENTRIC' || c.type === 'PIERCE') {
       dof -= 2;
     } else {
-      // HORIZONTAL, VERTICAL, DISTANCE, EQUAL, TANGENT, ANGLE, PARALLEL, PERPENDICULAR
       dof -= 1; 
     }
   }
@@ -579,6 +883,26 @@ export function analyzeSketchDefinitions(
           const n2 = relaxedNodes[constraint.nodeIds[1]];
           if (n1 && n2) {
             err = Math.hypot(n2.x - n1.x, n2.y - n1.y);
+          }
+        } else if (constraint.nodeIds && constraint.nodeIds.length === 1 && constraint.edgeIds && constraint.edgeIds.length === 1) {
+          const node = relaxedNodes[constraint.nodeIds[0]];
+          const edge = edges[constraint.edgeIds[0]];
+          if (node && edge) {
+            const e1 = relaxedNodes[edge.nodeIds[0]];
+            const e2 = relaxedNodes[edge.nodeIds[1]];
+            if (e1 && e2) {
+              if (edge.type === 'LINE' || edge.type === 'CENTER_LINE') {
+                const dx = e2.x - e1.x;
+                const dy = e2.y - e1.y;
+                const l = Math.hypot(dx, dy);
+                if (l > 1e-6) {
+                  err = Math.abs((node.x - e1.x) * (-dy / l) + (node.y - e1.y) * (dx / l));
+                }
+              } else if (edge.type === 'CIRCLE' || edge.type === 'ARC') {
+                const R = Math.hypot(e2.x - e1.x, e2.y - e1.y);
+                err = Math.abs(Math.hypot(node.x - e1.x, node.y - e1.y) - R);
+              }
+            }
           }
         }
         break;
@@ -732,6 +1056,88 @@ export function analyzeSketchDefinitions(
                 let diff = targetAngleRad - currentAngle;
                 diff = Math.atan2(Math.sin(diff), Math.cos(diff));
                 err = Math.abs(diff);
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 'PARALLEL': {
+        if (constraint.edgeIds && constraint.edgeIds.length === 2) {
+          const e1 = edges[constraint.edgeIds[0]];
+          const e2 = edges[constraint.edgeIds[1]];
+          if (e1 && e2 && e1.nodeIds.length >= 2 && e2.nodeIds.length >= 2) {
+            const p1a = relaxedNodes[e1.nodeIds[0]];
+            const p1b = relaxedNodes[e1.nodeIds[1]];
+            const p2a = relaxedNodes[e2.nodeIds[0]];
+            const p2b = relaxedNodes[e2.nodeIds[1]];
+            if (p1a && p1b && p2a && p2b) {
+              const dx1 = p1b.x - p1a.x;
+              const dy1 = p1b.y - p1a.y;
+              const dx2 = p2b.x - p2a.x;
+              const dy2 = p2b.y - p2a.y;
+              if (Math.hypot(dx1, dy1) > 1e-4 && Math.hypot(dx2, dy2) > 1e-4) {
+                const angle1 = Math.atan2(dy1, dx1);
+                const angle2 = Math.atan2(dy2, dx2);
+                let diff = angle2 - angle1;
+                diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                if (Math.abs(diff) > Math.PI / 2) {
+                   diff = diff > 0 ? diff - Math.PI : diff + Math.PI;
+                }
+                err = Math.abs(diff);
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 'PERPENDICULAR': {
+        if (constraint.edgeIds && constraint.edgeIds.length === 2) {
+          const e1 = edges[constraint.edgeIds[0]];
+          const e2 = edges[constraint.edgeIds[1]];
+          if (e1 && e2 && e1.nodeIds.length >= 2 && e2.nodeIds.length >= 2) {
+            const p1a = relaxedNodes[e1.nodeIds[0]];
+            const p1b = relaxedNodes[e1.nodeIds[1]];
+            const p2a = relaxedNodes[e2.nodeIds[0]];
+            const p2b = relaxedNodes[e2.nodeIds[1]];
+            if (p1a && p1b && p2a && p2b) {
+              const dx1 = p1b.x - p1a.x;
+              const dy1 = p1b.y - p1a.y;
+              const dx2 = p2b.x - p2a.x;
+              const dy2 = p2b.y - p2a.y;
+              if (Math.hypot(dx1, dy1) > 1e-4 && Math.hypot(dx2, dy2) > 1e-4) {
+                const angle1 = Math.atan2(dy1, dx1);
+                const angle2 = Math.atan2(dy2, dx2);
+                let diff = angle2 - angle1;
+                diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+                if (diff > 0) diff -= Math.PI / 2;
+                else diff += Math.PI / 2;
+                err = Math.abs(diff);
+              }
+            }
+          }
+        }
+        break;
+      }
+      case 'COLLINEAR': {
+        if (constraint.edgeIds && constraint.edgeIds.length === 2) {
+          const e1 = edges[constraint.edgeIds[0]];
+          const e2 = edges[constraint.edgeIds[1]];
+          if (e1 && e2 && e1.nodeIds.length >= 2 && e2.nodeIds.length >= 2) {
+            const p1a = relaxedNodes[e1.nodeIds[0]];
+            const p1b = relaxedNodes[e1.nodeIds[1]];
+            const p2a = relaxedNodes[e2.nodeIds[0]];
+            const p2b = relaxedNodes[e2.nodeIds[1]];
+            if (p1a && p1b && p2a && p2b) {
+              const dx1 = p1b.x - p1a.x;
+              const dy1 = p1b.y - p1a.y;
+              const len1 = Math.hypot(dx1, dy1);
+              if (len1 > 1e-4) {
+                const nx = -dy1 / len1;
+                const ny = dx1 / len1;
+                const distA = Math.abs((p2a.x - p1a.x) * nx + (p2a.y - p1a.y) * ny);
+                const distB = Math.abs((p2b.x - p1a.x) * nx + (p2b.y - p1a.y) * ny);
+                err = distA + distB;
               }
             }
           }

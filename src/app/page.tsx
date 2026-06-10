@@ -37,6 +37,7 @@ import { ExportModal } from '@/ui/Modals/ExportModal';
 import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
 import { EquationsModal } from '@/ui/Modals/EquationsModal';
 import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
+import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -463,6 +464,7 @@ export default function Home() {
         )}
       </div>
       <StatusBar />
+      <MaterialSelectorModal />
     </main>
   );
 }

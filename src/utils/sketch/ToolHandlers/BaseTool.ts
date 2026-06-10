@@ -4,6 +4,7 @@ export interface SketchToolContext {
   snappedU: number;
   snappedV: number;
   snappedNodeId: string | null;
+  snappedEdgeId?: string | null;
   shiftKey: boolean;
   activeSnapType?: string;
 }

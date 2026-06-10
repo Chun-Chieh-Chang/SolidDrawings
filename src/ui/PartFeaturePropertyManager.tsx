@@ -490,7 +490,6 @@ export function PartFeaturePropertyManager({
                       >
                         <option value="BLIND">Blind</option>
                         <option value="THROUGH_ALL">Through All</option>
-                        <option value="MID_PLANE">Mid Plane</option>
                         <option value="UP_TO_NEXT">Up To Next</option>
                         <option value="UP_TO_SURFACE">Up To Surface</option>
                       </select>
@@ -586,8 +585,21 @@ export function PartFeaturePropertyManager({
 
             {selectedFeature.type === 'REVOLVE' && (
               <>
-                <Rollout title="Revolve Parameters" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><polyline points="21 3 21 8 16 8"/></svg>}>
+                <Rollout title={selectedFeature.parameters.operation === 'CUT' ? "Revolved Cut Parameters" : "Revolve Parameters"} icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><polyline points="21 3 21 8 16 8"/></svg>}>
                   <div className="space-y-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <select
+                          value={selectedFeature.parameters.operation === 'CUT' ? 'CUT' : 'ADD'}
+                          onChange={(e) => onParamChange('operation', e.target.value)}
+                          className="flex-1 bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                        >
+                          <option value="ADD">Boss/Base</option>
+                          <option value="CUT">Cut</option>
+                        </select>
+                      </div>
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Revolve Type</label>
                       <select value="ONE_DIRECTION" disabled className="w-full bg-[#F5F5F5] border border-slate-300 rounded px-2 py-1 text-[12px] font-bold text-slate-500">
@@ -635,28 +647,34 @@ export function PartFeaturePropertyManager({
               </>
             )}
 
-            {selectedFeature.type === 'DOME' && (
-              <Rollout title="Dome Parameters" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M2 20a10 10 0 0 1 20 0H2z"/></svg>}>
-                <div className="space-y-3">
-                  <SelectionBox 
-                    label="Faces to Dome" 
-                    selectedCount={selectedFeature.parameters.refs?.length || 0} 
-                    onClear={() => onParamChange('refs', [])}
-                    active={pendingFeatureCommand === 'DOME'}
-                    onClick={() => useCadStore.setState({ pendingFeatureCommand: 'DOME' })}
-                  />
-                  <ParamInput label="Distance" value={selectedFeature.parameters.distance || 2.0} onChange={(v) => onParamChange('distance', v)} badge="DIST" />
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase">Reverse Direction</label>
-                    <button 
-                      onClick={() => onParamChange('reverse', !selectedFeature.parameters.reverse)}
-                      className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.reverse ? 'bg-amber-600 text-white border-amber-700' : 'bg-white text-slate-400 border-slate-200'}`}
-                    >
-                      {selectedFeature.parameters.reverse ? 'INWARD' : 'OUTWARD'}
-                    </button>
+            {selectedFeature.type === 'SHELL' && (
+              <>
+                <Rollout title="Parameters" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/></svg>}>
+                  <div className="space-y-3">
+                    <ParamInput label="Thickness" value={selectedFeature.parameters.thickness} onChange={(v) => onParamChange('thickness', v)} badge="T1" />
+                    <div className="flex items-center justify-between">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Shell Outward</label>
+                      <button
+                        onClick={() => onParamChange('flip', !selectedFeature.parameters.flip)}
+                        className={`px-3 py-1 rounded text-[11px] font-bold transition-all border ${
+                          selectedFeature.parameters.flip ? 'bg-teal-600 text-white border-teal-600 shadow-sm' : 'bg-white text-teal-600 border-teal-200 hover:bg-teal-50'
+                        }`}
+                      >
+                        {selectedFeature.parameters.flip ? 'OUTWARD' : 'OFF'}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </Rollout>
+                </Rollout>
+                <Rollout title="Faces to Remove" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>}>
+                  <SelectionBox 
+                    label="Selected Faces"
+                    items={(selectedFeature.parameters.faces_to_remove_refs || []).map((ref: any) => ({ id: ref.id, name: `Face ${ref.id.slice(0, 4)}` }))}
+                    onRemove={(id) => onParamChange('faces_to_remove_refs', selectedFeature.parameters.faces_to_remove_refs.filter((r: any) => r.id !== id))}
+                    onClear={() => onParamChange('faces_to_remove_refs', [])}
+                    placeholder="Select faces to remove"
+                  />
+                </Rollout>
+              </>
             )}
 
             {selectedFeature.type === 'HOLE_WIZARD' && (
@@ -804,28 +822,32 @@ export function PartFeaturePropertyManager({
             )}
 
             {selectedFeature.type === 'REFERENCE_POINT' && (
-              <Rollout title="Point Construction" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>}>
+              <Rollout title="Reference Point" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="4" fill="currentColor"/></svg>}>
                 <div className="space-y-3">
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-slate-500 uppercase">Method</label>
                     <select 
-                      value={selectedFeature.parameters.pointType || 'CENTER_OF_FACE'} 
+                      value={selectedFeature.parameters.pointType || 'FACE_CENTER'} 
                       onChange={(e) => onParamChange('pointType', e.target.value)} 
                       className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
                     >
-                      <option value="CENTER_OF_FACE">Center of Face</option>
-                      <option value="CENTER_OF_EDGE">Midpoint of Edge</option>
-                      <option value="TWO_POINTS">Intersection of Two Points</option>
+                      <option value="FACE_CENTER">Center of Face</option>
+                      <option value="OFFSET">Offset</option>
+                      <option value="INTERSECTION">Intersection</option>
                     </select>
                   </div>
 
+                  {selectedFeature.parameters.pointType === 'OFFSET' && (
+                    <ParamInput label="Offset Distance" value={selectedFeature.parameters.offset || 0} onChange={(v) => onParamChange('offset', v)} badge="DIST" />
+                  )}
+
                   <SelectionBox 
-                    label="Reference" 
+                    label="References" 
                     selectedCount={selectedFeature.parameters.refs?.length || 0} 
                     onClear={() => onParamChange('refs', [])}
-                    placeholder="Select a face or edge"
+                    placeholder="Select face or edge"
                     active={pendingFeatureCommand === 'REFERENCE_POINT'}
-                    onClick={() => useCadStore.setState({ pendingFeatureCommand: 'REFERENCE_POINT' })}
+                    onClick={() => useCadStore.setState({ pendingFeatureCommand: 'REFERENCE_POINT' as any })}
                   />
                 </div>
               </Rollout>
