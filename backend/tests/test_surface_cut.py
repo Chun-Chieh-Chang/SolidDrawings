@@ -51,7 +51,6 @@ def test_surface_cut():
         }
     ]
     
-    from app.services.geometry_service import TopoDS_Shape
     # process_features requires a proper mock for TNS linker.
     # We can pass an empty list of updates.
     updates = []
