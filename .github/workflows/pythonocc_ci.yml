@@ -15,28 +15,34 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Miniforge (Mamba)
+      - name: Setup Miniforge
         uses: conda-incubator/setup-miniconda@v3
         with:
           miniforge-version: latest
           python-version: "3.10"
-          activate-environment: test-env
           use-mamba: true
           channels: conda-forge
           channel-priority: true
-          conda-remove-defaults: "true"
+          activate-environment: test-env
+
+      - name: Debug environment
+        run: |
+          echo "Python: $(which python)"
+          echo "Python version: $(python --version)"
+          echo "Conda env: $CONDA_DEFAULT_ENV"
+          mamba list python
+          mamba list pythonocc-core || echo "pythonocc-core NOT installed"
 
       - name: Install Dependencies
         run: |
-          mamba install -y \
-            pythonocc-core \
+          mamba install -c conda-forge -y \
+            pythonocc-core=7.8.1 \
             pytest \
             fastapi \
             pydantic \
             httpx \
             uvicorn \
             python-multipart
-          echo "pythonocc-core installed successfully"
 
       - name: Verify pythonocc-core
         run: |
