@@ -1139,10 +1139,21 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             # --- TNS 2.0 Tracking ---
             feat_id = params.get('id', 'unknown')
             for eid, local_edge in edge_map.items():
-                gen_face = revol_tool.Generated(local_edge)
-                if not gen_face.IsNull():
-                    gen_face.Move(TopLoc_Location(trsf))
-                    linker.record_generation(f"{eid}_GEN", gen_face)
+                gen_faces = revol_tool.Generated(local_edge)
+                if gen_faces is not None:
+                    try:
+                        it = TopTools_ListIteratorOfListOfShape(gen_faces)
+                        while it.More():
+                            gf = it.Value()
+                            it.Next()
+                            if gf and not gf.IsNull():
+                                gf.Move(TopLoc_Location(trsf))
+                                linker.record_generation(f"{eid}_GEN", gf)
+                                break
+                    except:
+                        if hasattr(gen_faces, 'IsNull') and not gen_faces.IsNull():
+                            gen_faces.Move(TopLoc_Location(trsf))
+                            linker.record_generation(f"{eid}_GEN", gen_faces)
             
             if angle < 2 * math.pi:
                 start_cap = revol_tool.FirstShape()
@@ -1536,40 +1547,56 @@ class TopologicalLinker:
                     
                     # Get Generated
                     generated_list = tool.Generated(sub)
-                    if generated_list and not (hasattr(generated_list, 'IsEmpty') and generated_list.IsEmpty()):
-                        # In some OCC versions, generated_list might not have IsNull but IsEmpty
-                        # For TopTools_ListOfShape, we iterate using TopExp_Explorer or ListIterator
+                    if generated_list is not None:
                         try:
-                            exp_gen = TopExp_Explorer(generated_list, sub_type)
-                            while exp_gen.More():
-                                gen_sub = exp_gen.Current()
+                            # In pythonocc 7.8+, Generated() returns TopTools_ListOfShape
+                            # It is NOT a TopoDS_Shape, so TopExp_Explorer fails.
+                            # It is NOT a Python iterable, so 'for' fails.
+                            # Must use TopTools_ListIteratorOfListOfShape.
+                            it = TopTools_ListIteratorOfListOfShape(generated_list)
+                            while it.More():
+                                gen_sub = it.Value()
+                                it.Next()
+                                if gen_sub and not gen_sub.IsNull():
+                                    h_gen = get_shape_hash(gen_sub, 10000000)
+                                    if h_sub not in self.mapping: self.mapping[h_sub] = []
+                                    self.mapping[h_sub].append(h_gen)
+                                    self.shape_pool[h_gen] = gen_sub
+                                    # Propagate Color to Generated
+                                    if sub_color: self.color_map[h_gen] = sub_color
+                        except:
+                            # Fallback if generated_list is a single TopoDS_Shape (older versions)
+                            if hasattr(generated_list, 'IsNull') and not generated_list.IsNull():
+                                gen_sub = generated_list
                                 h_gen = get_shape_hash(gen_sub, 10000000)
                                 if h_sub not in self.mapping: self.mapping[h_sub] = []
                                 self.mapping[h_sub].append(h_gen)
                                 self.shape_pool[h_gen] = gen_sub
-                                # Propagate Color to Generated
                                 if sub_color: self.color_map[h_gen] = sub_color
-                                exp_gen.Next()
-                        except:
-                            # Fallback if generated_list is a TopoDS_Shape or other iterable
-                            pass
                         
                     # Get Modified
                     modified_list = tool.Modified(sub)
-                    if modified_list and not (hasattr(modified_list, 'IsEmpty') and modified_list.IsEmpty()):
+                    if modified_list is not None:
                         try:
-                            exp_mod = TopExp_Explorer(modified_list, sub_type)
-                            while exp_mod.More():
-                                mod_sub = exp_mod.Current()
+                            it = TopTools_ListIteratorOfListOfShape(modified_list)
+                            while it.More():
+                                mod_sub = it.Value()
+                                it.Next()
+                                if mod_sub and not mod_sub.IsNull():
+                                    h_mod = get_shape_hash(mod_sub, 10000000)
+                                    if h_sub not in self.mapping: self.mapping[h_sub] = []
+                                    self.mapping[h_sub].append(h_mod)
+                                    self.shape_pool[h_mod] = mod_sub
+                                    # Propagate Color to Modified
+                                    if sub_color: self.color_map[h_mod] = sub_color
+                        except:
+                            if hasattr(modified_list, 'IsNull') and not modified_list.IsNull():
+                                mod_sub = modified_list
                                 h_mod = get_shape_hash(mod_sub, 10000000)
                                 if h_sub not in self.mapping: self.mapping[h_sub] = []
                                 self.mapping[h_sub].append(h_mod)
                                 self.shape_pool[h_mod] = mod_sub
-                                # Propagate Color to Modified
                                 if sub_color: self.color_map[h_mod] = sub_color
-                                exp_mod.Next()
-                        except:
-                            pass
                     exp.Next()
 
 linker = TopologicalLinker()
@@ -1671,9 +1698,19 @@ def process_features(features, deflection=0.01):
                                     signature = ref.get('signature')
                                     matched_edge = find_matching_edge(final_shape, edge_data.get('start'), edge_data.get('end'), signature)
                                     if matched_edge:
-                                        gen_face = fillet_tool.Generated(matched_edge)
-                                        if gen_face and not gen_face.IsNull():
-                                            linker.record_generation(f"{f_id}_GEN", gen_face)
+                                        gen_faces = fillet_tool.Generated(matched_edge)
+                                        if gen_faces is not None:
+                                            try:
+                                                it = TopTools_ListIteratorOfListOfShape(gen_faces)
+                                                while it.More():
+                                                    gf = it.Value()
+                                                    it.Next()
+                                                    if gf and not gf.IsNull():
+                                                        linker.record_generation(f"{f_id}_GEN", gf)
+                                                        break
+                                            except:
+                                                if hasattr(gen_faces, 'IsNull') and not gen_faces.IsNull():
+                                                    linker.record_generation(f"{f_id}_GEN", gen_faces)
                                 final_shape = res_shape
                     except Exception as fillet_err:
                         print(f"[ERROR] Fillet failed: {fillet_err}")
@@ -2113,9 +2150,19 @@ def build_shape_only(
                                     signature = ref.get('signature')
                                     matched_edge = find_matching_edge(final_shape, edge_data.get('start'), edge_data.get('end'), signature)
                                     if matched_edge:
-                                        gen_face = fillet_tool.Generated(matched_edge)
-                                        if gen_face and not gen_face.IsNull():
-                                            linker.record_generation(f"{f_id}_GEN", gen_face)
+                                        gen_faces = fillet_tool.Generated(matched_edge)
+                                        if gen_faces is not None:
+                                            try:
+                                                it = TopTools_ListIteratorOfListOfShape(gen_faces)
+                                                while it.More():
+                                                    gf = it.Value()
+                                                    it.Next()
+                                                    if gf and not gf.IsNull():
+                                                        linker.record_generation(f"{f_id}_GEN", gf)
+                                                        break
+                                            except:
+                                                if hasattr(gen_faces, 'IsNull') and not gen_faces.IsNull():
+                                                    linker.record_generation(f"{f_id}_GEN", gen_faces)
                                 final_shape = res_shape
                     except Exception as fillet_err:
                         print(f"[ERROR] Fillet failed: {fillet_err}")

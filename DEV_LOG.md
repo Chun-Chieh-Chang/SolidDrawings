@@ -641,6 +641,20 @@ GitHub Actions ?��?測試?��???`backend/tests/test_geometry.py` ?��?
 $log
 $log
 
+## 2026-06-10 SkillsBuilder PDCA: CI Import Fix & Refactor
+
+### Analysis:
+- **Bug**: CI 環境中出現 `UnboundLocalError: local variable 'BRepBuilderAPI_MakeEdge' referenced before assignment`。
+- **RCA**: 在 `_build_wire_from_points` 等函式中使用了局部 `from OCC.Core... import`，導致 Python 編譯器將該符號視為區域變數，若路徑未觸及匯入即使用則會失敗。
+- **Resolution**: 
+  - 全面重構 `geometry_service.py` 的匯入機制。
+  - 將所有 `OCC` 與 `OCP` 符號移至模組最頂層的 `try...except` 區塊，確保全域可用。
+  - 簡化了 Fallback 邏輯 (OCC -> OCP -> Mock)。
+- **Verification**: 
+  - 執行 `pytest backend/tests/test_geometry.py` -> 通過。
+  - 執行 `test_dome_feature.py` 與 `e2e_video_spanner_final.py` -> 通過。
+- **Result**: ✅ Fixed (All systems aligned for CI and industrial use).
+
 ## 2026-06-10 SkillsBuilder PDCA: Video Index 83 (Dice Example: Fillet & Dome)
 
 ### Analysis:

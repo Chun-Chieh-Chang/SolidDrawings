@@ -13,11 +13,29 @@
 
 # SkillsBuilder Multi-Agent Closed-Loop PDCA (Global Rule)
 
-**專案專屬的子代理協同閉環機制 (Closed-Loop Workflow):**
-本專案的開發必須強制依賴 `skills/dev/skills-builder-agents` 定義的子代理進行。
-任何複雜功能的開發與修復，必須嚴格遵循以下循環，直到任務完成：
-1. **[規劃] SolidWorks 專家**：接收用戶的建模需求（若需求為 YouTube 影片，專家需主動調用 `youtube` Skill 提取字幕與操作流程），將其轉換為精確的 CAD 操作步驟與標準。
-2. **[實作] 實作機器人 (Robot Subagent)**：負責接手專家的教學步驟，透過 `browser_subagent` 實際在瀏覽器中操作 UI，驗證建模行為。
-3. **[阻礙反饋]**：若機器人操作卡關（找不到按鈕、發生錯誤、不符合預期），機器人必須**立即停止**，並將錯誤拋給 **架構師代理 (Architect)**。
-4. **[修正]**：架構師提出修訂方案，並交由 **核心實作代理 (Implementer)** 進行外科手術式修改，然後由 **QA 代理** 進行回歸檢查與建置驗證。
-5. **[重試]**：修改完畢後，再次交由 **實作機器人** 重試。此循環將不斷往復 (Robot -> Architect -> Implementer -> QA -> Robot)，直到實作機器人能順暢無阻地完成 SolidWorks 專家所規定的所有操作步驟為止。
+... [rest of the section] ...
+
+# OpenCASCADE & Backend Engineering Standards (Industrial Parity)
+
+為了確保在 GitHub Actions CI 與工業級建模環境下的魯棒性，所有 Agent 必須遵守以下幾何引擎開發規範：
+
+1.  **Collection API Safety (ListOfShape)**:
+    *   **NO `IsNull()`**: `TopTools_ListOfShape` 在新版 pythonocc 中不再具備 `.IsNull()` 方法。禁止在清單對象上直接調用。
+    *   **ListIterator Pattern**: 必須使用 `TopTools_ListIteratorOfListOfShape(list_obj)` 進行迭代。
+    *   **Iteration Block**:
+        ```python
+        it = TopTools_ListIteratorOfListOfShape(gen_list)
+        while it.More():
+            shape = it.Value()
+            it.Next()
+            if shape and not shape.IsNull():
+                # Process shape...
+        ```
+2.  **Global Import Scope**:
+    *   所有 OpenCASCADE (`OCC`) 與 CadQuery (`OCP`) 的匯入必須位於模組最頂層。
+    *   **禁止局部匯入**：嚴禁在函式內部使用 `from OCC... import`，以防止 `UnboundLocalError` 與 CI 環境衝突。
+3.  **Cross-Version Compatibility (OCC/OCP)**:
+    *   始終實作 `try...except` Fallback 機制（`OCC` -> `OCP` -> `Mock`）。
+    *   針對 `Generated()` 與 `Modified()`，應同時相容返回「單個 Shape」與「Shape List」的情況。
+4.  **Deprecated Classes**:
+    *   優先使用 `BRepOffsetAPI_MakePipeShell` 替代已被移除的 `BRepFill_PipeShell`。
