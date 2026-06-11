@@ -78,6 +78,7 @@ export const SketchPropertyManager: React.FC = () => {
     sketchTool,
     setSketchTool,
     setHoveredEntityId,
+    pushToast,
   } = useCadStore();
 
   const [isEditName, setIsEditName] = useState<string | null>(null);
@@ -185,7 +186,7 @@ export const SketchPropertyManager: React.FC = () => {
     }
   };
 
-  const applyConstraint = async (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR' | 'COLLINEAR' | 'FIX' | 'UNFIX') => {
+  const applyConstraint = async (type: 'COINCIDENT' | 'HORIZONTAL' | 'VERTICAL' | 'DISTANCE' | 'EQUAL' | 'CONCENTRIC' | 'TANGENT' | 'ANGLE' | 'PARALLEL' | 'PERPENDICULAR' | 'COLLINEAR' | 'FIX' | 'UNFIX' | 'SYMMETRIC' | 'MIDPOINT') => {
     if (type === 'FIX') {
       handleFixSelection(true);
       return;
@@ -210,6 +211,25 @@ export const SketchPropertyManager: React.FC = () => {
         newConstraint.nodeIds = [selectedNodes[0].id];
         newConstraint.edgeIds = [selectedEdges[0].id];
       } else {
+        return;
+      }
+    } else if (type === 'SYMMETRIC') {
+      // 2 nodes and 1 center line
+      const centerLine = selectedEdges.find(e => e.type === 'CENTER_LINE');
+      if (selectedNodes.length === 2 && centerLine) {
+        newConstraint.nodeIds = [selectedNodes[0].id, selectedNodes[1].id];
+        newConstraint.edgeIds = [centerLine.id];
+      } else {
+        pushToast('Symmetric requires 2 points and 1 center line.', 'info');
+        return;
+      }
+    } else if (type === 'MIDPOINT') {
+      // 1 node and 1 edge
+      if (selectedNodes.length === 1 && selectedEdges.length === 1) {
+        newConstraint.nodeIds = [selectedNodes[0].id];
+        newConstraint.edgeIds = [selectedEdges[0].id];
+      } else {
+        pushToast('Midpoint requires 1 point and 1 edge.', 'info');
         return;
       }
     } else if (type === 'DISTANCE') {
