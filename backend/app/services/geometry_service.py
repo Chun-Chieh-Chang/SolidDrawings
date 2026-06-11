@@ -1562,9 +1562,14 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             # Extract outer loops for each profile
             profile_wires = []
             for sketch_loops in profiles_data:
-                if not sketch_loops or not sketch_loops[0]: continue
-                # Use the first (outer) loop of the sketch
-                wire = _build_wire_from_points(sketch_loops[0], is_closed=not is_surface)
+                if not sketch_loops: continue
+                # Handle both List[List[Point]] (list of sketch loops) and List[Point] (single loop)
+                if isinstance(sketch_loops[0][0], (int, float)):
+                    loop_pts = sketch_loops
+                else:
+                    if not sketch_loops[0]: continue
+                    loop_pts = sketch_loops[0]
+                wire = _build_wire_from_points(loop_pts, is_closed=not is_surface)
                 profile_wires.append(wire)
             
             if len(profile_wires) < 2: return None
@@ -2232,8 +2237,12 @@ def process_features(features, deflection=0.01):
                     if op == 'ADD': final_shape = BRepAlgoAPI_Fuse(final_shape, current_feat_shape).Shape()
                     else: final_shape = BRepAlgoAPI_Cut(final_shape, current_feat_shape).Shape()
 
-    if final_shape:
-        return {"type": "mesh", "data": _shape_to_mesh(final_shape, deflection), "ref_geometry": ref_geometry}
+    if final_shape or len(ref_geometry) > 0:
+        return {
+            "type": "mesh",
+            "data": _shape_to_mesh(final_shape, deflection) if final_shape else {"vertices": [], "indices": [], "normals": []},
+            "ref_geometry": ref_geometry
+        }
     return None
 
 def build_shape_only(
