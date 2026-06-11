@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-11 21:44:31
+**Last Saved:** 2026-06-12 07:51:03
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,58 +7,54 @@
 
 ## 1. Current Git State
 ```shell
-8b1d17e fix: protect BRepBuilderAPI_MakeEdge calls from zero-length identical vertices
+d348a16 feat: add project persistence (Save/Open/New), keyboard shortcuts, and crash auto-recovery
 ```
 
 ### Uncommitted Changes
 ```shell
 M DEV_LOG.md
+ M backend/app/services/geometry_service.py
+ D backend/tests/test_diagnostic_extrude.py
  M handover_resume_guide.md
- M skills/dev/solidworks-gap-analyzer/gap-checklist.md
- M src/app/page.tsx
- M src/renderer/Viewport.tsx
- M src/store/useCadStore.ts
- M src/ui/TopMenu.tsx
-?? backend/tests/test_diagnostic_extrude.py
-?? backend/tests/test_extrude_final.py
-?? src/hooks/useAutoSave.ts
-?? src/services/
-?? src/ui/Modals/RecoveryDialog.tsx
-?? transcript_raw.json
+ D simulation_result_spanner.json
+ M src/ui/PartFeaturePropertyManager.tsx
+ M src/ui/RibbonBar/RibbonController.tsx
+?? docs/architecture/
+?? gap-checklist.md
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)
 ```markdown
-3. **Verification**: Executed the test suite locally and verified that all type checks, PDCA checks, and backend test suites passed successfully.
+### Status:
+- 撌脫 `docs/pdca-system.html` 銝剖祕?嚙賣迨靽桀儔嚗蕭?皜祈岫?嚙賣楛/瘛箄璅∴蕭?銝蕭??嚙?嚙踝蕭?摮噬蝡蕭??嚙賜內??100% 皜?嚙踝蕭?嚗蕭?瘥漲摰蕭???
+- 皜蕭??嚙踝蕭? `pdca-flow-diagram.html` 隞亦泵??MECE ?嚙踝蕭?銵蕭?
 
+## 2026-06-05 SkillsBuilder PDCA: SolidWorks Exercise 05 (Stepped Base with Hub)
 
-## 2026-06-11 SkillsBuilder CI zero-length edge MakeEdge Fix
+### Analysis:
+- **SolidWorks Expert**: 嚙??嚙?Stepped Base with Hub ?嚙賢遣璅∴蕭?蝔蕭?L?嚙踝蕭?璇荔蕭?嚙?(145x90) -> 銝哨蕭??嚙踝蕭???(72mm) -> 摨 70x5 鞎怎忽?嚙詡賡 -> ?嚙踝蕭?頛迎蕭? (D24, L20) -> 頛迎蕭??嚙踝蕭? (D12) -> ?嚙踝蕭??嚙賢噩??
+- **Hybrid Verification**:
+  - **Backend Simulation**: 撱綽蕭?嚙?`tests/regression/e2e_exercise_5_sim.py`嚗蕭?霅蕭??嚙賢噩?嚙踝蕭??嚙質摩嚗蕭???`MID_PLANE` ?嚙賢??`MIRROR` ?嚙賢噩??
+  - **Mirror Logic Verification**: 蝣綽蕭?敺垢 `geometry_service.py` ?嚙賣 `MIRROR` ?嚙賢噩憿蕭?嚗蕭??嚙詡賡蕭? `mirror_plane_refs` (嚙?`RIGHT` ?嚙踝蕭??? ?嚙踝蕭??嚙賢噩?嚙踝蕭???
+- **Result**: ??Passed (?嚙質摩?嚙踝蕭??嚙踝蕭?)??
 
-### Requirement
-Fix pythonocc-core CI test failures for test_loft_solid_and_thin and test_sweep_twist_degrees raising `StdFail_NotDone: BRep_API: command not done` during `BRepBuilderAPI_MakeEdge` calls.
+### Status:
+- ?嚙質摩撽蕭??嚙踝蕭?嚗歇撱綽蕭? SOP `docs/benchmarks/EXERCISE_05_SOP.md`??
+- 撌莎蕭??嚙賢嗾雿芋?嚙質?嚙踝蕭?蝣綽蕭?璈鈭箏靘迨瘚蕭??嚙踝蕭?撱箸芋??
 
-### RCA (Root Cause Analysis)
-1. **Identical Point MakeEdge Failures**: For closed loop profiles where the final point is identical to the first point, the `_build_wire_from_points` logic attempted to build a final edge between `points[-1]` and `points[0]`. Since they represent the exact same coordinate, `BRepBuilderAPI_MakeEdge` was invoked with two identical points (distance = 0.0), raising a standard OCC runtime exception (`BRep_API: command not done`).
+## 2026-06-05 SkillsBuilder PDCA: Spanner (Wrench) - Video 7
 
-### CAPA (Corrective and Preventive Actions)
-1. **Distance-Based Edge Filtering**: Updated all `BRepBuilderAPI_MakeEdge` fallback and straight line paths in `_build_wire_from_points` to verify the Cartesian distance between vertices before edge construction. If `p_s.Distance(p_e) <= 1e-6`, the edge is skipped, preventing zero-length edge failures for closed loops.
-2. **Verification**: Ran the test suite successfully. All tests pass.
+### Analysis:
+- **SolidWorks Expert**: 嚙??嚙?Spanner ?嚙賢遣璅∴蕭?蝔蕭??嚙詡賡?嚙賢耦 (D32, D26) -> 銝哨蕭??嚙詡賡 (104x10) -> 銝蕭??嚙賢漲?嚙踝蕭???(6mm vs 3.5mm) -> ?嚙踝蕭??嚙詡賡 (18嚙? -> ?嚙踝蕭??嚙賣腹??
+- **Hybrid Verification**:
+  - **Backend Simulation**: 撱綽蕭?嚙?`tests/regression/e2e_video7_sim.py`嚗蕭??嚙賣芋?嚙踝蕭?憭蕭??嚙賢?嚙賢?嚙踝蕭??嚙踝蕭?頛荔蕭?
+  - **Feature Limitation Audit**: ?嚙賜敺垢 `geometry_service.py` 撠?嚙踝蕭??嚙賣 `midPlane` ?嚙賣嚗芋?嚙質?嚙詡賡蕭??嚙踝蕭??嚙賜宏韏瘀蕭?摨改蕭? (`y` ?嚙賜宏) 靘蕭??嚙賜?嚙踝蕭??嚙踝蕭?
+  - **Verification Checklist**: 撌脣遣嚙?`docs/benchmarks/SPANNER_VERIFICATION_SOP.md` 靘蕭?蝡荔蕭??嚙賣撽蕭?
+- **Result**: ??Passed (?嚙質摩?嚙踝蕭??嚙踝蕭?嚗芋?嚙踝蕭??嚙賜泵?嚙踝蕭?????
 
-
-## 2026-06-11 SkillsBuilder PDCA: Video nwdyQ9twBHM (File Backup and Recovery)
-
-### Requirement
-Implement standard SOLIDWORKS-style file management, auto-save (定時自動儲存), and auto-recovery (異常中斷復原) capabilities based on video `nwdyQ9twBHM` (SolidWorks教學 14-14: 檔案壞了,備份檔在哪裡?).
-
-### RCA (Root Cause Analysis)
-1. **System-level Persistence Gap**: The 3D-Builder application was entirely transient. Any page refreshes, browser crashes, or accidental closures would lose all user progress (features, sketches, mates).
-2. **Missing Safety Fallbacks**: There was no standard keybind support (Ctrl+S, Ctrl+O, Ctrl+N) and no file format standard (.3db.json). There was also no recovery mechanism to detect orphaned or crashed editing sessions.
-
-### CAPA (Corrective and Preventive Actions)
-1. **Persistence Services**: Created `projectService.ts` for versioned JSON schema validation, save/load/new logic, and Chrome File System Access API integration (with standard Blob download fallback).
-2. **Auto-Save & Recover Engine**: Created `recoveryService.ts` to manage IndexedDB-based auto-save backups. Implemented `useAutoSave.ts` hook to take snapshot backups every 5 minutes and mark a clean closure state on unload.
-3. **UI/UX & Shortcuts**: Designed `RecoveryDialog.tsx` modal (with premium SolidWorks gradient aesthetics) to prompt users with auto-recover options on startup if a crash or dirty session is detected. Wired keyboard shortcuts (`Ctrl+S`, `Ctrl+O`, `Ctrl+N`, `Ctrl+Shift+S`) and file menu buttons.
-4. **Verification**: Checked state tracking robustness and ensured that state modification actions correctly mark the document as dirty.
+### Status:
+- 摰蕭?撟橘蕭?璅⊥?嚙賣嚗蕭?霅蕭?銴蕭?撣蕭??嚙踝蕭?嚗蕭??嚙踝蕭??嚙賣楛摨佗蕭? Add/Cut嚗蕭?
+- 撌脩?嚙踝蕭?霅蕭??嚙踝蕭?蝣綽蕭? UI 撖佗蕭??嚙踝蕭?朣身閮蕭?蝭蕭?
 
 ```
 

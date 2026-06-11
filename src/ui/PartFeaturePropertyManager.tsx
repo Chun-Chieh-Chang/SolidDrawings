@@ -42,8 +42,11 @@ const ParamInput: React.FC<{
     }
   };
 
-  const handleFocus = () => {
-    isEditing.current = true;
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleBlur();
+      (e.target as HTMLInputElement).blur();
+    }
   };
 
   return (
@@ -56,27 +59,23 @@ const ParamInput: React.FC<{
           </span>
         )}
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 group">
         <div className="relative flex-1">
           <input
             type="text"
             value={localValue}
+            onFocus={() => { isEditing.current = true; }}
             onChange={(e) => setLocalValue(e.target.value)}
             onBlur={handleBlur}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleBlur();
-                (e.target as HTMLInputElement).blur();
-              }
-            }}
-            className={`w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-right font-mono font-bold transition-all focus:border-[#005B9A] focus:ring-1 focus:ring-[#005B9A]/20 outline-none ${isFormula ? 'text-indigo-700 border-indigo-200' : 'text-slate-800'}`}
+            onKeyDown={handleKeyDown}
+            className={`w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] text-right font-mono font-bold transition-all focus:border-[#005B9A] focus:ring-1 focus:ring-[#005B9A]/20 outline-none pr-8 ${isFormula ? 'text-indigo-700 border-indigo-200' : 'text-slate-800'}`}
           />
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 group-focus-within:text-[#005B9A] uppercase">{unit}</span>
           {badge && <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-black">{badge}</span>}
         </div>
-        <span className="text-[11px] text-slate-500 font-bold w-6">{unit}</span>
       </div>
       {(isFormula || (localValue !== evaluated.toString() && localValue !== evaluated.toFixed(3))) && (
-        <div className="text-[10px] text-emerald-600 font-black text-right pr-8 animate-in fade-in">
+        <div className="text-[10px] text-emerald-600 font-black text-right pr-2 animate-in fade-in">
           = {evaluated.toFixed(3)} {unit}
         </div>
       )}

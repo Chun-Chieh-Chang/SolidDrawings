@@ -791,38 +791,42 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         # --- Up To Next / Up To Surface implementation via Raycasting ---
         if end_cond in ['UP_TO_NEXT', 'UP_TO_SURFACE'] and parent_shape and not parent_shape.IsNull():
             try:
-                # Use centroid of the first sketch loop as ray origin
-                cx, cy, cz = 0.0, 0.0, 0.0
-                pts_count = 0
+                # Use multiple sample points from the first sketch loop as ray origins for robustness
+                sample_pts = []
                 if cleaned_loops:
-                    for pt in cleaned_loops[0]:
+                    loop = cleaned_loops[0]
+                    # Centroid
+                    cx, cy, cz = 0.0, 0.0, 0.0
+                    for pt in loop:
                         cx += float(pt[0]); cy += float(pt[1]); cz += float(pt[2])
-                        pts_count += 1
-                if pts_count > 0:
-                    cx /= pts_count; cy /= pts_count; cz /= pts_count
-                
-                local_pnt = gp_Pnt(cx, cy, cz)
-                trsf = gp_Trsf()
-                trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
-                local_pnt.Transform(trsf)
-                
+                    sample_pts.append(gp_Pnt(cx/len(loop), cy/len(loop), cz/len(loop)))
+                    # Add mid-points of some edges
+                    if len(loop) > 4:
+                        for i in [0, len(loop)//4, len(loop)//2]:
+                            p1, p2 = loop[i], loop[(i+1)%len(loop)]
+                            sample_pts.append(gp_Pnt((p1[0]+p2[0])/2, (p1[1]+p2[1])/2, (p1[2]+p2[2])/2))
+
                 ray_dir_gp = gp_Dir(-normal_dir.X(), -normal_dir.Y(), -normal_dir.Z()) if is_flip else normal_dir
-                ray = gp_Lin(local_pnt, ray_dir_gp)
-                
                 intersector = IntCurvesFace_ShapeIntersector()
                 intersector.Load(parent_shape, 1e-4)
-                intersector.Perform(ray, 0.001, 9999.0)
                 
-                min_dist = None
-                if intersector.IsDone():
-                    for i in range(1, intersector.NbPnt() + 1):
-                        d = intersector.WParameter(i)
-                        if d > 0.001:
-                            if min_dist is None or d < min_dist:
-                                min_dist = d
+                valid_distances = []
+                trsf = gp_Trsf()
+                trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
                 
-                if min_dist is not None:
-                    depth = min_dist
+                for pnt in sample_pts:
+                    pnt.Transform(trsf)
+                    ray = gp_Lin(pnt, ray_dir_gp)
+                    intersector.Perform(ray, 0.001, 9999.0)
+                    
+                    if intersector.IsDone():
+                        for i in range(1, intersector.NbPnt() + 1):
+                            d = intersector.WParameter(i)
+                            if d > 0.001:
+                                valid_distances.append(d)
+                
+                if valid_distances:
+                    depth = min(valid_distances)
             except Exception as e:
                 print(f"[WARNING] {end_cond} ray casting failed: {e}")
 
@@ -1518,13 +1522,23 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             print(f"[ERROR] HELICAL_SWEEP failed: {helix_err}")
             return None
     elif f_type == 'HOLE_WIZARD':
+        # Standard ISO Metric sizes mapping (diameter in mm)
+        STANDARD_SIZES = {
+            'M3': 3.0, 'M4': 4.0, 'M5': 5.0, 'M6': 6.0, 'M8': 8.0, 
+            'M10': 10.0, 'M12': 12.0, 'M16': 16.0, 'M20': 20.0
+        }
+        
         hole_type = params.get('hole_type', 'SIMPLE') # SIMPLE, COUNTERBORE, COUNTERSINK
-        diameter = float(params.get('diameter', 6.0))
+        size_key = params.get('size')
+        if size_key in STANDARD_SIZES:
+            diameter = STANDARD_SIZES[size_key]
+        else:
+            diameter = float(params.get('diameter', 6.0))
+            
         depth = float(params.get('depth', 10.0))
         
         # Position & Orientation
         x, y, z = float(params.get('x', 0)), float(params.get('y', 0)), float(params.get('z', 0))
-        # Orientation defaults to Z-axis but can be mapped to face normal
         nx, ny, nz = float(params.get('nx', 0)), float(params.get('ny', 0)), float(params.get('nz', 1))
         
         axis = gp_Ax1(gp_Pnt(x, y, z), gp_Dir(nx, ny, nz))
@@ -1535,6 +1549,7 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             final_hole_shape = main_hole
             
             if hole_type == 'COUNTERBORE':
+                # Industrial defaults: CB diameter = 1.5 * dia, depth = 0.5 * dia
                 cb_diameter = float(params.get('cb_diameter', diameter * 1.5))
                 cb_depth = float(params.get('cb_depth', diameter * 0.5))
                 cb_hole = BRepPrimAPI_MakeCylinder(axis, cb_diameter/2.0, cb_depth).Shape()
@@ -1543,7 +1558,6 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             elif hole_type == 'COUNTERSINK':
                 cs_diameter = float(params.get('cs_diameter', diameter * 1.5))
                 cs_angle = float(params.get('cs_angle', 90.0)) * math.pi / 180.0
-                # Cone height to reach diameter
                 cs_height = (cs_diameter/2.0 - diameter/2.0) / math.tan(cs_angle/2.0)
                 cs_hole = BRepPrimAPI_MakeCone(axis, cs_diameter/2.0, diameter/2.0, cs_height).Shape()
                 final_hole_shape = BRepAlgoAPI_Fuse(main_hole, cs_hole).Shape()
@@ -2752,6 +2766,10 @@ def build_shape_only(
                     if target_shape:
                         target_op = tf_params.get('operation', 'ADD')
                         
+                        # Collect instance shapes for optimized Boolean performance
+                        instance_shapes_add = []
+                        instance_shapes_cut = []
+                        
                         # Pattern Loops
                         for i in range(count):
                             for j in range(max(1, count2)):
@@ -2776,13 +2794,27 @@ def build_shape_only(
                                     trsf.SetRotation(ax1, angle_rad)
 
                                 copy_shape = BRepBuilderAPI_Transform(target_shape, trsf, True).Shape()
-                                if final_shape is None:
-                                    final_shape = copy_shape
+                                if target_op == 'ADD':
+                                    instance_shapes_add.append(copy_shape)
                                 else:
-                                    if target_op == 'ADD':
-                                        final_shape = BRepAlgoAPI_Fuse(final_shape, copy_shape).Shape()
-                                    elif target_op == 'CUT':
-                                        final_shape = BRepAlgoAPI_Cut(final_shape, copy_shape).Shape()
+                                    instance_shapes_cut.append(copy_shape)
+                                    
+                        # Perform bulk Boolean operations
+                        if instance_shapes_add:
+                            builder = BRepAlgoAPI_Fuse()
+                            builder.SetArguments(final_shape)
+                            builder.SetTools(instance_shapes_add)
+                            builder.Build()
+                            if builder.IsDone():
+                                final_shape = builder.Shape()
+                        
+                        if instance_shapes_cut:
+                            builder = BRepAlgoAPI_Cut()
+                            builder.SetArguments(final_shape)
+                            builder.SetTools(instance_shapes_cut)
+                            builder.Build()
+                            if builder.IsDone():
+                                final_shape = builder.Shape()
                                 
         elif f_type == 'MIRROR':
             target_ids = params.get('target_feature_ids', [])
