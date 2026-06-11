@@ -5,7 +5,7 @@ import sys
 
 def run_cmd(cmd):
     try:
-        return subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.STDOUT).strip()
+        return subprocess.check_output(cmd, shell=True, encoding="utf-8", stderr=subprocess.STDOUT).strip()
     except subprocess.CalledProcessError as e:
         return f"Error: {e.output}"
 

@@ -240,7 +240,19 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   id: `feat_${uuidv4()}`,
                   type: 'SWEEP',
                   name: `Sweep ${features.filter(f => f.type === 'SWEEP').length + 1}`,
-                  parameters: { profile_id: '', path_id: '' }
+                  parameters: {
+                    profile_id: '',
+                    path_id: '',
+                    circularProfile: false,
+                    diameter: 10.0,
+                    guide_ids: [],
+                    isThin: false,
+                    thinThickness: 1.0,
+                    thinDirection: 'ONE_DIRECTION',
+                    operation: 'ADD',
+                    twistType: 'NONE',
+                    twistValue: 0.0
+                  }
                 });
                 setHint('Sweep feature created. Configure in PropertyManager.');
               }}
@@ -287,8 +299,18 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               addFeature({
                 id: `feat_${uuidv4()}`,
                 type: 'LOFT',
-                name: `Loft ${features.filter(f => f.type === 'LOFT').length + 1}`,
-                parameters: { profile_ids: [] }
+                name: `Loft ${features.filter(f => f.type === 'LOFT' && f.parameters.operation !== 'CUT').length + 1}`,
+                parameters: { 
+                  profile_ids: [], 
+                  guide_ids: [],
+                  operation: 'ADD',
+                  isThin: false,
+                  thinThickness: 1.0,
+                  startConstraint: 'NONE',
+                  endConstraint: 'NONE',
+                  startMagnitude: 1.0,
+                  endMagnitude: 1.0
+                }
               });
               setHint('Loft feature created. Configure in PropertyManager.');
             }}
@@ -299,6 +321,34 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M6 12h12"/><path d="M8 4h8"/><path d="M4 20L8 4"/><path d="M20 20L16 4"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Loft</span>
+            </button>
+            <button
+            onClick={() => {
+              addFeature({
+                id: `feat_${uuidv4()}`,
+                type: 'LOFT',
+                name: `Lofted Cut ${features.filter(f => f.type === 'LOFT' && f.parameters.operation === 'CUT').length + 1}`,
+                parameters: { 
+                  profile_ids: [], 
+                  guide_ids: [],
+                  operation: 'CUT',
+                  isThin: false,
+                  thinThickness: 1.0,
+                  startConstraint: 'NONE',
+                  endConstraint: 'NONE',
+                  startMagnitude: 1.0,
+                  endMagnitude: 1.0
+                }
+              });
+              setHint('Lofted Cut feature created. Configure in PropertyManager.');
+            }}
+            className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+            title="Lofted Cut"
+            >
+              <div className="w-10 h-10 flex items-center justify-center text-rose-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16M6 12h12M8 4h8M4 20L8 4M20 20L16 4"/><path d="M12 4v16" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 3"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Lofted<br/>Cut</span>
             </button>
             <button
               onClick={() => { 

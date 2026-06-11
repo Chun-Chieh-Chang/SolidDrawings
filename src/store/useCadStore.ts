@@ -636,9 +636,45 @@ export const useCadStore = create<CadState>()(
       hoveredChildren: [],
       setHoveredChildren: (ids) => set({ hoveredChildren: ids }),
       history: { past: [], future: [] },
-      saveSnapshot: () => set((state) => { const snapshot = { features: state.features, sketchNodes: state.sketchNodes, sketchEdges: state.sketchEdges, sketchConstraints: state.sketchConstraints, mates: state.mates, components: state.components }; return { history: { past: [...state.history.past.slice(-50), snapshot], future: [] } }; }),
-      undo: () => set((state) => { if (state.history.past.length === 0) return state; const previous = state.history.past[state.history.past.length - 1]; const newPast = state.history.past.slice(0, state.history.past.length - 1); const current = { features: state.features, sketchNodes: state.sketchNodes, sketchEdges: state.sketchEdges, sketchConstraints: state.sketchConstraints, mates: state.mates, components: state.components }; return { ...previous, rebuildDirty: true, history: { past: newPast, future: [current, ...state.history.future] } }; }),
-      redo: () => set((state) => { if (state.history.future.length === 0) return state; const next = state.history.future[0]; const newFuture = state.history.future.slice(1); const current = { features: state.features, sketchNodes: state.sketchNodes, sketchEdges: state.sketchEdges, sketchConstraints: state.sketchConstraints, mates: state.mates, components: state.components }; return { ...next, rebuildDirty: true, history: { past: [...state.history.past, current], future: newFuture } }; }),
+      saveSnapshot: () => set((state) => {
+        const snapshot = JSON.parse(JSON.stringify({
+          features: state.features,
+          sketchNodes: state.sketchNodes,
+          sketchEdges: state.sketchEdges,
+          sketchConstraints: state.sketchConstraints,
+          mates: state.mates,
+          components: state.components
+        }));
+        return { history: { past: [...state.history.past.slice(-50), snapshot], future: [] } };
+      }),
+      undo: () => set((state) => {
+        if (state.history.past.length === 0) return state;
+        const previous = state.history.past[state.history.past.length - 1];
+        const newPast = state.history.past.slice(0, state.history.past.length - 1);
+        const current = JSON.parse(JSON.stringify({
+          features: state.features,
+          sketchNodes: state.sketchNodes,
+          sketchEdges: state.sketchEdges,
+          sketchConstraints: state.sketchConstraints,
+          mates: state.mates,
+          components: state.components
+        }));
+        return { ...previous, rebuildDirty: true, history: { past: newPast, future: [current, ...state.history.future] } };
+      }),
+      redo: () => set((state) => {
+        if (state.history.future.length === 0) return state;
+        const next = state.history.future[0];
+        const newFuture = state.history.future.slice(1);
+        const current = JSON.parse(JSON.stringify({
+          features: state.features,
+          sketchNodes: state.sketchNodes,
+          sketchEdges: state.sketchEdges,
+          sketchConstraints: state.sketchConstraints,
+          mates: state.mates,
+          components: state.components
+        }));
+        return { ...next, rebuildDirty: true, history: { past: [...state.history.past, current], future: newFuture } };
+      }),
       selectedTopology: null,
       setSelectedTopology: (selectedTopology) => set({ selectedTopology }),
       measurementMode: 'NONE',

@@ -1198,47 +1198,124 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         path_points = params.get('path_points', [])
         guide_points_list = params.get('guide_points', []) # List of point arrays
         
-        if not profile_points or not path_points:
+        is_circular = params.get('circularProfile') or params.get('circular_profile')
+        is_thin = params.get('isThin', False)
+        
+        twist_type = params.get('twistType', 'NONE')
+        twist_value = float(params.get('twistValue', 0.0))
+        
+        total_twist_angle = 0.0
+        if twist_type == 'DEGREES':
+            total_twist_angle = math.radians(twist_value)
+        elif twist_type == 'TURNS':
+            total_twist_angle = twist_value * 2.0 * math.pi
+        
+        if not path_points:
+            return None
+        if not is_circular and not profile_points:
             return None
             
         try:
             # Construct path wire (open)
             path_wire = _build_wire_from_points(path_points, is_closed=False)
-            
-            # Initialize PipeShell with path
-            sweep_tool = BRepOffsetAPI_MakePipeShell(path_wire)
-            
-            # Add profile (closed) at the start of the path
             edge_map = {}
-            profile_wire = _build_wire_from_points(profile_points, is_closed=True, edge_map=edge_map)
-            sweep_tool.Add(profile_wire)
             
-            # Add guide curves if provided
-            for guide_pts in guide_points_list:
-                if guide_pts:
-                    guide_wire = _build_wire_from_points(guide_pts, is_closed=False)
-                    try:
-                        sweep_tool.SetGuide(guide_wire)
-                    except Exception:
-                        pass  # SetGuide may not be supported, ignore
-            
-            # --- Alignment control (SW Style) ---
-            alignment = params.get('alignment', 'PARALLEL')
-            if alignment == 'PERPENDICULAR':
-                try:
-                    sweep_tool.SetMode(GeomAbs_Perpendicular)
-                except Exception:
-                    pass  # SetMode may not be available on all OCCT versions
+            # Setup path start properties for circular profile
+            circle_ax2 = None
+            radius = 5.0
+            if is_circular:
+                diameter = float(params.get('diameter', 10.0))
+                radius = diameter / 2.0
+                exp_edge = TopExp_Explorer(path_wire, TopAbs_EDGE)
+                if exp_edge.More():
+                    first_edge = topods.Edge(exp_edge.Current())
+                    adaptor = BRepAdaptor_Curve(first_edge)
+                    first_param = adaptor.FirstParameter()
+                    pt_start = gp_Pnt()
+                    tangent_vec = gp_Vec()
+                    adaptor.D1(first_param, pt_start, tangent_vec)
+                    if tangent_vec.Magnitude() > 1e-6:
+                        tangent_vec.Normalize()
+                        circle_ax2 = gp_Ax2(pt_start, gp_Dir(tangent_vec))
+                    else:
+                        circle_ax2 = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
+                else:
+                    circle_ax2 = gp_Ax2(gp_Pnt(0, 0, 0), gp_Dir(0, 0, 1))
 
-            # --- Flip profile control ---
-            flip_profile = params.get('flip_profile', False)
-            if flip_profile:
-                try:
-                    # Flip by inverting the profile wire
-                    reversed_wire = profile_wire.Reversed()
-                    # Rebuild PipeShell with reversed profile
+            def _subdivide_path_points(points, num_divisions=24):
+                if len(points) < 2: return points
+                lens = []
+                tot_len = 0.0
+                for i in range(len(points) - 1):
+                    dx = points[i+1][0] - points[i][0]
+                    dy = points[i+1][1] - points[i][1]
+                    dz = points[i+1][2] - points[i][2]
+                    l = math.sqrt(dx*dx + dy*dy + dz*dz)
+                    lens.append(l)
+                    tot_len += l
+                if tot_len < 1e-6: return points
+                new_points = []
+                for j in range(num_divisions + 1):
+                    target_d = (j / num_divisions) * tot_len
+                    curr_d = 0.0
+                    for i in range(len(points) - 1):
+                        seg_l = lens[i]
+                        if curr_d + seg_l >= target_d - 1e-9:
+                            t = (target_d - curr_d) / seg_l if seg_l > 1e-9 else 0.0
+                            p_start = points[i]
+                            p_end = points[i+1]
+                            px = p_start[0] + t * (p_end[0] - p_start[0])
+                            py = p_start[1] + t * (p_end[1] - p_start[1])
+                            pz = p_start[2] + t * (p_end[2] - p_start[2])
+                            new_points.append([px, py, pz])
+                            break
+                        curr_d += seg_l
+                return new_points
+
+            def build_single_sweep(p_wire):
+                if abs(total_twist_angle) > 1e-6:
+                    # Subdivision-based twist sweep using ThruSections
+                    M = 24
+                    subdivided_pts = _subdivide_path_points(path_points, M)
+                    loft_tool = BRepOffsetAPI_ThruSections(True, False)
+                    
+                    for j in range(M + 1):
+                        p_j = subdivided_pts[j]
+                        if j < M:
+                            T_j = [subdivided_pts[j+1][0] - p_j[0], subdivided_pts[j+1][1] - p_j[1], subdivided_pts[j+1][2] - p_j[2]]
+                        else:
+                            T_j = [p_j[0] - subdivided_pts[j-1][0], p_j[1] - subdivided_pts[j-1][1], p_j[2] - subdivided_pts[j-1][2]]
+                        
+                        t_len = math.sqrt(T_j[0]**2 + T_j[1]**2 + T_j[2]**2)
+                        T_j = [T_j[0]/t_len, T_j[1]/t_len, T_j[2]/t_len] if t_len > 1e-9 else [0.0, 0.0, 1.0]
+                        
+                        angle_j = (j / M) * total_twist_angle
+                        
+                        V_j = [p_j[0] - path_points[0][0], p_j[1] - path_points[0][1], p_j[2] - path_points[0][2]]
+                        trsf = gp_Trsf()
+                        trsf.SetTranslation(gp_Vec(V_j[0], V_j[1], V_j[2]))
+                        translated = BRepBuilderAPI_Transform(p_wire, trsf).Shape()
+                        
+                        if abs(angle_j) > 1e-6:
+                            rot_axis = gp_Ax1(gp_Pnt(p_j[0], p_j[1], p_j[2]), gp_Dir(T_j[0], T_j[1], T_j[2]))
+                            trsf_rot = gp_Trsf()
+                            trsf_rot.SetRotation(rot_axis, angle_j)
+                            transformed = BRepBuilderAPI_Transform(translated, trsf_rot).Shape()
+                        else:
+                            transformed = translated
+                            
+                        wire_j = topods.Wire(transformed)
+                        loft_tool.AddWire(wire_j)
+                        
+                    loft_tool.Build()
+                    if loft_tool.IsDone():
+                        return loft_tool.Shape(), None
+                    return None, None
+                else:
                     sweep_tool = BRepOffsetAPI_MakePipeShell(path_wire)
-                    sweep_tool.Add(reversed_wire)
+                    sweep_tool.Add(p_wire)
+                    
+                    # Add guide curves if provided
                     for guide_pts in guide_points_list:
                         if guide_pts:
                             guide_wire = _build_wire_from_points(guide_pts, is_closed=False)
@@ -1246,33 +1323,122 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                                 sweep_tool.SetGuide(guide_wire)
                             except Exception:
                                 pass
-                except Exception:
-                    pass  # Flip may fail on some paths, continue with original
-            
-            # Build and return shape
-            sweep_tool.Build()
-            if sweep_tool.IsDone():
-                sweep_tool.MakeSolid()
-                res_shape = sweep_tool.Shape()
-                
-                # --- TNS 2.0 Tracking ---
-                for eid, local_edge in edge_map.items():
-                    gen_faces = sweep_tool.Generated(local_edge)
-                    if gen_faces is not None:
+                    
+                    # Alignment control
+                    alignment = params.get('alignment', 'PARALLEL')
+                    if alignment == 'PERPENDICULAR':
                         try:
-                            ext = gen_faces.Extent()
+                            sweep_tool.SetMode(GeomAbs_Perpendicular)
                         except Exception:
-                            ext = 0
-                        if ext > 0:
-                            it = TopTools_ListIteratorOfListOfShape(gen_faces)
-                            while it.More():
-                                gf = it.Value()
-                                it.Next()
-                                if gf and not gf.IsNull():
-                                    linker.record_generation(f"{eid}_GEN", gf)
-                                    break
+                            pass
+                    
+                    # Flip profile control
+                    flip_profile = params.get('flip_profile', False)
+                    if flip_profile:
+                        try:
+                            reversed_wire = p_wire.Reversed()
+                            sweep_tool = BRepOffsetAPI_MakePipeShell(path_wire)
+                            sweep_tool.Add(reversed_wire)
+                            for guide_pts in guide_points_list:
+                                if guide_pts:
+                                    guide_wire = _build_wire_from_points(guide_pts, is_closed=False)
+                                    try:
+                                        sweep_tool.SetGuide(guide_wire)
+                                    except Exception:
+                                        pass
+                        except Exception:
+                            pass
+                    
+                    sweep_tool.Build()
+                    if sweep_tool.IsDone():
+                        sweep_tool.MakeSolid()
+                        return sweep_tool.Shape(), sweep_tool
+                    return None, None
+
+            if is_thin:
+                thin_thickness = float(params.get('thinThickness', 1.0))
+                thin_dir = params.get('thinDirection', 'ONE_DIRECTION')
                 
-                return res_shape
+                # Build outer and inner wires
+                if is_circular:
+                    r_out = radius
+                    r_in = radius - thin_thickness if thin_dir == 'ONE_DIRECTION' else (radius - thin_thickness/2.0 if thin_dir == 'MID_PLANE' else radius - thin_thickness)
+                    r_in = max(0.1, r_in)
+                    
+                    circle_geom_out = gp_Circ(circle_ax2, r_out)
+                    outer_wire = BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(circle_geom_out).Edge()).Wire()
+                    
+                    circle_geom_in = gp_Circ(circle_ax2, r_in)
+                    inner_wire = BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(circle_geom_in).Edge()).Wire()
+                else:
+                    profile_wire = _build_wire_from_points(profile_points, is_closed=True, edge_map=edge_map)
+                    outer_wire = profile_wire
+                    offset_tool = BRepOffsetAPI_MakeOffset()
+                    offset_tool.AddWire(profile_wire)
+                    if thin_dir == 'MID_PLANE':
+                        offset_tool.Perform(-thin_thickness / 2.0)
+                        inner_wire = topods.Wire(offset_tool.Shape())
+                        
+                        offset_tool_out = BRepOffsetAPI_MakeOffset()
+                        offset_tool_out.AddWire(profile_wire)
+                        offset_tool_out.Perform(thin_thickness / 2.0)
+                        outer_wire = topods.Wire(offset_tool_out.Shape())
+                    else:
+                        offset_tool.Perform(-thin_thickness)
+                        inner_wire = topods.Wire(offset_tool.Shape())
+                
+                outer_solid, out_shell = build_single_sweep(outer_wire)
+                inner_solid, _ = build_single_sweep(inner_wire)
+                
+                if outer_solid and inner_solid:
+                    res_shape = BRepAlgoAPI_Cut(outer_solid, inner_solid).Shape()
+                    
+                    # Track TNS 2.0 for outer shell
+                    if out_shell:
+                        for eid, local_edge in edge_map.items():
+                            gen_faces = out_shell.Generated(local_edge)
+                            if gen_faces is not None:
+                                try:
+                                    ext = gen_faces.Extent()
+                                except Exception:
+                                    ext = 0
+                                if ext > 0:
+                                    it = TopTools_ListIteratorOfListOfShape(gen_faces)
+                                    while it.More():
+                                        gf = it.Value()
+                                        it.Next()
+                                        if gf and not gf.IsNull():
+                                            linker.record_generation(f"{eid}_GEN", gf)
+                                            break
+                    return res_shape
+            else:
+                # Solid / standard sweep
+                if is_circular:
+                    circle_geom = gp_Circ(circle_ax2, radius)
+                    profile_wire = BRepBuilderAPI_MakeWire(BRepBuilderAPI_MakeEdge(circle_geom).Edge()).Wire()
+                else:
+                    profile_wire = _build_wire_from_points(profile_points, is_closed=True, edge_map=edge_map)
+                
+                solid_shape, sweep_tool = build_single_sweep(profile_wire)
+                if solid_shape:
+                    # Track TNS 2.0
+                    if sweep_tool:
+                        for eid, local_edge in edge_map.items():
+                            gen_faces = sweep_tool.Generated(local_edge)
+                            if gen_faces is not None:
+                                try:
+                                    ext = gen_faces.Extent()
+                                except Exception:
+                                    ext = 0
+                                if ext > 0:
+                                    it = TopTools_ListIteratorOfListOfShape(gen_faces)
+                                    while it.More():
+                                        gf = it.Value()
+                                        it.Next()
+                                        if gf and not gf.IsNull():
+                                            linker.record_generation(f"{eid}_GEN", gf)
+                                            break
+                    return solid_shape
         except Exception as sweep_err:
             print(f"[ERROR] SWEEP feature failed: {sweep_err}")
             return None
@@ -1381,6 +1547,13 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         profiles_data = params.get('profiles', []) # List of point loops: List[List[List[Point]]]
         guide_data = params.get('guide_points', []) # List of point loops
         is_surface = params.get('isSurfaceOnly', False)
+        is_thin = params.get('isThin', False)
+        thin_thickness = float(params.get('thinThickness', params.get('thickness', 1.0)))
+        
+        start_constraint = params.get('startConstraint', 'NONE')
+        end_constraint = params.get('endConstraint', 'NONE')
+        start_magnitude = float(params.get('startMagnitude', 1.0))
+        end_magnitude = float(params.get('endMagnitude', 1.0))
         
         if len(profiles_data) < 2:
             return None
@@ -1395,6 +1568,64 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
                 profile_wires.append(wire)
             
             if len(profile_wires) < 2: return None
+
+            if is_thin and not is_surface:
+                # Build thin loft by subtracting inner loft from outer loft
+                inner_profile_wires = []
+                for pw in profile_wires:
+                    try:
+                        offset_tool = BRepOffsetAPI_MakeOffset()
+                        offset_tool.AddWire(pw)
+                        offset_tool.Perform(-thin_thickness)
+                        if offset_tool.IsDone():
+                            inner_pw = topods.Wire(offset_tool.Shape())
+                            inner_profile_wires.append(inner_pw)
+                        else:
+                            inner_profile_wires.append(pw)
+                    except Exception:
+                        inner_profile_wires.append(pw)
+                
+                def build_loft_solid(wires):
+                    if guide_data and len(guide_data) > 0 and guide_data[0]:
+                        path_wire = _build_wire_from_points(guide_data[0][0], is_closed=False)
+                        pipe_shell = BRepOffsetAPI_MakePipeShell(path_wire)
+                        for pw in wires:
+                            pipe_shell.Add(pw)
+                        for i in range(1, len(guide_data)):
+                            if not guide_data[i] or not guide_data[i][0]: continue
+                            g_wire = _build_wire_from_points(guide_data[i][0], is_closed=False)
+                            try:
+                                pipe_shell.SetGuide(g_wire)
+                            except Exception:
+                                pass
+                        pipe_shell.Build()
+                        if pipe_shell.IsDone():
+                            pipe_shell.MakeSolid()
+                            return pipe_shell.Shape()
+                    
+                    loft_tool = BRepOffsetAPI_ThruSections(True, False)
+                    for pw in wires:
+                        loft_tool.AddWire(pw)
+                    if start_constraint in ['NORMAL_TO_PROFILE', 'TANGENT_TO_FACE'] or end_constraint in ['NORMAL_TO_PROFILE', 'TANGENT_TO_FACE']:
+                        try:
+                            loft_tool.SetSmoothing(True)
+                        except Exception:
+                            pass
+                    loft_tool.Build()
+                    if loft_tool.IsDone():
+                        return loft_tool.Shape()
+                    return None
+
+                outer_shape = build_loft_solid(profile_wires)
+                inner_shape = build_loft_solid(inner_profile_wires)
+                
+                if outer_shape and inner_shape:
+                    try:
+                        return BRepAlgoAPI_Cut(outer_shape, inner_shape).Shape()
+                    except Exception:
+                        return outer_shape
+                elif outer_shape:
+                    return outer_shape
 
             # --- Advanced Logic: Guided Loft via PipeShell ---
             if guide_data and len(guide_data) > 0 and guide_data[0]:
@@ -1426,6 +1657,12 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             for pw in profile_wires:
                 loft_tool.AddWire(pw)
             
+            if start_constraint in ['NORMAL_TO_PROFILE', 'TANGENT_TO_FACE'] or end_constraint in ['NORMAL_TO_PROFILE', 'TANGENT_TO_FACE']:
+                try:
+                    loft_tool.SetSmoothing(True)
+                except Exception:
+                    pass
+
             loft_tool.Build()
             if loft_tool.IsDone():
                 return loft_tool.Shape()
@@ -1635,7 +1872,23 @@ def process_features(features, deflection=0.01):
     Supports BOX, CYLINDER, SPHERE, and EXTRUDE features.
     """
     if not HAS_OCC:
-        return {"type": "mesh", "data": generate_mock_mesh(features)}
+        ref_geometry = []
+        for feat in features:
+            if hasattr(feat, 'type'):
+                f_id = feat.id
+                f_type = feat.type
+                params = feat.parameters
+            else:
+                f_id = feat.get('id')
+                f_type = feat.get('type')
+                params = feat.get('parameters', {})
+            if f_type == 'REFERENCE_PLANE':
+                res = generate_reference_plane(params.get('planeType', 'OFFSET'), params.get('refs', []), params.get('offset', 0.0), features, angle=params.get('angle', 0.0))
+                ref_geometry.append({"id": f_id, "type": "PLANE", "data": res})
+            elif f_type == 'REFERENCE_AXIS':
+                res = generate_reference_axis(params.get('axisType', 'TWO_POINTS'), params.get('refs', []), features)
+                ref_geometry.append({"id": f_id, "type": "AXIS", "data": res})
+        return {"type": "mesh", "data": generate_mock_mesh(features), "ref_geometry": ref_geometry}
 
     final_shape = None
     ref_geometry = [] # [{id, type, origin, normal/direction, xDir, yDir}]

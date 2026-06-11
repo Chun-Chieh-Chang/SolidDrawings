@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-10 16:36:39
+**Last Saved:** 2026-06-11 20:24:11
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,47 +7,62 @@
 
 ## 1. Current Git State
 ```shell
-b701496 fix: resolve UnboundLocalError by globalizing OCC imports in geometry_service.py
+a58aea5 Merge remote changes from Hermes and restore critical development logs
 ```
 
 ### Uncommitted Changes
 ```shell
-M backend/app/services/geometry_service.py
-?? simulation_result_spanner.json
+AA DEV_LOG.md
+M  backend/app/services/geometry_service.py
+A  backend/tests/test_loft_features.py
+A  backend/tests/test_reference_plane_angle.py
+A  backend/tests/test_sweep_features.py
+A  backend/tests/test_sweep_twist.py
+M  docs/05_GOVERNANCE/PDCA_GOVERNANCE.md
+A  docs/governance/PDCA_GOVERNANCE.md
+A  docs/productization/PRODUCTIZATION_PLAN.md
+AA handover_resume_guide.md
+M  skills/dev/solidworks-gap-analyzer/gap-checklist.md
+M  src/hooks/usePartRebuild.ts
+M  src/store/useCadStore.ts
+M  src/ui/PartFeaturePropertyManager.tsx
+M  src/ui/RibbonBar/RibbonController.tsx
+A  task_plan.md
+M  tools/save_checkpoint.py
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)
 ```markdown
+### CAPA (Corrective and Preventive Actions)
+1. **Loft Engine Upgrades**: Enhanced `geometry_service.py` to parse `isThin`, `thinThickness`, `operation` (ADD/CUT), and `startConstraint`/`endConstraint` (supporting Normal to Profile smoothing transitions).
+2. **UI Expansion**: Added "Lofted Cut" button to `RibbonController.tsx` and rolls for Operation, Start/End Constraints, and Thin Feature to `PartFeaturePropertyManager.tsx`.
+3. **Testing & Validation**: Created `test_loft_features.py` testing solid/thin lofts and cuts, and ran full type checks and PDCA verification suite successfully.
 
-## 2026-06-10 SkillsBuilder PDCA: Video sDqD0PRYhJI (Spanner/Wrench) - Industrial Parity V2
+## [2026-06-11] Reference Plane Angle Verification
 
-### Analysis:
-- **SolidWorks Expert**: 解析了扳手 (Spanner) 的建模流程。核心重點在於 18 度的頭部傾斜除料，以及 12 角星 (Ring End) 的構造。專家建議使用兩組旋轉 30 度的六角形進行聯集 (Union) 或連續除料來達成。
-- **Hybrid Verification**:
-  - **Backend Simulation**: 建立了 `tests/regression/e2e_video_spanner_final.py`。驗證了：
-    - **Mid Plane Extrusion**: 雙向對稱擠出邏輯正確。
-    - **Tilted Cut**: 18 度旋轉矩陣計算正確。
-    - **12-Point Star**: 透過兩次連續的 Hexagon Cut 成功模擬 12 角孔。
-  - **Constraint Audit**: 確認系統支援 `ANGLE` 約束用於頭部傾斜，並支援 `MID_PLANE` 終點條件。
-  - **Manual UI SOP**: 產出了 `docs/benchmarks/SPANNER_V2_SOP.md`，詳述了 1:1 對標 SolidWorks 的操作步驟。
-- **Architect Audit**:
-  - 驗證了 `PartFeaturePropertyManager.tsx` 已整合 `MID_PLANE` 選項。
-  - 診斷了 Polygon 工具缺失，但 Line 工具足以完成精確建模。
-- **Result**: ✅ Passed (Backend logic 100% verified; UI readiness 95% confirmed).
+### Requirement
+Verify and align the Angle Reference Plane creation method (SolidWorks Video 10-1) to support plane rotation about an edge axis at an angle, compliant with SolidWorks 2025 Online Help specifications.
 
-### Status:
-- 系統已具備處理工業級扳手建模所需的所有核心幾何與 UI 邏輯。
-- 準備進入實機測試階段。
+### RCA (Root Cause Analysis)
+1. **Mock Environment Gap**: The mock `process_features` pipeline did not populate `ref_geometry` in non-OCC environments, which prevented validation and testing of reference geometry features in local mock environments.
 
-## 2026-06-09 SkillsBuilder PDCA: Video Index 79 (Surface Cut)
+### CAPA (Corrective and Preventive Actions)
+1. **Mock Path Extraction**: Modified `process_features` mock pipeline to extract and compile `ref_geometry` elements (such as `REFERENCE_PLANE` and `REFERENCE_AXIS`) even when `HAS_OCC` is False.
+2. **Verification Suite**: Created `test_reference_plane_angle.py` containing tests for Rodrigues' rotation angles and CAD feature rebuilding. Both tests passed successfully.
 
-### Analysis:
-- **SolidWorks Expert**: 影片 8-4 介紹了「曲面除料 (Surface Cut)」特徵。這允許使用者利用一個曲面當作刀具，將實體模型切分並移除一側。
-- **Gap Detection**: 系統缺乏 SURFACE_CUT 的處理邏輯與前端 UI。
-- **Surgical Implementation**:
-  - **Backend**: 在 process_features 迴圈中新增 SURFACE_CUT 處理邏輯，透過 BRepPrimAPI_MakeHalfSpace 與 BRepAlgoAPI_Cut 達成曲面切除。
-  - **UI/UX**: 在 RibbonController 與 PartFeaturePropertyManager 中新增了 Surface Cut 的入口與操作面板。
-- **Result**: ✅ Passed。
+## [2026-06-11] Sweep Twist Feature Gap Alignment
+
+### Requirement
+Implement video-driven Sweep Twist functional enhancements (Twist along Path by Degrees or Turns) to match SolidWorks capabilities as requested by Video 13-5.
+
+### RCA (Root Cause Analysis)
+1. **Twist Support Gap**: The standard `BRepOffsetAPI_MakePipeShell` builder in pythonocc/OCP does not have a native twist parameter, meaning standard sweeps could not rotate/twist section profiles along the trajectory.
+
+### CAPA (Corrective and Preventive Actions)
+1. **Path Subdivision and Section Lofting**: Updated `geometry_service.py` Sweep builder. When a twist angle is specified (Degrees or Turns), the path points are subdivided (default 24 intervals). For each point, the profile section is translated and rotated around the local path tangent. The resulting series of section wires is lofted using `BRepOffsetAPI_ThruSections` to produce a smooth, twisted sweep.
+2. **UI Options Integration**: Added Twist Type select dropdown and Twist Value inputs under the Sweep Options rollout in `PartFeaturePropertyManager.tsx` and updated defaults in `RibbonController.tsx`.
+3. **Verification**: Created `test_sweep_twist.py` validating twisted solid/thin sweeps. Pytest, tsc typecheck, and PDCA validation checks passed successfully.
+>>>>>>> Stashed changes
 
 ```
 

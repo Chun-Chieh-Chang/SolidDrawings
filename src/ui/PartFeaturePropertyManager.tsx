@@ -715,19 +715,56 @@ export function PartFeaturePropertyManager({
                 <Rollout title="Profile and Path" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M4 22C4 13 14 13 14 4"/><circle cx="14" cy="4" r="2"/><circle cx="4" cy="22" r="2"/></svg>}>
                   <div className="space-y-3">
                     <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase">Profile (截面)</label>
-                      <select 
-                        value={selectedFeature.parameters.profile_id || ''} 
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Operation (操作)</label>
+                      <select
+                        value={selectedFeature.parameters.operation === 'CUT' ? 'CUT' : 'ADD'}
+                        onChange={(e) => onParamChange('operation', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                      >
+                        <option value="ADD">Boss/Base (填料)</option>
+                        <option value="CUT">Cut (除料)</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Profile Type (輪廓類型)</label>
+                      <select
+                        value={selectedFeature.parameters.circularProfile ? 'CIRCULAR' : 'SKETCH'}
                         onChange={(e) => {
-                          onParamChange('profile_id', e.target.value);
+                          onParamChange('circularProfile', e.target.value === 'CIRCULAR');
                           setTimeout(() => { const rb = (window as any).__handleRebuild; if (rb) rb(); }, 0);
                         }}
                         className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
                       >
-                        <option value="">— Select Sketch (截面草圖) —</option>
-                        {features.filter(f => f.type === 'SKETCH').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        <option value="SKETCH">Sketch Profile (草圖輪廓)</option>
+                        <option value="CIRCULAR">Circular Profile (圓形輪廓)</option>
                       </select>
                     </div>
+
+                    {selectedFeature.parameters.circularProfile ? (
+                      <ParamInput 
+                        label="Diameter (直徑)" 
+                        value={selectedFeature.parameters.diameter || 10.0} 
+                        onChange={(v) => onParamChange('diameter', v)} 
+                        badge="Ø" 
+                      />
+                    ) : (
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase">Profile (截面)</label>
+                        <select 
+                          value={selectedFeature.parameters.profile_id || ''} 
+                          onChange={(e) => {
+                            onParamChange('profile_id', e.target.value);
+                            setTimeout(() => { const rb = (window as any).__handleRebuild; if (rb) rb(); }, 0);
+                          }}
+                          className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                        >
+                          <option value="">— Select Sketch (截面草圖) —</option>
+                          {features.filter(f => f.type === 'SKETCH').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+                        </select>
+                      </div>
+                    )}
+
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase">Path (路徑)</label>
                       <select 
@@ -742,10 +779,17 @@ export function PartFeaturePropertyManager({
                         {features.filter(f => f.type === 'SKETCH').map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
                       </select>
                     </div>
-                    <div className="text-[9px] text-slate-400 italic px-1">
-                      💡 SW 風格：也可在 3D viewport 中直接點擊草圖輪廓與路徑線
-                    </div>
                   </div>
+                </Rollout>
+
+                <Rollout title="Guide Curves (導引曲線)" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M4 22C4 13 14 13 14 4"/><circle cx="14" cy="4" r="2"/><circle cx="4" cy="22" r="2"/></svg>}>
+                  <SelectionBox 
+                    label="Guide Curves"
+                    items={(selectedFeature.parameters.guide_ids || []).map((id: string) => ({ id, name: features.find(f => f.id === id)?.name || id }))}
+                    onRemove={(id) => onParamChange('guide_ids', (selectedFeature.parameters.guide_ids || []).filter((gid: string) => gid !== id))}
+                    onClear={() => onParamChange('guide_ids', [])}
+                    placeholder="Select guide sketches"
+                  />
                 </Rollout>
 
                 <Rollout title="Options (方向與配置)" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 3v18M3 12h18"/><path d="M7 7l10 10M17 7L7 17"/></svg>}>
@@ -772,17 +816,75 @@ export function PartFeaturePropertyManager({
                         <option value="PERPENDICULAR">Perpendicular to Path (垂直於路徑)</option>
                       </select>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="checkbox"
-                        id="sweep-flip"
-                        checked={!!selectedFeature.parameters.flip_profile}
-                        onChange={(e) => onParamChange('flip_profile', e.target.checked ? 'true' : 'false')}
-                        className="w-4 h-4 accent-primary"
-                      />
-                      <label htmlFor="sweep-flip" className="text-[10px] font-bold text-slate-600 uppercase">Flip Profile (翻轉截面)</label>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Twist Type (扭轉控制)</label>
+                      <select 
+                        value={selectedFeature.parameters.twistType ?? 'NONE'} 
+                        onChange={(e) => onParamChange('twistType', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                      >
+                        <option value="NONE">Follow Path (跟隨路徑)</option>
+                        <option value="DEGREES">Twist along Path - Degrees (角度)</option>
+                        <option value="TURNS">Twist along Path - Turns (圈數)</option>
+                      </select>
                     </div>
+                    {(selectedFeature.parameters.twistType ?? 'NONE') !== 'NONE' && (
+                      <ParamInput 
+                        label={selectedFeature.parameters.twistType === 'TURNS' ? "Turns (圈數)" : "Degrees (角度)"} 
+                        value={selectedFeature.parameters.twistValue ?? 0.0} 
+                        onChange={(v) => onParamChange('twistValue', v)} 
+                        badge={selectedFeature.parameters.twistType === 'TURNS' ? "N" : "DEG"} 
+                      />
+                    )}
+                    {!selectedFeature.parameters.circularProfile && (
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="checkbox"
+                          id="sweep-flip"
+                          checked={!!selectedFeature.parameters.flip_profile}
+                          onChange={(e) => onParamChange('flip_profile', e.target.checked)}
+                          className="w-4 h-4 accent-primary"
+                        />
+                        <label htmlFor="sweep-flip" className="text-[10px] font-bold text-slate-600 uppercase">Flip Profile (翻轉截面)</label>
+                      </div>
+                    )}
                   </div>
+                </Rollout>
+
+                <Rollout title="Thin Feature (薄壁特徵)" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>}>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase">Thin Feature On/Off</label>
+                       <button
+                         onClick={() => onParamChange('isThin', !selectedFeature.parameters.isThin)}
+                         className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.isThin ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200'}`}
+                       >
+                         {selectedFeature.parameters.isThin ? 'ON' : 'OFF'}
+                       </button>
+                     </div>
+
+                     {selectedFeature.parameters.isThin && (
+                       <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                         <div className="space-y-1">
+                           <label className="text-[10px] font-bold text-slate-500 uppercase">Direction</label>
+                           <select
+                             value={selectedFeature.parameters.thinDirection || 'ONE_DIRECTION'}
+                             onChange={(e) => onParamChange('thinDirection', e.target.value)}
+                             className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                           >
+                             <option value="ONE_DIRECTION">One-Direction</option>
+                             <option value="MID_PLANE">Mid-Plane</option>
+                           </select>
+                         </div>
+                         <ParamInput 
+                           label="Thickness" 
+                           value={selectedFeature.parameters.thinThickness || 1.0} 
+                           onChange={(v) => onParamChange('thinThickness', v)} 
+                           badge="T1" 
+                         />
+                       </div>
+                     )}
+                   </div>
                 </Rollout>
               </>
             )}
@@ -829,6 +931,92 @@ export function PartFeaturePropertyManager({
                     </select>
                     <SelectionBox label="Guide Curves" items={(selectedFeature.parameters.guide_ids || []).map((id: string) => ({ id, name: features.find(f => f.id === id)?.name || id }))} onRemove={(id) => onParamChange('guide_ids', selectedFeature.parameters.guide_ids.filter((tid: string) => tid !== id))} onClear={() => onParamChange('guide_ids', [])} />
                   </div>
+                </Rollout>
+
+                <Rollout title="Loft Parameters" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><path d="M12 2v20"/><path d="M2 12h20"/></svg>}>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Operation Type (運算類型)</label>
+                      <select 
+                        value={selectedFeature.parameters.operation ?? 'ADD'} 
+                        onChange={(e) => onParamChange('operation', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                      >
+                        <option value="ADD">ADD (本體/增料)</option>
+                        <option value="CUT">CUT (切除/除料)</option>
+                      </select>
+                    </div>
+                  </div>
+                </Rollout>
+
+                <Rollout title="Start/End Constraints (限制條件)" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M7 10l5 5 5-5"/></svg>}>
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">Start Constraint (起始限制)</label>
+                      <select 
+                        value={selectedFeature.parameters.startConstraint ?? 'NONE'} 
+                        onChange={(e) => onParamChange('startConstraint', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                      >
+                        <option value="NONE">None (預設)</option>
+                        <option value="NORMAL_TO_PROFILE">Normal to Profile (垂直於草圖)</option>
+                        <option value="TANGENT_TO_FACE">Tangent to Face (相切於面)</option>
+                      </select>
+                    </div>
+                    {(selectedFeature.parameters.startConstraint ?? 'NONE') !== 'NONE' && (
+                      <ParamInput 
+                        label="Start Magnitude (長度)" 
+                        value={selectedFeature.parameters.startMagnitude ?? 1.0} 
+                        onChange={(v) => onParamChange('startMagnitude', v)} 
+                        badge="M1" 
+                      />
+                    )}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase">End Constraint (終止限制)</label>
+                      <select 
+                        value={selectedFeature.parameters.endConstraint ?? 'NONE'} 
+                        onChange={(e) => onParamChange('endConstraint', e.target.value)}
+                        className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                      >
+                        <option value="NONE">None (預設)</option>
+                        <option value="NORMAL_TO_PROFILE">Normal to Profile (垂直於草圖)</option>
+                        <option value="TANGENT_TO_FACE">Tangent to Face (相切於面)</option>
+                      </select>
+                    </div>
+                    {(selectedFeature.parameters.endConstraint ?? 'NONE') !== 'NONE' && (
+                      <ParamInput 
+                        label="End Magnitude (長度)" 
+                        value={selectedFeature.parameters.endMagnitude ?? 1.0} 
+                        onChange={(v) => onParamChange('endMagnitude', v)} 
+                        badge="M2" 
+                      />
+                    )}
+                  </div>
+                </Rollout>
+
+                <Rollout title="Thin Feature (薄壁特徵)" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>}>
+                   <div className="space-y-3">
+                     <div className="flex items-center justify-between">
+                       <label className="text-[10px] font-bold text-slate-500 uppercase">Thin Feature On/Off</label>
+                       <button
+                         onClick={() => onParamChange('isThin', !selectedFeature.parameters.isThin)}
+                         className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.isThin ? 'bg-rose-600 text-white border-rose-600 shadow-sm' : 'bg-white text-slate-400 border-slate-200'}`}
+                       >
+                         {selectedFeature.parameters.isThin ? 'ON' : 'OFF'}
+                       </button>
+                     </div>
+
+                     {selectedFeature.parameters.isThin && (
+                       <div className="space-y-2 animate-in fade-in slide-in-from-top-1">
+                         <ParamInput 
+                           label="Thickness" 
+                           value={selectedFeature.parameters.thinThickness || 1.0} 
+                           onChange={(v) => onParamChange('thinThickness', v)} 
+                           badge="T1" 
+                         />
+                       </div>
+                     )}
+                   </div>
                 </Rollout>
               </>
             )}
