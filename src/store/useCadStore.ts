@@ -211,6 +211,12 @@ export interface RibbonLayout {
 export interface CadState {
   projectName: string;
   setProjectName: (name: string) => void;
+  isDirty: boolean;
+  lastSavedAt: string | null;
+  projectFilePath: string | null;
+  markProjectDirty: () => void;
+  markProjectClean: () => void;
+  setProjectFilePath: (path: string | null) => void;
   drawingScale: string;
   setDrawingScale: (scale: string) => void;
   drawnBy: string;
@@ -483,6 +489,12 @@ export const useCadStore = create<CadState>()(
     (set, get) => ({
       projectName: 'Professional CAD Project',
       setProjectName: (projectName) => set({ projectName }),
+      isDirty: false,
+      lastSavedAt: null,
+      projectFilePath: null,
+      markProjectDirty: () => set({ isDirty: true }),
+      markProjectClean: () => set({ isDirty: false, lastSavedAt: new Date().toISOString() }),
+      setProjectFilePath: (projectFilePath) => set({ projectFilePath }),
       drawingScale: '1:1',
       setDrawingScale: (drawingScale) => set({ drawingScale }),
       drawnBy: 'SkillsBuilder',
@@ -600,19 +612,19 @@ export const useCadStore = create<CadState>()(
       selectedEntityIds: [],
       setSelectedEntityIds: (ids) => set((state) => ({ selectedEntityIds: typeof ids === 'function' ? ids(state.selectedEntityIds) : ids })),
       sketchNodes: {},
-      setSketchNodes: (nodes) => { get().markRebuildDirty(0); set((state) => ({ sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes })); },
+      setSketchNodes: (nodes) => { get().markRebuildDirty(0); set((state) => ({ sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes, isDirty: true })); },
       sketchEdges: {},
-      setSketchEdges: (edges) => { get().markRebuildDirty(0); set((state) => ({ sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges })); },
+      setSketchEdges: (edges) => { get().markRebuildDirty(0); set((state) => ({ sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges, isDirty: true })); },
       sketchConstraints: {},
-      setSketchConstraints: (constraints) => { get().markRebuildDirty(0); set((state) => ({ sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints })); },
+      setSketchConstraints: (constraints) => { get().markRebuildDirty(0); set((state) => ({ sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints, isDirty: true })); },
 
       features: [],
-      setFeatures: (features) => { get().saveSnapshot(); get().markRebuildDirty(0); set({ features }); },
-      addFeature: (feature) => { get().saveSnapshot(); const fromIndex = get().features.length; get().markRebuildDirty(fromIndex); set((state) => ({ features: [...state.features, feature] })); },
-      removeFeature: (id) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.filter(f => f.id !== id) })); },
-      removeFeatures: (ids) => { get().saveSnapshot(); let minIndex = get().features.length; ids.forEach(id => { const idx = get().features.findIndex(f => f.id === id); if (idx >= 0 && idx < minIndex) minIndex = idx; }); get().markRebuildDirty(minIndex < get().features.length ? minIndex : 0); set((state) => ({ features: state.features.filter(f => !ids.includes(f.id)) })); },
-      updateFeatureParams: (id, params) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.map(f => f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f) })); },
-      updateFeatureProperty: (id, key, value) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.map(f => f.id === id ? { ...f, [key]: value } : f) })); },
+      setFeatures: (features) => { get().saveSnapshot(); get().markRebuildDirty(0); set({ features, isDirty: true }); },
+      addFeature: (feature) => { get().saveSnapshot(); const fromIndex = get().features.length; get().markRebuildDirty(fromIndex); set((state) => ({ features: [...state.features, feature], isDirty: true })); },
+      removeFeature: (id) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.filter(f => f.id !== id), isDirty: true })); },
+      removeFeatures: (ids) => { get().saveSnapshot(); let minIndex = get().features.length; ids.forEach(id => { const idx = get().features.findIndex(f => f.id === id); if (idx >= 0 && idx < minIndex) minIndex = idx; }); get().markRebuildDirty(minIndex < get().features.length ? minIndex : 0); set((state) => ({ features: state.features.filter(f => !ids.includes(f.id)), isDirty: true })); },
+      updateFeatureParams: (id, params) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.map(f => f.id === id ? { ...f, parameters: { ...f.parameters, ...params } } : f), isDirty: true })); },
+      updateFeatureProperty: (id, key, value) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.map(f => f.id === id ? { ...f, [key]: value } : f), isDirty: true })); },
 
       rebuildDirty: true,
       dirtyFromFeatureIndex: 0,
@@ -628,8 +640,8 @@ export const useCadStore = create<CadState>()(
       setSelectedSubNodeType: (selectedSubNodeType) => set({ selectedSubNodeType }),
       visibleSketches: [],
       toggleSketchVisibility: (featureId) => set((state) => ({ visibleSketches: state.visibleSketches.includes(featureId) ? state.visibleSketches.filter(id => id !== featureId) : [...state.visibleSketches, featureId] })),
-      setSuppressed: (id, suppressed) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.map(f => f.id === id ? { ...f, isSuppressed: suppressed } : f) })); },
-      reorderFeatures: (startIndex, endIndex) => { get().saveSnapshot(); get().markRebuildDirty(Math.min(startIndex, endIndex)); set((state) => { const nextFeatures = [...state.features]; const [removed] = nextFeatures.splice(startIndex, 1); nextFeatures.splice(endIndex, 0, removed); return { features: nextFeatures }; }); },
+      setSuppressed: (id, suppressed) => { get().saveSnapshot(); const fromIndex = get().features.findIndex((f) => f.id === id); get().markRebuildDirty(fromIndex >= 0 ? fromIndex : 0); set((state) => ({ features: state.features.map(f => f.id === id ? { ...f, isSuppressed: suppressed } : f), isDirty: true })); },
+      reorderFeatures: (startIndex, endIndex) => { get().saveSnapshot(); get().markRebuildDirty(Math.min(startIndex, endIndex)); set((state) => { const nextFeatures = [...state.features]; const [removed] = nextFeatures.splice(startIndex, 1); nextFeatures.splice(endIndex, 0, removed); return { features: nextFeatures, isDirty: true }; }); },
       checkDependencies: () => set((state) => { const features = [...state.features]; return { features: features.map((f, idx) => { if (f.type === 'FILLET' || f.type === 'CHAMFER') { const targetId = f.parameters?.target_feature_id; if (targetId) { const parentIdx = features.findIndex(p => p.id === targetId); if (parentIdx === -1 || parentIdx >= idx) return { ...f, isBroken: true }; } } return { ...f, isBroken: false }; })}; }),
       hoveredTreeId: null,
       setHoveredTreeId: (id) => set({ hoveredTreeId: id }),

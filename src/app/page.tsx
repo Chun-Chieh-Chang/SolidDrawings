@@ -39,8 +39,11 @@ import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
 import { EquationsModal } from '@/ui/Modals/EquationsModal';
 import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
 import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
+import { useAutoSave } from '@/hooks/useAutoSave';
+import { RecoveryDialog } from '@/ui/Modals/RecoveryDialog';
 
 export default function Home() {
+  useAutoSave();
   const [loading, setLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
   const [sidebarTab, setSidebarTab] = useState<'TREE' | 'PROPERTIES' | 'CONFIGS'>('TREE');
@@ -342,6 +345,7 @@ export default function Home() {
           {showEquationsModal && <EquationsModal onClose={() => setShowEquationsModal(false)} />}
           {showTranslatorModal && <TranslatorModal onClose={() => setShowTranslatorModal(false)} onOpenAlternative={async () => { setShowTranslatorModal(false); const r = await fileAPI.open(); if(r) { const res = await fileAPI.read(r.path); if(res.success && res.content) loadCadData(res.content, r.path); } }} />}
           {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} activeTab={activeTab} />}
+          <RecoveryDialog />
         </section>
 
         {/* Right Task Pane (Design Library) */}

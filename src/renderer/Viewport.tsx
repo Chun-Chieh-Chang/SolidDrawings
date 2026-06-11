@@ -982,6 +982,28 @@ const Viewport = ({ children }: ViewportProps) => {
   // Handle Global Key Events (SolidWorks Style)
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // === File Management Shortcuts (Highest Priority) ===
+      if (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        (window as any).__handleFileSaveAs?.();
+        return;
+      }
+      if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        (window as any).__handleFileSave?.();
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        (window as any).__handleFileOpen?.();
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        (window as any).__handleFileNew?.();
+        return;
+      }
+
       // Escape: Stop current drafting chain
       if (e.key === 'Escape') {
         if (isSketchMode) {

@@ -73,3 +73,13 @@ This document tracks implementation status, file paths, and alignment strategies
 | **Ref Geometry** | Reference Plane | ✅ Implemented | [geometry_service.py](file:///c:/Users/USER/Downloads/3D-Builder/backend/app/services/geometry_service.py) | High | Supports creating reference planes via Offset from Plane, Three Points, and Angle (rotated around Edge/Axis) aligning with SolidWorks 2025 Online Help. |
 | **Feature Engine** | Sweep (Guides/Circular/Thin/Cut/Twist) | ✅ Implemented | [geometry_service.py](file:///c:/Users/USER/Downloads/3D-Builder/backend/app/services/geometry_service.py) | Critical | Fully implements sweep features supporting path/guide curves, circular profile generation, thin wall hollows, boolean swept cuts, and **twist along path** (by Degrees or Turns). |
 
+---
+
+## 6. File Management & Auto-Recovery (檔案管理與自動復原)
+
+| SolidWorks Feature | Capability / Key | Current Status | Relevant Files | Priority | Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Save / Load** | Native JSON project `.3db.json` I/O | ✅ Implemented | [projectService.ts](file:///c:/Users/3kids/Downloads/3D-Builder/src/services/projectService.ts) | Critical | Local project storage and loading with versioning, schema validation, and file integrity check. |
+| **Save/Open Shortcuts**| `Ctrl + S` / `Ctrl + O` / `Ctrl + N` / `Ctrl+Shift+S` | ✅ Implemented | [Viewport.tsx](file:///c:/Users/3kids/Downloads/3D-Builder/src/renderer/Viewport.tsx) | High | Standard keyboard shortcuts for Save, Open, New, and Save As. |
+| **Auto-Save (自動儲存)**| Background periodic snapshot | ✅ Implemented | [useAutoSave.ts](file:///c:/Users/3kids/Downloads/3D-Builder/src/hooks/useAutoSave.ts) | Critical | Periodically auto-saves the active project state to local IndexedDB every 5 minutes if changes are detected. |
+| **Auto-Recovery (自動復原)**| Recovery UI on abnormal close | ✅ Implemented | [recoveryService.ts](file:///c:/Users/3kids/Downloads/3D-Builder/src/services/recoveryService.ts) | High | Prompts the user with a list of recoverable sessions if the previous session was not cleanly closed. |
