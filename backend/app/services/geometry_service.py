@@ -2091,6 +2091,75 @@ def process_features(features, deflection=0.01):
                             print(f"[ERROR] Chamfer failed: {chamfer_err}")
             continue
 
+        elif f_type == 'DRAFT':
+            if final_shape is not None:
+                angle_deg = float(params.get('angle', 5))
+                angle_rad = math.radians(angle_deg)
+                neutral_refs = params.get('neutral_plane_refs', [])
+                face_refs = params.get('faces_to_draft_refs', [])
+                
+                if neutral_refs and face_refs:
+                    n_ref = neutral_refs[0]
+                    n_origin = n_ref.get('coordinates', [0,0,0])
+                    n_normal = n_ref.get('normal', [0,0,1])
+                    n_sig = n_ref.get('signature', {})
+                    
+                    _, _, matched_n_face = find_matching_face(final_shape, n_origin, n_normal, n_sig)
+                    
+                    if matched_n_face:
+                        surf_adaptor = BRep_Tool.Surface(matched_n_face)
+                        if surf_adaptor:
+                            n_norm_vec = gp_Vec(*n_normal)
+                            if n_norm_vec.Magnitude() > 1e-6:
+                                n_norm_vec.Normalize()
+                            else:
+                                n_norm_vec = gp_Vec(0,0,1)
+                            
+                            pull_dir = gp_Dir(n_norm_vec.X(), n_norm_vec.Y(), n_norm_vec.Z())
+                            neutral_plane_geom = Geom_Plane(gp_Pnt(*n_origin), pull_dir)
+                            
+                            try:
+                                draft_tool = BRepOffsetAPI_DraftAngle(final_shape)
+                                faces_added = 0
+                                
+                                for f_ref in face_refs:
+                                    f_origin = f_ref.get('coordinates', [0,0,0])
+                                    f_normal = f_ref.get('normal', [0,0,1])
+                                    f_sig = f_ref.get('signature', {})
+                                    _, _, matched_face = find_matching_face(final_shape, f_origin, f_normal, f_sig)
+                                    if matched_face:
+                                        draft_tool.Add(matched_face, pull_dir, angle_rad, neutral_plane_geom)
+                                        faces_added += 1
+                                
+                                if faces_added > 0:
+                                    draft_tool.Build()
+                                    if draft_tool.IsDone():
+                                        final_shape = draft_tool.Shape()
+                            except Exception as draft_err:
+                                print(f"[ERROR] Draft failed: {draft_err}")
+            continue
+
+        elif f_type == 'RIB':
+            if final_shape is not None:
+                # Map RIB to a Thin Feature Extrude with UP_TO_NEXT
+                tf_params = dict(params)
+                tf_params['operation'] = 'ADD'
+                tf_params['endCondition'] = 'UP_TO_NEXT'
+                tf_params['isThin'] = True
+                tf_params['thinThickness'] = float(params.get('thickness', 10.0))
+                tf_params['thinDirection'] = params.get('direction', 'MID_PLANE')
+                
+                try:
+                    rib_shape = build_feature_shape_in_isolation('EXTRUDE', tf_params, final_shape, features)
+                    if rib_shape:
+                        builder = BRepAlgoAPI_Fuse(final_shape, rib_shape)
+                        builder.Build()
+                        if builder.IsDone():
+                            final_shape = builder.Shape()
+                except Exception as rib_err:
+                    print(f"[ERROR] Rib failed: {rib_err}")
+            continue
+
         elif f_type == 'SURFACE_OFFSET':
             if final_shape is not None:
                 distance = float(params.get('distance', 1.0))

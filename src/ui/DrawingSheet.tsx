@@ -88,31 +88,77 @@ const DrawingView = ({ title, type, lines, showDimensions, components }: Drawing
     setEditingDim(null);
   };
   
+  const [manualDims, setManualDims] = useState<any[]>([]);
+  const [clickStart, setClickStart] = useState<[number, number] | null>(null);
+
+  const handleSvgClick = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!useCadStore.getState().smartDimensionActive) return;
+    
+    const svg = e.currentTarget;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const cursorPt = pt.matrixTransform(svg.getScreenCTM()?.inverse());
+    const finalPt: [number, number] = [cursorPt.x, -cursorPt.y];
+
+    if (clickStart) {
+      const dx = finalPt[0] - clickStart[0];
+      const dy = finalPt[1] - clickStart[1];
+      const dist = Math.hypot(dx, dy);
+      if (dist > 1) {
+        setManualDims(prev => [...prev, {
+          id: `mdim_${Date.now()}`,
+          type: Math.abs(dx) > Math.abs(dy) ? 'HORIZ' : 'VERT',
+          value: dist,
+          u: Math.min(clickStart[0], finalPt[0]),
+          v: Math.max(clickStart[1], finalPt[1]),
+          length: Math.abs(dx) > Math.abs(dy) ? Math.abs(dx) : Math.abs(dy),
+          p1: clickStart,
+          p2: finalPt
+        }]);
+      }
+      setClickStart(null);
+    } else {
+      setClickStart(finalPt);
+    }
+  };
+
   const smartDims: any[] = [];
   if (showDimensions && type !== 'ISO') {
-    features.forEach(feat => {
+    features.forEach((feat, index) => {
       const p = feat.parameters || {};
       const [x, y, z] = [p.x || 0, p.y || 0, p.z || 0];
+      const offsetV = index * extOffset * 0.3; // Stagger dimensions to avoid overlap
+
       if (feat.type === 'BOX' || feat.type === 'EXTRUDE') {
         const [w, h, d] = [p.width || 10, p.height || 10, p.depth || 10];
         if (type === 'FRONT') {
-           smartDims.push({ id: feat.id, type: 'HORIZ', value: w, u: x, v: y, length: w, param: 'width' });
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: w, u: x, v: y - offsetV, length: w, param: 'width' });
            smartDims.push({ id: feat.id, type: 'VERT', value: h, u: x, v: y, length: h, param: 'height' });
         } else if (type === 'TOP') {
-           smartDims.push({ id: feat.id, type: 'HORIZ', value: w, u: x, v: -z-d, length: w, param: 'width' });
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: w, u: x, v: -z-d - offsetV, length: w, param: 'width' });
            smartDims.push({ id: feat.id, type: 'VERT', value: d, u: x, v: -z-d, length: d, param: 'depth' });
         } else if (type === 'RIGHT') {
-           smartDims.push({ id: feat.id, type: 'HORIZ', value: d, u: z, v: y, length: d, param: 'depth' });
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: d, u: z, v: y - offsetV, length: d, param: 'depth' });
            smartDims.push({ id: feat.id, type: 'VERT', value: h, u: z, v: y, length: h, param: 'height' });
         }
-      } else if (feat.type === 'CYLINDER' || feat.type === 'SPHERE' || feat.type === 'HOLE') {
-        const r = p.radius || 5;
+      } else if (feat.type === 'CYLINDER' || feat.type === 'SPHERE' || feat.type === 'HOLE' || feat.type === 'HOLE_WIZARD') {
+        const r = p.radius || (p.diameter ? p.diameter/2 : 5);
         const h = p.height || (p.depth || 10);
         if (type === 'TOP') smartDims.push({ id: feat.id, type: 'RADIAL', value: r*2, u: x, v: -z, radius: r, param: 'radius' });
         else if (type === 'FRONT') {
-           smartDims.push({ id: feat.id, type: 'HORIZ', value: r*2, u: x-r, v: y, length: r*2, param: 'radius' });
+           smartDims.push({ id: feat.id, type: 'HORIZ', value: r*2, u: x-r, v: y - offsetV, length: r*2, param: 'radius' });
            smartDims.push({ id: feat.id, type: 'VERT', value: h, u: x-r, v: y, length: h, param: 'height' });
         }
+      } else if (feat.type === 'FILLET') {
+        const r = p.radius || 2;
+        if (type === 'FRONT') smartDims.push({ id: feat.id, type: 'RADIAL', value: r, u: x + wVal/2, v: y + hVal/2, radius: r, param: 'radius', prefix: 'R' });
+      } else if (feat.type === 'CHAMFER') {
+        const d = p.distance || 1.5;
+        if (type === 'FRONT') smartDims.push({ id: feat.id, type: 'HORIZ', value: d, u: x, v: y - offsetV, length: d, param: 'distance', prefix: 'C' });
+      } else if (feat.type === 'SHELL' || feat.type === 'RIB') {
+        const t = p.thickness || 2;
+        if (type === 'TOP') smartDims.push({ id: feat.id, type: 'HORIZ', value: t, u: x, v: -z - offsetV, length: t, param: 'thickness', prefix: 'T' });
       }
     });
   }
@@ -123,7 +169,7 @@ const DrawingView = ({ title, type, lines, showDimensions, components }: Drawing
         {title} {hasBounds && type !== 'ISO' && `(${widthVal.toFixed(1)} x ${heightVal.toFixed(1)})`}
       </div>
       <div className="flex-1 flex items-center justify-center p-4">
-        <svg viewBox={viewBox} className="w-full h-full text-slate-900 overflow-visible" style={{ transform: 'scaleY(-1)' }}>
+        <svg viewBox={viewBox} className="w-full h-full text-slate-900 overflow-visible" style={{ transform: 'scaleY(-1)' }} onClick={handleSvgClick}>
           <defs>
             <marker id={`arrow-start-${type}`} viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 10 0 L 0 5 L 10 10 z" fill="#3B82F6" />
@@ -131,7 +177,17 @@ const DrawingView = ({ title, type, lines, showDimensions, components }: Drawing
             <marker id={`arrow-end-${type}`} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
               <path d="M 0 0 L 10 5 L 0 10 z" fill="#3B82F6" />
             </marker>
+            <marker id={`arrow-start-manual-${type}`} viewBox="0 0 10 10" refX="0" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 10 0 L 0 5 L 10 10 z" fill="#10B981" />
+            </marker>
+            <marker id={`arrow-end-manual-${type}`} viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="#10B981" />
+            </marker>
           </defs>
+
+          {clickStart && (
+            <circle cx={clickStart[0]} cy={clickStart[1]} r={viewBoxSize * 0.01} fill="#EF4444" className="animate-pulse" />
+          )}
 
           {normalizedLines.map((line: any, i: number) => (
             <polyline
@@ -142,7 +198,7 @@ const DrawingView = ({ title, type, lines, showDimensions, components }: Drawing
               strokeWidth={lineStrokeWidth}
               strokeDasharray={line.visible ? "none" : `${lineStrokeWidth*3},${lineStrokeWidth*2}`}
               strokeOpacity={line.visible ? 1 : 0.4}
-              className="group-hover:stroke-primary transition-colors"
+              className="group-hover:stroke-primary transition-colors cursor-crosshair"
             />
           ))}
 
@@ -156,6 +212,33 @@ const DrawingView = ({ title, type, lines, showDimensions, components }: Drawing
               </g>
             </g>
           ))}
+
+          {/* Manual Dimensions Rendering */}
+          {manualDims.map((dim, idx) => {
+              const dimY = dim.v - dimOffset - (idx * extOffset * 0.5);
+              const dimX = dim.u - dimOffset - (idx * extOffset * 0.5);
+              return dim.type === 'HORIZ' ? (
+                <g key={`m-horiz-${dim.id}`}>
+                  <line x1={dim.p1[0]} y1={dim.p1[1]} x2={dim.p1[0]} y2={dimY} stroke="#94A3B8" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dim.p2[0]} y1={dim.p2[1]} x2={dim.p2[0]} y2={dimY} stroke="#94A3B8" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dim.u} y1={dimY} x2={dim.u + dim.length} y2={dimY} stroke="#10B981" strokeWidth={dimStrokeWidth} markerStart={`url(#arrow-start-manual-${type})`} markerEnd={`url(#arrow-end-manual-${type})`} />
+                  <g transform={`translate(${dim.u + dim.length/2}, ${dimY}) scale(1, -1)`} className="select-none">
+                    <rect x={-rectW/2} y={-rectH/2} width={rectW} height={rectH} fill="white" stroke="#10B981" strokeWidth={dimStrokeWidth/2} rx={rectH*0.2} />
+                    <text y={rectH * 0.2} textAnchor="middle" fontSize={textSize} fontWeight="bold" fill="#047857" fontFamily="monospace">{dim.value.toFixed(1)}</text>
+                  </g>
+                </g>
+              ) : (
+                <g key={`m-vert-${dim.id}`}>
+                  <line x1={dim.p1[0]} y1={dim.p1[1]} x2={dimX} y2={dim.p1[1]} stroke="#94A3B8" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dim.p2[0]} y1={dim.p2[1]} x2={dimX} y2={dim.p2[1]} stroke="#94A3B8" strokeWidth={dimStrokeWidth} strokeDasharray={`${dimStrokeWidth*2},${dimStrokeWidth}`} />
+                  <line x1={dimX} y1={dim.u} x2={dimX} y2={dim.u + dim.length} stroke="#10B981" strokeWidth={dimStrokeWidth} markerStart={`url(#arrow-start-manual-${type})`} markerEnd={`url(#arrow-end-manual-${type})`} />
+                  <g transform={`translate(${dimX}, ${dim.u + dim.length/2}) scale(1, -1)`} className="select-none">
+                    <rect x={-rectH/2} y={-rectW/2} width={rectH} height={rectW} fill="white" stroke="#10B981" strokeWidth={dimStrokeWidth/2} rx={rectH*0.2} />
+                    <text x={0} y={rectW * 0.2} textAnchor="middle" fontSize={textSize} fontWeight="bold" fill="#047857" fontFamily="monospace" transform="rotate(-90)">{dim.value.toFixed(1)}</text>
+                  </g>
+                </g>
+              );
+          })}
 
           {/* Dimensions Rendering */}
           {smartDims.filter(d => d.type === 'HORIZ').map((dim, idx) => {
@@ -215,6 +298,15 @@ export const DrawingSheet = () => {
 
   const [showDimensions, setShowDimensions] = useState<boolean>(true);
   const [isRebuilding, setIsRebuilding] = useState<boolean>(false);
+
+  useEffect(() => {
+    (window as any).__handlePrintToPDF = () => {
+      window.print();
+    };
+    return () => {
+      delete (window as any).__handlePrintToPDF;
+    };
+  }, []);
 
   const calculateMass = () => {
     if (!massProperties) return 0;

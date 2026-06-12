@@ -676,6 +676,34 @@ export function PartFeaturePropertyManager({
               </>
             )}
 
+            {selectedFeature.type === 'DRAFT' && (
+              <>
+                <Rollout title="Parameters" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}>
+                  <div className="space-y-3">
+                    <ParamInput label="Draft Angle" value={selectedFeature.parameters.angle || 5} onChange={(v) => onParamChange('angle', v)} unit="deg" badge="A1" />
+                  </div>
+                </Rollout>
+                <Rollout title="Neutral Plane" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/></svg>}>
+                  <SelectionBox
+                    label="Neutral Plane / Face"
+                    items={(selectedFeature.parameters.neutral_plane_refs || []).map((ref: any) => ({ id: ref.id, name: `Ref ${ref.id.slice(0, 4)}` }))}
+                    onRemove={(id) => onParamChange('neutral_plane_refs', selectedFeature.parameters.neutral_plane_refs.filter((r: any) => r.id !== id))}
+                    onClear={() => onParamChange('neutral_plane_refs', [])}
+                    placeholder="Select a neutral plane"
+                  />
+                </Rollout>
+                <Rollout title="Faces to Draft" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>}>
+                  <SelectionBox
+                    label="Selected Faces"
+                    items={(selectedFeature.parameters.faces_to_draft_refs || []).map((ref: any) => ({ id: ref.id, name: `Face ${ref.id.slice(0, 4)}` }))}
+                    onRemove={(id) => onParamChange('faces_to_draft_refs', selectedFeature.parameters.faces_to_draft_refs.filter((r: any) => r.id !== id))}
+                    onClear={() => onParamChange('faces_to_draft_refs', [])}
+                    placeholder="Select faces to draft"
+                  />
+                </Rollout>
+              </>
+            )}
+
             {selectedFeature.type === 'HOLE_WIZARD' && (
               <>
                 <Rollout title="Hole Type" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>}>

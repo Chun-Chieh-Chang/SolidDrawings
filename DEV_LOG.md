@@ -1,3 +1,22 @@
+## 2026-06-12 Sprint DRAW-3: Interactive Smart Dimensions & BOM
+
+### Goal:
+- Execute the final Sprint (DRAW-3) of Phase 2 (The Documentation Wall).
+- Enable interactive, manual dimensioning on the 2D SVG drawing canvas and refine the automatic Bill of Materials (BOM) table.
+
+### Actions:
+- **Interactive SVG Canvas (`DrawingSheet.tsx`)**:
+  - Wired `onClick` handlers directly to the `<svg>` canvas to capture user point selections across the HLR projected lines.
+  - Implemented manual dimension drawing logic that calculates true scale distances based on captured SVG points and inverse CTM matrices.
+  - Rendered user-defined dimensions with standard industrial styles (extension lines, arrows, dimension text boxes).
+- **Auto-Dimensioning Enhancements**:
+  - Expanded the parametric `smartDims` feature to automatically generate and stagger dimensions for `CHAMFER`, `FILLET`, `SHELL`, and `RIB` features alongside standard extrusions/holes.
+- **BOM Refinement**:
+  - Refined the Bill of Materials logic to correctly aggregate instances of the same part and dynamically map density and weight using `partMaterial`.
+
+### Status:
+- ✅ **Done**: Phase 2 is now 100% complete. The Engineering Drawings module possesses full capability for both parametric and manual dimensioning, marking the breach of "The Documentation Wall".
+
 ## 2026-06-12 Sprint DRAW-2: Frontend 2D SVG Canvas & Engineering Drawings
 
 ### Goal:

@@ -123,6 +123,10 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
           className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "ASSEMBLY" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
         >ASSEMBLY</button>
         <button
+          onClick={() => { setActiveTab('DRAWING'); setMeasurementMode('NONE'); useCadStore.getState().setMode('DRAWING'); } }
+          className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "DRAWING" ? "border-amber-600 text-amber-700 bg-amber-50 shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
+        >DRAWING</button>
+        <button
           onClick={() => { setActiveTab('RENDER'); setMeasurementMode('NONE'); useCadStore.getState().setMode('RENDER'); } }
           className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "RENDER" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
         >RENDER</button>
@@ -130,7 +134,23 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
 
       {/* Ribbon Content Panels */}
       <div className="flex-1 flex items-center px-6 py-2 gap-2 overflow-x-auto overflow-y-hidden bg-surface"> 
-        {activeTab === 'FEATURES' ? (
+        {activeTab === 'DRAWING' ? (
+          <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
+            <button onClick={() => { pushToast('Print/Export to PDF initiated.', 'info'); const printHook = (window as any).__handlePrintToPDF; if (printHook) printHook(); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Export to PDF">
+              <div className="w-10 h-10 flex items-center justify-center text-amber-700 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Save PDF</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { setActiveTab('FEATURES'); useCadStore.getState().setMode('PART'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Back to 3D Part">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-700 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Exit</span>
+            </button>
+          </div>
+        ) : activeTab === 'FEATURES' ? (
           <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
             <input 
               type="file" 
@@ -560,6 +580,37 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 20a10 10 0 0 1 20 0H2z"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Dome</span>
+            </button>
+
+            <button
+              onClick={() => {
+                if (solidSketchPointCount < 2) {
+                  setSketchMode(true);
+                  setSketchTool('LINE');
+                  pushToast('A Rib requires an open sketch line. Please draw one first.', 'info');
+                  return;
+                }
+                const featId = `feat_${uuidv4()}`;
+                addFeature({
+                  id: featId,
+                  type: 'RIB',
+                  name: `Rib ${features.filter(f => f.type === 'RIB').length + 1}`,
+                  parameters: { thickness: 5.0, direction: 'MID_PLANE' }
+                });
+                setSelectedId(featId);
+                appliedEdgeFeatureRef.current = null;
+                setActiveTab('FEATURES');
+                setPendingFeatureCommand('RIB');
+                setSelectedTopology(null);
+                setHint('Configure Rib thickness and direction in the property manager.');
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'RIB' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
+              title="Rib"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'RIB' ? 'text-[#005B9A] scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21h18M3 14l9-9 9 9M9 14v7M15 14v7"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Rib</span>
             </button>
 
             <div className="w-[1px] h-10 bg-border/50 mx-1" />

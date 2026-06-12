@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-12 20:34:50
+**Last Saved:** 2026-06-12 21:27:51
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,18 +7,20 @@
 
 ## 1. Current Git State
 ```shell
-3b7bce1 docs: pivot project baseline from SW 2025 to SW 2010 for MVP focus
+f5acafa docs: finalize Sprint DRAW-2 marking Frontend Engineering Drawings as complete
 ```
 
 ### Uncommitted Changes
 ```shell
 M DEV_LOG.md
+ M PROJECT_ROADMAP.md
  M backend/app/services/geometry_service.py
  M gap-checklist.md
- M src/ui/Modals/ExportModal.tsx
+ M progress.md
+ M src/ui/DrawingSheet.tsx
+ M src/ui/PartFeaturePropertyManager.tsx
+ M src/ui/RibbonBar/RibbonController.tsx
  M task_plan.md
-?? backend/test_hlr.py
-?? progress.md
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)

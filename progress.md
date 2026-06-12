@@ -1,6 +1,5 @@
-## Session: 2026-06-12 (Sprint DRAW-1)
-- Initialized planning files.
-- Completed Phase 1: Research & Kernel Audit. Found `project_2d` and `/project` endpoint already successfully implements HLR projection using `HLRBRep`.
-- Completed Phase 2: Added raw DXF string building logic inside `export_cad_file` to support CAD projection line exports.
-- Completed Phase 3: Connected DXF export UI in `ExportModal.tsx`.
-- Completed Phase 4: Validated UI component updates.
+## Session: 2026-06-12 (Sprint DRAW-3)
+- Started Phase 1: Reading `DrawingSheet.tsx` to understand the SVG coordinate system and adding dimension structures.
+- Completed Phase 2: Added `onClick` handlers to `svg` element to allow manual point capturing and dynamic interactive dimension drawing.
+- Completed Phase 3: Validated and refined the Bill of Materials (BOM) table generation in the drawing sheet.
+- Completed Phase 4: Ready to update documentation and save checkpoint.
