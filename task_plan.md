@@ -1,27 +1,28 @@
-# Task Plan: Sprint DRAW-3 (Engineering Drawing Dimensions & BOM)
+# Task Plan: Sprint CFG-1 (Configuration Manager)
 
 ## Goal
-Finalize the Documentation Phase (Phase 2) by implementing interactive Smart Dimensions and an automatic Bill of Materials (BOM) table on the `DrawingSheet.tsx` SVG canvas.
+Implement the Configuration Manager module to allow users to create, switch, and manage multiple part variants (Configurations). Each configuration can have its own feature suppression states and parameter overrides.
 
 ## Phases
 
-### Phase 1: Architecture & Planning
-- [x] Read `src/ui/DrawingSheet.tsx` to understand the current SVG rendering flow and coordinate space.
-- [x] Define the `DrawingDimension` state structure.
-- Status: `complete`
+### Phase 1: State Engine Refinement
+- [ ] Audit `src/store/useCadStore.ts` for existing configuration state (`configurations`, `activeConfigurationId`).
+- [ ] Implement `applyConfiguration(configId)` logic to update the current `features` state based on the stored overrides and suppression maps.
+- Status: `not_started`
 
-### Phase 2: Implement Interactive Dimensioning
-- [x] Add `isDimensionMode` toggle state (using `smartDimensionActive` from `useCadStore`).
-- [x] Implement `onClick` handler on the SVG lines to capture endpoints and un-project the scale.
-- [x] Calculate dimension value (distance based on model scale).
-- [x] Render manual dimension lines (extension lines, arrows, text) on the SVG canvas with interactive points.
-- Status: `complete`
+### Phase 2: Configuration Manager UI
+- [ ] Develop `src/ui/ConfigurationManagerPanel.tsx`.
+- [ ] Implement UI for adding new configurations (cloning from current).
+- [ ] Implement double-click to activate a configuration.
+- [ ] Add visual indicators for the active configuration.
+- Status: `not_started`
 
-### Phase 3: Implement BOM Table
-- [x] Retrieve assembly components from `useCadStore`.
-- [x] Auto-generate a structured SVG/HTML table at the bottom-right corner of the drawing sheet (above the Title Block).
-- Status: `complete` (Confirmed existing implementation and refined auto-generation logic)
+### Phase 3: Property Manager Integration
+- [ ] Update `PartFeaturePropertyManager.tsx` to handle parameter changes when multiple configurations exist.
+- [ ] Option: "This Configuration", "All Configurations", or "Specified Configurations" (Mirroring SolidWorks behavior). For MVP, we will focus on "This Configuration" overrides.
+- Status: `not_started`
 
-### Phase 4: Validation
-- [x] Update `gap-checklist.md`, `PROJECT_ROADMAP.md`, and `DEV_LOG.md`.
-- Status: `complete`
+### Phase 4: Validation & Baseline Update
+- [ ] Verify that switching configurations correctly rebuilds the 3D model.
+- [ ] Update `gap-checklist.md`, `PROJECT_ROADMAP.md`, and `DEV_LOG.md`.
+- Status: `not_started`

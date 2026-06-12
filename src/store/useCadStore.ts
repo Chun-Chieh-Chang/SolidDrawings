@@ -506,11 +506,40 @@ export const useCadStore = create<CadState>()(
       activeConfigurationId: 'default',
       setConfigurations: (configurations) => set({ configurations }),
       setActiveConfiguration: (id) => set((state) => {
-        const config = state.configurations.find(c => c.id === id);
-        if (!config) return state;
-        return { 
+        const targetConfig = state.configurations.find(c => c.id === id);
+        if (!targetConfig) return state;
+
+        // 1. Save current features state to the active configuration before switching
+        const nextConfigs = state.configurations.map(c => {
+          if (c.id === state.activeConfigurationId) {
+            const suppression: Record<string, boolean> = {};
+            const overrides: Record<string, any> = {};
+            state.features.forEach(f => {
+              suppression[f.id] = !!f.isSuppressed;
+              overrides[f.id] = JSON.parse(JSON.stringify(f.parameters));
+            });
+            return { ...c, featureSuppression: suppression, parameterOverrides: overrides };
+          }
+          return c;
+        });
+
+        // 2. Apply target configuration to features
+        const nextFeatures = state.features.map(f => {
+          const isSuppressed = !!targetConfig.featureSuppression[f.id];
+          const overrides = targetConfig.parameterOverrides[f.id];
+          return { 
+            ...f, 
+            isSuppressed, 
+            parameters: overrides ? JSON.parse(JSON.stringify(overrides)) : f.parameters 
+          };
+        });
+
+        return {
+          configurations: nextConfigs,
           activeConfigurationId: id,
-          features: state.features.map(f => ({ ...f, isSuppressed: config.featureSuppression[f.id] || false }))
+          features: nextFeatures,
+          rebuildDirty: true,
+          dirtyFromFeatureIndex: 0
         };
       }),
       addConfiguration: (config) => set((state) => ({ configurations: [...state.configurations, config] })),
