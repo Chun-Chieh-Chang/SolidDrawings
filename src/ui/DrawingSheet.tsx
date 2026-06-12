@@ -152,7 +152,7 @@ const DrawingView = ({ title, type, lines, showDimensions, components }: Drawing
         }
       } else if (feat.type === 'FILLET') {
         const r = p.radius || 2;
-        if (type === 'FRONT') smartDims.push({ id: feat.id, type: 'RADIAL', value: r, u: x + wVal/2, v: y + hVal/2, radius: r, param: 'radius', prefix: 'R' });
+        if (type === 'FRONT') smartDims.push({ id: feat.id, type: 'RADIAL', value: r, u: x + widthVal/2, v: y + heightVal/2, radius: r, param: 'radius', prefix: 'R' });
       } else if (feat.type === 'CHAMFER') {
         const d = p.distance || 1.5;
         if (type === 'FRONT') smartDims.push({ id: feat.id, type: 'HORIZ', value: d, u: x, v: y - offsetV, length: d, param: 'distance', prefix: 'C' });
