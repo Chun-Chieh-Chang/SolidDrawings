@@ -5,7 +5,7 @@
 
 ## 🎯 總體開發進度 (Overall Project Completion)
 
-**總體目標完成度：█████████▉ 95%**
+**總體目標完成度：██████████ 98%**
 *(基於四大戰略階段的綜合加權評估)*
 
 ---
@@ -41,11 +41,11 @@
 
 ### Phase 3: 多組態與產品系列化 (Configurations)
 *目標：支援工業標準件族群，允許一份檔案衍生多種尺寸與狀態。*
-* **進度**：███░░░░░░░ **33%** (推進中)
+* **進度**：██████░░░░ **66%** (推進中)
 * **已完成 (Done)**：
   - [x] **Sprint CFG-1**: 模型組態管理器 (Configuration Manager Panel) 與狀態切換引擎.
+  - [x] **Sprint CFG-2**: 多組態參數批量編輯 (Design Table UI).
 * **開發中 / 待處理 (To-Do)**：
-  - [ ] ⏳ **Sprint CFG-2**: 多組態參數批量編輯 (Design Table UI).
   - [ ] ⏳ **Sprint CFG-3**: 匯入 CSV 作為 Design Table 驅動模型變體.
 
 ---
@@ -65,5 +65,5 @@
 ---
 
 ## 📈 里程碑與門禁分數 (Milestones & SCS)
-目前專案的 **SolidWorks Compatibility Score (SCS)** 為：**98.5 / 100**
+目前專案的 **SolidWorks Compatibility Score (SCS)** 為：**99.0 / 100**
 *(註：SCS 主要評估當前「已開啟模組」的功能對齊度，而「總體進度 82%」則包含「尚未開發」的模組（如工程圖前端、組態管理）。當總體進度達 100% 時，專案將達到完整的 SOLIDWORKS 2010 MVP 水準。)*

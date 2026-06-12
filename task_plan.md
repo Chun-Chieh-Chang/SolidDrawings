@@ -1,28 +1,27 @@
-# Task Plan: Sprint CFG-1 (Configuration Manager)
+# Task Plan: Sprint CFG-2 (Design Table UI)
 
 ## Goal
-Implement the Configuration Manager module to allow users to create, switch, and manage multiple part variants (Configurations). Each configuration can have its own feature suppression states and parameter overrides.
+Implement a "Design Table" UI that allows users to view and batch-edit parameters and suppression states across all configurations in a single grid interface.
 
 ## Phases
 
-### Phase 1: State Engine Refinement
-- [ ] Audit `src/store/useCadStore.ts` for existing configuration state (`configurations`, `activeConfigurationId`).
-- [ ] Implement `applyConfiguration(configId)` logic to update the current `features` state based on the stored overrides and suppression maps.
+### Phase 1: Data Aggregation Engine
+- [ ] Implement a utility to extract a unique set of all overridden parameters and features across all existing configurations.
+- [ ] Define the table schema: Rows = Configurations, Columns = Features/Parameters.
 - Status: `not_started`
 
-### Phase 2: Configuration Manager UI
-- [ ] Develop `src/ui/ConfigurationManagerPanel.tsx`.
-- [ ] Implement UI for adding new configurations (cloning from current).
-- [ ] Implement double-click to activate a configuration.
-- [ ] Add visual indicators for the active configuration.
+### Phase 2: Design Table Component
+- [ ] Develop `src/ui/Modals/DesignTableModal.tsx`.
+- [ ] Implement a sticky-header grid using standard HTML tables with Tailwind styling.
+- [ ] Implement editable cells that push updates back to the `useCadStore`'s `configurations` state.
 - Status: `not_started`
 
-### Phase 3: Property Manager Integration
-- [ ] Update `PartFeaturePropertyManager.tsx` to handle parameter changes when multiple configurations exist.
-- [ ] Option: "This Configuration", "All Configurations", or "Specified Configurations" (Mirroring SolidWorks behavior). For MVP, we will focus on "This Configuration" overrides.
+### Phase 3: Integration & UX
+- [ ] Add a "Design Table" button to `ConfigurationManagerPanel.tsx`.
+- [ ] Add a "Sync to Model" button to apply batch changes.
 - Status: `not_started`
 
 ### Phase 4: Validation & Baseline Update
-- [ ] Verify that switching configurations correctly rebuilds the 3D model.
+- [ ] Verify that editing a cell in the Design Table correctly updates the specific configuration's state.
 - [ ] Update `gap-checklist.md`, `PROJECT_ROADMAP.md`, and `DEV_LOG.md`.
 - Status: `not_started`
