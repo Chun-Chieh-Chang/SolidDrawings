@@ -1,3 +1,24 @@
+## 2026-06-13 Sprint ASM-1: Rapier3D Physics Integration
+
+### Goal:
+- Execute Phase 4 (Assembly Dynamics) of the Continuous Improvement Plan.
+- Move from static geometry to dynamic mechanical simulation by integrating the Rapier3D physics engine.
+
+### Actions:
+- **Dependency Integration**: Installed `@dimforge/rapier3d-compat` to enable high-performance Rust-based physics in the browser.
+- **Physics Core Service (`AssemblyPhysicsService.ts`)**:
+  - Implemented a singleton service to manage the Rapier world lifecycle (Init, Sync, Step, Reset).
+  - Developed logic to convert static CAD components into dynamic rigid bodies with bounding-box colliders.
+  - Mapped core CAD Mates (Coincident, Concentric) to Rapier's spherical/hinge impulse joints.
+- **Frontend Integration**:
+  - Added a "Physics" toggle button to the Assembly Ribbon.
+  - Implemented the `useAssemblyPhysics` hook to drive the simulation loop and synchronize physics-calculated transforms with the Three.js viewport.
+- **Visual Feedback**:
+  - Integrated real-time simulation status into the CAD store and UI button styling.
+
+### Status:
+- ✅ **Done**: The system now supports real-time dynamic simulation. Users can enable "Physics" mode to see their mechanical linkages respond to gravity and constraints.
+
 ## 2026-06-12 Sprint CFG-3: CSV Import/Export for Design Table
 
 ### Goal:

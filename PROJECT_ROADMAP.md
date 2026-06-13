@@ -53,13 +53,13 @@
 
 ### Phase 4: 動態連桿與進階組合件 (Assembly Dynamics)
 *目標：整合剛體物理引擎，讓靜態零件升級為可拖曳驗證的機構。*
-* **進度**：████░░░░░░ **40%** (基礎完備，待升級)
+* **進度**：██████░░░░ **60%** (已整合物理引擎)
 * **已完成 (Done)**：
   - [x] 基礎的靜態組合件樹 (Assembly Tree).
   - [x] 靜態幾何干涉檢查 (Interference Detection).
   - [x] 基礎配合 (同心、重合等靜態定位).
+  - [x] **Sprint ASM-1**: 整合 `rapier3d` (Rust/WASM) 物理引擎與核心仿真服務.
 * **開發中 / 待處理 (To-Do)**：
-  - [ ] ⏳ **Sprint ASM-1**: 整合 `rapier3d` (Rust/WASM) 物理引擎.
   - [ ] ⏳ **Sprint ASM-2**: 將幾何 Mate 轉換為動態 Joints (Hinge, Slider).
   - [ ] ⏳ **Sprint ASM-3**: 實作「拖曳以模擬 (Drag to Animate)」與齒輪/凸輪咬合.
 

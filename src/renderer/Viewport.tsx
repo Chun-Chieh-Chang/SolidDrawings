@@ -10,6 +10,8 @@ import { DatumPlanes } from './DatumPlanes';
 import { SketchPreview } from './SketchPreview';
 import { TopologySelector } from '../kernel/TopologySelector';
 
+import { useAssemblyPhysics } from '../hooks/useAssemblyPhysics';
+
 const CameraHandler = () => {
   const activePlane = useCadStore(state => state.activePlane);
   const isSketchMode = useCadStore(state => state.isSketchMode);
@@ -969,6 +971,7 @@ const PerspectiveCameraWrapper = React.memo(() => {
 PerspectiveCameraWrapper.displayName = 'PerspectiveCameraWrapper';
 
 const Viewport = ({ children }: ViewportProps) => {
+  useAssemblyPhysics();
   const isSketchMode = useCadStore(state => state.isSketchMode);
   const setSketchMode = useCadStore(state => state.setSketchMode);
   const setSelectedId = useCadStore(state => state.setSelectedId);

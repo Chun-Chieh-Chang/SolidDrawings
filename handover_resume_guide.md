@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-13 09:51:45
+**Last Saved:** 2026-06-13 09:59:28
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,17 +7,19 @@
 
 ## 1. Current Git State
 ```shell
-b6ab972 feat: complete Sprint CFG-2 implementing Design Table UI for batch configuration management
+13a53a1 feat: finalize Phase 3 with CSV Design Table Import/Export (Sprint CFG-3) and TS fix
 ```
 
 ### Uncommitted Changes
 ```shell
-M DEV_LOG.md
- M PROJECT_ROADMAP.md
- M gap-checklist.md
- M progress.md
- M src/ui/Modals/DesignTableModal.tsx
+M package-lock.json
+ M package.json
+ M src/renderer/Viewport.tsx
+ M src/store/useCadStore.ts
+ M src/ui/RibbonBar/RibbonController.tsx
  M task_plan.md
+?? src/hooks/useAssemblyPhysics.ts
+?? src/services/AssemblyPhysicsService.ts
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)

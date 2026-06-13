@@ -343,6 +343,8 @@ export interface CadState {
   setAllLightweight: (light: boolean) => void;
   isLargeAssemblyMode: boolean;
   setLargeAssemblyMode: (active: boolean) => void;
+  isPhysicsActive: boolean;
+  setIsPhysicsActive: (active: boolean) => void;
   mates: CADMate[];
   setMates: (mates: CADMate[]) => void;
   addMate: (mate: CADMate) => void;

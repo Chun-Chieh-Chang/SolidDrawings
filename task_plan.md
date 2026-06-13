@@ -1,28 +1,35 @@
-# Task Plan: Sprint CFG-3 (CSV Design Table Import)
+# Task Plan: Sprint ASM-1 (Rapier3D Integration)
 
 ## Goal
-Implement a CSV import feature for the Design Table to allow users to drive part configurations from external spreadsheets.
+Integrate the Rapier3D physics engine to enable dynamic assembly simulation and mechanical linkage verification.
 
 ## Phases
 
-### Phase 1: CSV Parser Logic
-- [x] Implement a front-end CSV parser utility directly in `DesignTableModal.tsx`.
-- [x] Map CSV rows to configurations and columns to feature parameters/suppression states using a header schema (FeatureName.Parameter).
-- Status: `complete`
+### Phase 1: Environment & Dependency Setup
+- [x] Audit `package.json` for Rapier3D availability (Found: Not installed).
+- [ ] Install `@dimforge/rapier3d-compat`.
+- Status: `in_progress`
 
-### Phase 2: Design Table UI Enhancement
-- [x] Add an "Import CSV" button to `DesignTableModal.tsx`.
-- [x] Add an "Export Template" button to allow users to easily see the required CSV schema.
-- [x] Implement a file upload handler that triggers the parser.
-- Status: `complete`
+### Phase 2: Assembly Physics Engine (Core)
+- [ ] Implement `src/services/AssemblyPhysicsService.ts`.
+- [ ] Initialize the Rapier World.
+- [ ] Implement `convertComponentToRigidBody(component)` logic.
+- Status: `not_started`
 
-### Phase 3: Integration & Sync
-- [x] Ensure imported configurations are correctly added to the `localConfigs` state (creates new configs or updates existing by name).
-- [x] Verify that imported suppression and parameter data correctly maps to the internal IDs.
-- Status: `complete`
+### Phase 3: CAD Mate to Physics Joint Mapping
+- [ ] Implement mapping for core mates:
+  - COINCIDENT (Point-to-Point) -> Ball Joint
+  - CONCENTRIC -> Hinge Joint
+  - PARALLEL/FIXED -> Fixed Joint
+- Status: `not_started`
 
-### Phase 4: Validation & Phase 3 Completion
-- [x] Verify CSV import correctly updates the table and then the model after syncing.
-- [x] Update `gap-checklist.md`, `PROJECT_ROADMAP.md`, and `DEV_LOG.md`.
-- [x] Mark Phase 3 as 100% complete.
-- Status: `complete`
+### Phase 4: Frontend Integration & Animate Mode
+- [ ] Add "Enable Physics" toggle in the Assembly Ribbon.
+- [ ] Implement a simulation loop that syncs Three.js meshes with Rapier rigid bodies.
+- [ ] Implement mouse-drag interaction during simulation.
+- Status: `not_started`
+
+### Phase 5: Validation & Phase 4 Initiation
+- [ ] Verify that a simple linkage (e.g., 2 bars with a concentric mate) can rotate in real-time.
+- [ ] Update `gap-checklist.md`, `PROJECT_ROADMAP.md`, and `DEV_LOG.md`.
+- Status: `not_started`
