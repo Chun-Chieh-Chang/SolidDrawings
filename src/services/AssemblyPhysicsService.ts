@@ -72,9 +72,11 @@ export class AssemblyPhysicsService {
 
       if (mate.type === 'CONCENTRIC') {
         // Revolute (Hinge) Joint: Fixed axis of rotation
+        // Align joint axis with local normal
         const axis1 = mate.entity1.localNormal ? { x: mate.entity1.localNormal[0], y: mate.entity1.localNormal[1], z: mate.entity1.localNormal[2] } : { x: 0, y: 0, z: 1 };
         const axis2 = mate.entity2.localNormal ? { x: mate.entity2.localNormal[0], y: mate.entity2.localNormal[1], z: mate.entity2.localNormal[2] } : { x: 0, y: 0, z: 1 };
         
+        // Use revolute impulse joint
         const params = RAPIER.JointData.revolute(anchor1, anchor2, axis1);
         this.world!.createImpulseJoint(params, body1, body2, true);
       } else if (mate.type === 'COINCIDENT') {
@@ -82,12 +84,15 @@ export class AssemblyPhysicsService {
         const params = RAPIER.JointData.spherical(anchor1, anchor2);
         this.world!.createImpulseJoint(params, body1, body2, true);
       } else if (mate.type === 'DISTANCE') {
-        // Distance constraint
-        const targetDist = mate.parameters?.offset || 0;
-        const params = RAPIER.JointData.fixed(anchor1, { x: 0, y: 0, z: 0, w: 1 }, anchor2, { x: 0, y: 0, z: 0, w: 1 });
-        // Rapier doesn't have a direct "distance" impulse joint in the same way, 
-        // we'd typically use a prismatic with limits or a custom force.
-        // For MVP, we fix them at the offset position.
+        // Prismatic (Slider) Joint: Linear motion along the normal axis
+        const axis1 = mate.entity1.localNormal ? { x: mate.entity1.localNormal[0], y: mate.entity1.localNormal[1], z: mate.entity1.localNormal[2] } : { x: 0, y: 0, z: 1 };
+        const params = RAPIER.JointData.prismatic(anchor1, anchor2, axis1);
+        
+        // Add limits if defined
+        const offset = mate.parameters?.offset || 0;
+        params.limitsEnabled = true;
+        params.limits = [offset - 0.001, offset + 0.001]; // Rigid distance for now
+        
         this.world!.createImpulseJoint(params, body1, body2, true);
       } else if (mate.type === 'GEAR') {
         // Mechanical Transmission

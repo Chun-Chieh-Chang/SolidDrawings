@@ -1,3 +1,3 @@
-## Session: 2026-06-13 (Sprint ASM-2 & ASM-3)
-- Charging into the final strategic high ground.
-- Started Phase 1: Refining `AssemblyPhysicsService.ts` for advanced mechanical joint mapping.
+## Session: 2026-06-13 (Sprint ASM-2 Deep Dive)
+- Restarted Sprint ASM-2 to achieve true mechanical precision.
+- Phase 1: Refining anchor logic to use local coordinate systems.
