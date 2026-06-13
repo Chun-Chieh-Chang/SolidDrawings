@@ -125,8 +125,8 @@ export class AssemblyPhysicsService {
       z: (targetPosition.z - currentPos.z) * 100
     };
 
-    body.setLinearVelocity(vec, true);
+    body.setLinvel(vec, true);
     // Add some damping when close
-    body.setAngularVelocity({ x: 0, y: 0, z: 0 }, true);
+    body.setAngvel({ x: 0, y: 0, z: 0 }, true);
   }
 }
