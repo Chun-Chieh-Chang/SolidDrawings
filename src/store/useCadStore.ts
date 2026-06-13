@@ -743,6 +743,8 @@ export const useCadStore = create<CadState>()(
       setAllLightweight: (light) => set((state) => { get().saveSnapshot(); return { components: state.components.map(c => ({ ...c, isLightweight: light })) }; }),
       isLargeAssemblyMode: false,
       setLargeAssemblyMode: (active) => set({ isLargeAssemblyMode: active }),
+      isPhysicsActive: false,
+      setIsPhysicsActive: (active) => set({ isPhysicsActive: active }),
       mates: [],
       setMates: (mates) => set({ mates }),
       addMate: (mate) => set((state) => { get().saveSnapshot(); return { mates: [...state.mates, mate] }; }),
