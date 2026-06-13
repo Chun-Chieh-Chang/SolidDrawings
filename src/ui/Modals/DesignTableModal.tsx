@@ -11,6 +11,7 @@ export const DesignTableModal: React.FC<DesignTableModalProps> = ({ onClose }) =
   const { 
     configurations, 
     features, 
+    projectName,
     setConfigurations, 
     pushToast,
     markProjectDirty 
