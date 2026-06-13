@@ -1,3 +1,21 @@
+## 2026-06-12 Sprint CFG-3: CSV Import/Export for Design Table
+
+### Goal:
+- Execute the final Sprint (CFG-3) of Phase 3 (Configurations).
+- Enable external data-driven modeling by implementing CSV Import and Export for the Design Table.
+
+### Actions:
+- **CSV Data Hub (`DesignTableModal.tsx`)**:
+  - Developed a front-end CSV parser that maps spreadsheet headers (`Feature.Parameter`) directly to the model's internal feature IDs.
+  - Implemented an **"Export Template"** feature that generates a pre-formatted CSV based on the current model's active parameters, serving as a perfect starting point for users.
+  - Built a robust **"Import CSV"** handler that dynamically updates existing configurations or creates new ones based on the spreadsheet rows.
+- **Workflow Integration**:
+  - Integrated the CSV buttons into the Design Table header with professional industrial iconography.
+  - Validated that imported data correctly synchronizes to the 3D model after clicking "Sync to Model".
+
+### Status:
+- ✅ **Done**: Phase 3 is now 100% complete. 3D-Builder now possesses professional-grade product serialization capabilities, allowing users to drive hundreds of part variants via external spreadsheets.
+
 ## 2026-06-12 Sprint CFG-2: Design Table UI & Batch Editing
 
 ### Goal:

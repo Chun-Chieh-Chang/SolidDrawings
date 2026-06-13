@@ -70,6 +70,95 @@ export const DesignTableModal: React.FC<DesignTableModalProps> = ({ onClose }) =
     onClose();
   };
 
+  const exportCSV = () => {
+    const header = ['Configuration Name', ...columns.map(c => `${c.featName}.${c.param}`)].join(',');
+    const rows = localConfigs.map(config => {
+      const rowData = [config.name];
+      columns.forEach(col => {
+        if (col.param === 'SUPPRESSION') {
+          rowData.push(config.featureSuppression[col.featId] ? 'SUPPRESSED' : 'RESOLVED');
+        } else {
+          const featInConfig = config.parameterOverrides[col.featId] || {};
+          const value = featInConfig[col.param] ?? features.find(f => f.id === col.featId)?.parameters[col.param] ?? 0;
+          rowData.push(value.toString());
+        }
+      });
+      return rowData.join(',');
+    });
+    
+    const csvContent = [header, ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `DesignTable_${projectName.replace(/\s/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    pushToast('Design Table exported to CSV.', 'info');
+  };
+
+  const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (!text) return;
+
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length < 2) {
+        pushToast('Invalid CSV format. Need at least a header and one row.', 'error');
+        return;
+      }
+
+      const headers = lines[0].split(',').map(h => h.trim());
+      const newConfigs = [...localConfigs];
+
+      for (let i = 1; i < lines.length; i++) {
+        const values = lines[i].split(',').map(v => v.trim());
+        const configName = values[0];
+        if (!configName) continue;
+
+        let config = newConfigs.find(c => c.name === configName);
+        if (!config) {
+          config = {
+            id: `cfg_${Date.now()}_${i}`,
+            name: configName,
+            featureSuppression: {},
+            parameterOverrides: {}
+          };
+          newConfigs.push(config);
+        }
+
+        headers.forEach((header, idx) => {
+          if (idx === 0) return; 
+          const value = values[idx];
+          if (value === undefined) return;
+
+          // Search column mapping: FeatureName.Parameter
+          const col = columns.find(c => `${c.featName}.${c.param}` === header);
+          if (col) {
+            if (col.param === 'SUPPRESSION') {
+              config!.featureSuppression[col.featId] = 
+                ['SUPPRESSED', 'TRUE', '1', 'YES'].includes(value.toUpperCase());
+            } else {
+              if (!config!.parameterOverrides[col.featId]) config!.parameterOverrides[col.featId] = {};
+              config!.parameterOverrides[col.featId][col.param] = parseFloat(value) || 0;
+            }
+          }
+        });
+      }
+
+      setLocalConfigs(newConfigs);
+      pushToast('CSV Data imported to table.', 'info');
+      // Reset file input
+      e.target.value = '';
+    };
+    reader.readAsText(file);
+  };
+
   return (
     <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md flex items-center justify-center z-[1100] p-8">
       <div className="w-full h-full bg-[#F1F5F9] border border-slate-300 rounded-lg shadow-2xl flex flex-col overflow-hidden">
@@ -82,7 +171,23 @@ export const DesignTableModal: React.FC<DesignTableModalProps> = ({ onClose }) =
               <p className="text-[10px] opacity-80 mt-1 font-bold">SOLIDWORKS 2010 PARITY BATCH EDITOR</p>
             </div>
           </div>
-          <button onClick={onClose} className="hover:text-slate-200 text-2xl font-bold leading-none">×</button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 border-r border-white/20 pr-4 mr-2">
+              <label className="cursor-pointer px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/30 rounded text-[10px] font-black uppercase transition-all flex items-center gap-1.5">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                匯入 CSV
+                <input type="file" accept=".csv" onChange={handleImportCSV} className="hidden" />
+              </label>
+              <button 
+                onClick={exportCSV}
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/30 rounded text-[10px] font-black uppercase transition-all flex items-center gap-1.5"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                匯出範本
+              </button>
+            </div>
+            <button onClick={onClose} className="hover:text-slate-200 text-2xl font-bold leading-none">×</button>
+          </div>
         </div>
 
         {/* Table Area */}
