@@ -345,6 +345,8 @@ export interface CadState {
   setLargeAssemblyMode: (active: boolean) => void;
   isPhysicsActive: boolean;
   setIsPhysicsActive: (active: boolean) => void;
+  draggedComponentId: string | null;
+  setDraggedComponentId: (id: string | null) => void;
   mates: CADMate[];
   setMates: (mates: CADMate[]) => void;
   addMate: (mate: CADMate) => void;
@@ -745,6 +747,8 @@ export const useCadStore = create<CadState>()(
       setLargeAssemblyMode: (active) => set({ isLargeAssemblyMode: active }),
       isPhysicsActive: false,
       setIsPhysicsActive: (active) => set({ isPhysicsActive: active }),
+      draggedComponentId: null,
+      setDraggedComponentId: (id) => set({ draggedComponentId: id }),
       mates: [],
       setMates: (mates) => set({ mates }),
       addMate: (mate) => set((state) => { get().saveSnapshot(); return { mates: [...state.mates, mate] }; }),

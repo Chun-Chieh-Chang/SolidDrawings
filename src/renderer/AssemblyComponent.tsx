@@ -3,9 +3,11 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { TransformControls } from '@react-three/drei';
+import { useFrame } from '@react-three/fiber';
 import { useCadStore, CADComponent } from '../store/useCadStore';
 import OcctShape, { MeshData } from './OcctShape';
 import { AssemblyService } from '../kernel/AssemblyService';
+import { AssemblyPhysicsService } from '../services/AssemblyPhysicsService';
 import { Box, Edges } from '@react-three/drei';
 
 interface AssemblyComponentProps {
@@ -15,9 +17,19 @@ interface AssemblyComponentProps {
 }
 
 export const AssemblyComponent: React.FC<AssemblyComponentProps> = ({ comp, meshes, isActive }) => {
-  const { updateComponentTransform, setComponents, components, mates, explodedView } = useCadStore();
+  const { updateComponentTransform, setComponents, components, mates, explodedView, isPhysicsActive } = useCadStore();
   const groupRef = useRef<THREE.Group>(null);
   const transformRef = useRef<any>(null);
+
+  useFrame(() => {
+    if (isPhysicsActive && groupRef.current) {
+      const transform = AssemblyPhysicsService.getInstance().getTransform(comp.id);
+      if (transform) {
+        groupRef.current.position.set(transform.position.x, transform.position.y, transform.position.z);
+        groupRef.current.quaternion.set(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
+      }
+    }
+  });
 
   // Compute bounding box for lightweight mode
   const boundingBox = useMemo(() => {

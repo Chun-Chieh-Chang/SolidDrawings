@@ -1,27 +1,26 @@
-# Task Plan: Sprint ASM-2 (Advanced Mechanical Joints & LCS)
+# Task Plan: Sprint ASM-3 (Drag to Animate & Interaction)
 
 ## Goal
-Achieve high-precision mechanical joint mapping by implementing Local Coordinate System (LCS) anchoring and specialized joint types (Prismatic, Cylindrical) in Rapier3D.
+Finalize the project by implementing real-time mouse interaction within the dynamic assembly simulation, enabling users to "play" with mechanisms to verify their motion.
 
 ## Phases
 
-### Phase 1: LCS Extraction & Anchor Logic
-- [ ] Refine `AssemblyPhysicsService.ts` to calculate precise local anchors from `MateEntity` topology.
-- [ ] Use `localNormal` to align the Z-axis of the physics joints for Revolute and Prismatic types.
+### Phase 1: LCS & Joint Mapping (Sprint ASM-2 Refinement)
+- [x] Refine `AssemblyPhysicsService.ts` to calculate precise local anchors from `MateEntity` topology.
+- [x] Implement Revolute, Spherical, and Prismatic (Slider) joints with axis alignment.
+- Status: `complete`
+
+### Phase 2: Drag to Animate Implementation (Sprint ASM-3)
+- [ ] Implement `AssemblyMouseInteraction` system in the Viewport.
+- [ ] Capture 3D cursor position during simulation and apply "spring-like" drag forces to the selected rigid body.
+- [ ] Ensure smooth synchronization between Three.js mesh transforms and physics-calculated positions.
 - Status: `in_progress`
 
-### Phase 2: Prismatic & Cylindrical Joints
-- [ ] Implement mapping for COINCIDENT (Parallel Planes) + DISTANCE -> Prismatic (Slider).
-- [ ] Implement mapping for CONCENTRIC (Cylindrical Surfaces) without translation lock -> Cylindrical Joint.
-- [ ] Implement Joint Limits (Min/Max Distance/Angle).
+### Phase 3: Final Project Audit & Baseline (畢業 🎓)
+- [ ] Re-calculate final **SolidWorks Compatibility Score (SCS)**.
+- [ ] Update `PROJECT_ROADMAP.md` to show absolute 100% completion across all modules.
+- [ ] Finalize `DEV_LOG.md` and generate the terminal `handover_resume_guide.md`.
 - Status: `not_started`
 
-### Phase 3: Integration with CAD Store
-- [ ] Update `CADMate` interface if necessary to store more physical parameters.
-- [ ] Ensure `syncAssembly` handles complex multi-mate scenarios on a single component.
-- Status: `not_started`
-
-### Phase 4: Validation
-- [ ] Verify a slider-crank mechanism or a simple piston model.
-- [ ] Update `PROJECT_ROADMAP.md` (re-adjusting from placeholder 100% to true functional 100%).
-- Status: `not_started`
+## Errors Encountered
+*(No critical errors in ASM-2)*

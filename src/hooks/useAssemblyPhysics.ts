@@ -19,6 +19,12 @@ export function useAssemblyPhysics() {
         physicsService.syncAssembly(components, mates);
         
         const animate = () => {
+          const { draggedComponentId, mousePos } = useCadStore.getState();
+          
+          if (draggedComponentId) {
+            physicsService.applyDragForce(draggedComponentId, { x: mousePos[0], y: mousePos[1], z: mousePos[2] });
+          }
+
           physicsService.step();
           
           // Update component transforms in the store (or just local for performance)
