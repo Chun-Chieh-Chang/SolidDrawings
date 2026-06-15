@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect } from 'react';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
@@ -220,21 +220,4 @@ export function useSelectionLogic(deps: SelectionLogicDeps) {
     selectedTopology, isSketchMode, selectedId,
     features, updateFeatureParams, setSelectedTopology, handleRebuild,
   ]);
-
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    const handleShiftClick = (e: MouseEvent) => {
-      if (!e.shiftKey && !e.ctrlKey) return;
-      const store = useCadStore.getState();
-      if (!store.selectedId) return;
-      if (e.shiftKey) {
-        store.pushToast("Shift+Click: Add range to selection", "info");
-      }
-      if (e.ctrlKey) {
-        store.pushToast("Ctrl+Click: Toggle individual selection", "info");
-      }
-    };
-    document.addEventListener("mousedown", handleShiftClick);
-    return () => document.removeEventListener("mousedown", handleShiftClick);
-  }, [selectedId]);
 }

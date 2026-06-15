@@ -17,7 +17,14 @@ export const RobotHUD: React.FC = () => {
     logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [automationLog]);
 
-  if (robotStatus === 'IDLE' && automationLog.length === 0) return null;
+  // Always show if there is ANY activity or history
+  if (robotStatus === 'IDLE' && automationLog.length === 0) {
+    return (
+      <div className="fixed right-6 top-24 px-4 py-2 bg-slate-900/40 backdrop-blur border border-white/10 rounded-lg z-[5000] text-[10px] text-white/50 font-bold uppercase tracking-widest">
+        Robot Monitoring: Standby
+      </div>
+    );
+  }
 
   return (
     <div className="fixed right-6 top-24 w-80 bg-slate-900/90 backdrop-blur-xl border border-white/20 rounded-xl shadow-2xl flex flex-col overflow-hidden z-[5000] animate-in slide-in-from-right-4 duration-300">

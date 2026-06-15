@@ -353,6 +353,7 @@ export interface CadState {
   setActiveAutomationStep: (step: string | null) => void;
   robotStatus: 'IDLE' | 'WORKING' | 'PAUSED' | 'ERROR';
   setRobotStatus: (status: 'IDLE' | 'WORKING' | 'PAUSED' | 'ERROR') => void;
+  resetStore: () => void;
   mates: CADMate[];
   setMates: (mates: CADMate[]) => void;
   addMate: (mate: CADMate) => void;
@@ -761,6 +762,28 @@ export const useCadStore = create<CadState>()(
       setActiveAutomationStep: (activeAutomationStep) => set({ activeAutomationStep }),
       robotStatus: 'IDLE',
       setRobotStatus: (robotStatus) => set({ robotStatus }),
+      resetStore: () => set({
+        features: [],
+        sketchNodes: {},
+        sketchEdges: {},
+        sketchConstraints: {},
+        mates: [],
+        components: [],
+        referencePlanes: [],
+        referenceAxes: [],
+        referencePoints: [],
+        globalVariables: {},
+        evaluatedVariables: {},
+        activeConfigurationId: 'default',
+        configurations: [{ id: 'default', name: 'Default', featureSuppression: {}, parameterOverrides: {} }],
+        selectedId: null,
+        meshData: [],
+        interferenceResults: [],
+        rollbackIndex: null,
+        activeTab: 'FEATURES',
+        isSketchMode: false,
+        isDirty: false
+      }),
       mates: [],
       setMates: (mates) => set({ mates }),
       addMate: (mate) => set((state) => { get().saveSnapshot(); return { mates: [...state.mates, mate] }; }),

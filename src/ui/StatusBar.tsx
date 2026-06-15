@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useMemo } from 'react';
 import { useCadStore } from '../store/useCadStore';
@@ -9,36 +9,38 @@ export const StatusBar: React.FC = () => {
     isSketchMode, 
     sketchNodes, 
     mousePos,
-    hint,
     solverReport,
-    isLargeAssemblyMode,
     components,
     activePlane,
     activeFaceOrigin,
     activeFaceNormal,
     referencePlanes,
+    viewportDisplayMode,
+    isLargeAssemblyMode,
   } = useCadStore();
 
   const activeBasis = useMemo(() => {
-    if (activePlane === 'FACE' && activeFaceOrigin && activeFaceNormal) {
-       const origin = new THREE.Vector3(...activeFaceOrigin);
-       const normal = new THREE.Vector3(...activeFaceNormal).normalize();
-       const xDir = new THREE.Vector3();
-       if (Math.abs(normal.x) < 1e-5 && Math.abs(normal.y) < 1e-5) xDir.set(1, 0, 0);
-       else xDir.set(-normal.y, normal.x, 0).normalize();
-       const yDir = new THREE.Vector3().crossVectors(normal, xDir).normalize();
-       return { origin, xDir, yDir };
-    }
-    const custom = referencePlanes.find(p => p.id === activePlane);
-    if (custom) {
-       return { 
-         origin: new THREE.Vector3(...custom.origin), 
-         xDir: new THREE.Vector3(...custom.xDir), 
-         yDir: new THREE.Vector3(...custom.yDir) 
-       };
+    if (isSketchMode && activePlane && activePlane !== 'FRONT' && activePlane !== 'TOP' && activePlane !== 'RIGHT') {
+      if (activePlane === 'FACE' && activeFaceOrigin && activeFaceNormal) {
+        const origin = new THREE.Vector3(...activeFaceOrigin);
+        const normal = new THREE.Vector3(...activeFaceNormal).normalize();
+        const xDir = new THREE.Vector3();
+        if (Math.abs(normal.x) < 1e-5 && Math.abs(normal.y) < 1e-5) xDir.set(1, 0, 0);
+        else xDir.set(-normal.y, normal.x, 0).normalize();
+        const yDir = new THREE.Vector3().crossVectors(normal, xDir).normalize();
+        return { origin, xDir, yDir };
+      }
+      const custom = referencePlanes?.find(p => p.id === activePlane);
+      if (custom) {
+        return { 
+          origin: new THREE.Vector3(...custom.origin), 
+          xDir: new THREE.Vector3(...custom.xDir), 
+          yDir: new THREE.Vector3(...custom.yDir) 
+        };
+      }
     }
     return null;
-  }, [activePlane, activeFaceOrigin, activeFaceNormal, referencePlanes]);
+  }, [isSketchMode, activePlane, activeFaceOrigin, activeFaceNormal, referencePlanes]);
 
   const displayCoords = useMemo(() => {
     if (isSketchMode && activePlane) {
@@ -57,61 +59,69 @@ export const StatusBar: React.FC = () => {
     return `X: ${mousePos[0].toFixed(2)}  Y: ${mousePos[1].toFixed(2)}  Z: ${mousePos[2].toFixed(2)}`;
   }, [isSketchMode, activePlane, mousePos, activeBasis]);
 
-  const isManyLightweight = useMemo(() => {
-    return components.filter(c => c.isLightweight).length > 5;
-  }, [components]);
-
   const definitionStatus = useMemo(() => {
     if (!isSketchMode) return null;
     
-    const nodeIds = Object.keys(sketchNodes);
-    if (nodeIds.length === 0) return { text: ' (Empty)', color: 'text-slate-400' };
+    const nodeIds = Object.keys(sketchNodes || {});
+    if (nodeIds.length === 0) return { text: 'Empty', color: '#9ca3af' };
 
-    if (!solverReport) return { text: 'Under Defined', color: 'text-blue-500 font-bold' };
+    if (!solverReport) return { text: 'Under Defined', color: '#3b82f6' };
 
     if (solverReport.dof < 0) {
-      return { text: ' (Over Defined)', color: 'text-red-500 font-black' };
+      return { text: 'Over Defined', color: '#ef4444' };
     }
-
     if (solverReport.dof === 0) {
-      return { text: 'Fully Defined', color: 'text-slate-800 font-bold' };
+      return { text: 'Fully Defined', color: '#22c55e' };
     } else {
-      return { text: 'Under Defined', color: 'text-blue-500 font-bold' };
+      return { text: `Under Defined (${solverReport.dof} DOF)`, color: '#3b82f6' };
     }
   }, [isSketchMode, sketchNodes, solverReport]);
 
+  const displayMode = useMemo(() => {
+    switch (viewportDisplayMode) {
+      case 'SHADED': return 'Shaded';
+      case 'SHADED_EDGES': return 'Shaded w/ Edges';
+      case 'WIREFRAME': return 'Wireframe';
+      case 'HIDDEN_LINES': return 'Hidden Lines Removed';
+      default: return 'Shaded';
+    }
+  }, [viewportDisplayMode]);
+
   return (
-    <footer className="h-[26px] w-full bg-[#E8E8E8] border-t border-[#A0A0A0] flex items-center justify-between px-3 text-[10px] text-slate-700 select-none z-50 shrink-0 font-sans font-bold uppercase tracking-tighter">
-      {/* Left: Hint & Mode */}
-      <div className="flex items-center gap-4 min-w-0 flex-1">
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-slate-500 font-black">▶</span>
-          <span className="truncate max-w-[400px]" title={hint}>{hint}</span>
-        </div>
+    <footer className="h-[26px] w-full flex items-center select-none text-[11px] font-sans border-t border-[#A0A0A0]" style={{ background: "linear-gradient(to bottom, #E8E8E8 0%, #D6D6D6 100%)" }}>
+      {/* Left Section */}
+      <div className="flex items-center gap-4 px-2 h-full flex-1">
+        <span className="text-[#404040] font-medium whitespace-nowrap">
+          {isLargeAssemblyMode ? 'Large Assembly' : isSketchMode ? 'Sketch Mode' : 'Part Mode'}
+        </span>
         
-        {isSketchMode && (
-          <div className="flex items-center gap-2 px-3 border-l border-slate-400">
-            <span className="text-slate-500 font-black">STATUS:</span>
-            <span className={definitionStatus?.color}>{definitionStatus?.text}</span>
-          </div>
+        {definitionStatus && (
+          <span className="font-bold text-xs whitespace-nowrap" style={{ color: definitionStatus.color }}>
+            ● {definitionStatus.text}
+          </span>
         )}
-
-        {(isLargeAssemblyMode || isManyLightweight) && (
-          <div className="flex items-center gap-2 px-3 border-l border-orange-400 bg-orange-100/50">
-            <span className="text-orange-700 font-black">⚡ LARGE ASSEMBLY MODE</span>
-          </div>
-        )}
+        
+        <span className="text-[#404040] font-mono whitespace-nowrap">
+          {displayCoords}
+        </span>
       </div>
-
-      {/* Right: Units & Coordinates */}
-      <div className="flex items-center gap-3 shrink-0">
-        <div className="px-3 border-l border-slate-400 flex items-center gap-2">
-          <span className="text-slate-500 font-black">COORD:</span>
-          <span className="font-mono text-slate-900 bg-white/50 px-1 rounded">{displayCoords}</span>
-        </div>
-        <div className="px-3 border-l border-slate-400 flex items-center gap-1.5 text-[#005B9A]">
-          MMGS (mm, g, s)
-        </div>
+      
+      {/* Divider */}
+      <div className="w-[1px] h-4 bg-[#A0A0A0]" />
+      
+      {/* Right Section */}
+      <div className="flex items-center gap-3 px-2 h-full">
+        <span className="text-[#404040] font-medium whitespace-nowrap">
+          {displayMode}
+        </span>
+        
+        <span className="text-[#404040] font-medium whitespace-nowrap">
+          MMGS
+        </span>
+        
+        <span className="text-[#404040] font-medium whitespace-nowrap">
+          1:1
+        </span>
       </div>
     </footer>
   );
