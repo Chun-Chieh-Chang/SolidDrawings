@@ -22,7 +22,7 @@ export const EnhancedSelectionBox: React.FC<SelectionBoxProps> = ({
   return (
     <div className="flex flex-col gap-1">
       <label className="text-[10px] font-bold text-[#404040] uppercase tracking-wider">{label}</label>
-      <div className={lex items-center gap-1 border rounded transition-colors }>
+      <div className="flex items-center gap-1 border rounded transition-colors">
         <div className="flex-1 px-2 py-1 text-[11px] font-semibold text-[#404040] min-w-[80px]">
           {selected || placeholder}
         </div>

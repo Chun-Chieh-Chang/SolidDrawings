@@ -217,6 +217,18 @@ export default function Home() {
     defaultFilletRadius, defaultChamferDistance, setHint,
   });
 
+  // S-Key Ring Menu Trigger
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 's' && !e.ctrlKey && !e.altKey && !e.metaKey) {
+        // Brief press of S toggles the ring menu
+        setShowSKey(prev => !prev);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Setup SOLIDWORKS 2010 keyboard shortcuts
   useEffect(() => {
     return setupKeyboardShortcuts();

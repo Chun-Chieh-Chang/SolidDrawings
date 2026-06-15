@@ -29,7 +29,7 @@ export const TaskPane: React.FC = () => {
   return (
     <div 
       className="fixed right-0 top-[64px] bottom-0 bg-white border-l border-[#A0A0A0] flex flex-col z-30 shadow-lg"
-      style={{ width: \\px\ }}
+      style={{ width: `${width}px` }}
     >
       {/* Tab bar */}
       <div className="flex items-center bg-[#F5F5F5] border-b border-[#A0A0A0]">
@@ -38,7 +38,7 @@ export const TaskPane: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={px-3 py-1.5 text-[10px] font-bold border-r border-[#A0A0A0] transition-colors flex flex-col items-center gap-0.5 \}
+              className="px-3 py-1.5 text-[10px] font-bold border-r border-[#A0A0A0] transition-colors flex flex-col items-center gap-0.5"
             >
               <span className="text-sm">{tab.icon}</span>
               <span>{tab.label}</span>

@@ -1,10 +1,11 @@
 ﻿// SOLIDWORKS 2010 Compatible Mouse Gesture Recognition
 // Detects drag direction in Graphics Area and triggers commands
 
+import React from 'react';
 import { useCadStore } from '../store/useCadStore';
 
 export interface GestureResult {
-  direction: '\''UP'\'' | '\''DOWN'\'' | '\''LEFT'\'' | '\''RIGHT'\'' | '\''NONE'\'';
+  direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE';
   distance: number;
   angle: number;
 }
@@ -44,7 +45,7 @@ export function detectGesture(startX: number, startY: number, endX: number, endY
   const distance = Math.sqrt(dx * dx + dy * dy);
   const angle = Math.atan2(dy, dx) * (180 / Math.PI);
 
-  let direction: '\''UP'\'' | '\''DOWN'\'' | '\''LEFT'\'' | '\''RIGHT'\'' | '\''NONE'\'' = '\''NONE'\'';
+  let direction: 'UP' | 'DOWN' | 'LEFT' | 'RIGHT' | 'NONE' = 'NONE';
   
   if (distance >= DEFAULT_CONFIG.threshold) {
     const normalizedAngle = ((angle % 360) + 360) % 360;
@@ -52,11 +53,11 @@ export function detectGesture(startX: number, startY: number, endX: number, endY
     const segment = Math.round(normalizedAngle / segmentAngle);
     
     switch (segment % DEFAULT_CONFIG.angleSegments) {
-      case 0: direction = '\''RIGHT'\''; break;  // 0
-      case 1: case 2: direction = '\''DOWN'\''; break;  // 45-135
-      case 3: case 4: direction = '\''LEFT'\''; break;  // 135-225
-      case 5: case 6: direction = '\''UP'\''; break;  // 225-315
-      case 7: direction = '\''RIGHT'\''; break;  // 315-360
+      case 0: direction = 'RIGHT'; break;  // 0
+      case 1: case 2: direction = 'DOWN'; break;  // 45-135
+      case 3: case 4: direction = 'LEFT'; break;  // 135-225
+      case 5: case 6: direction = 'UP'; break;  // 225-315
+      case 7: direction = 'RIGHT'; break;  // 315-360
     }
   }
 
@@ -84,7 +85,7 @@ export function setupMouseGestures(containerRef: React.RefObject<HTMLElement | n
         e.clientX, e.clientY
       );
 
-      if (gesture.direction !== '\''NONE'\'') {
+      if (gesture.direction !== 'NONE') {
         const config = DEFAULT_CONFIG;
         const command = config.commands[gesture.direction];
         if (command) {
@@ -96,12 +97,12 @@ export function setupMouseGestures(containerRef: React.RefObject<HTMLElement | n
     };
 
     const ref = containerRef.current;
-    ref.addEventListener('\''pointerdown'\'', handlePointerDown);
-    window.addEventListener('\''pointerup'\'', handlePointerUp);
+    ref.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('pointerup', handlePointerUp);
 
     return () => {
-      ref.removeEventListener('\''pointerdown'\'', handlePointerDown);
-      window.removeEventListener('\''pointerup'\'', handlePointerUp);
+      ref.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [containerRef, isDragging, startPos]);
 }

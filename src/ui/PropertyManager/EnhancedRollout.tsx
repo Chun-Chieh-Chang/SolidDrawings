@@ -19,7 +19,7 @@ export const EnhancedRollout: React.FC<RolloutProps> = ({ title, children, defau
         className="w-full flex items-center justify-between px-2 py-1 bg-gradient-to-r from-[#D6DADC] to-[#E8E8E8] hover:bg-[#E8E8E8] transition-colors"
       >
         <div className="flex items-center gap-1.5">
-          <span className={	ext-[8px] transition-transform duration-150 }>▼</span>
+          <span className="text-[8px] transition-transform duration-150">▼</span>
           <span className="text-[10px] font-black text-[#005B9A] uppercase tracking-wide">{title}</span>
         </div>
         <div className="flex items-center gap-1">
@@ -60,7 +60,7 @@ export const SubRollout: React.FC<{ title: string; children: React.ReactNode; de
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-1 py-1 text-[10px] font-semibold text-slate-700 hover:text-[#005B9A] transition-colors"
       >
-        <span className={	ext-[7px] transition-transform duration-150 }>▶</span>
+        <span className="text-[7px] transition-transform duration-150">▶</span>
         {title}
       </button>
       {isExpanded && <div className="pl-4 mt-1">{children}</div>}

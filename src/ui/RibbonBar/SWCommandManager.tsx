@@ -42,7 +42,7 @@ export const SWCommandManager: React.FC<SWCommandManagerProps> = ({ activeTab, s
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={px-4 py-1 text-[11px] font-bold transition-all border-b-[3px] flex items-center gap-1.5 }
+            className="px-4 py-1 text-[11px] font-bold transition-all border-b-[3px] flex items-center gap-1.5"
           >
             <span className="text-[12px]">{tab.icon}</span>
             {tab.label}
