@@ -39,19 +39,9 @@ docs/
 │   ├── RCA_CAPA_TEMPLATE.md          ← 根本原因分析模板
 │   └── master_workflow_hook.md       ← 主工作流 hook
 ├── 06_PRODUCTIZATION/                ← 產品化報告
-│   ├── (各功能 Gap Report)
 │   └── SOLIDWORKS_GAP_AUDIT.md       ← 總體缺口報告
-├── 07_BENCHMARKS/                    ← 實作練習
-│   ├── (EXERCISE_*.md)
-│   └── FOUNDATIONAL_BLOCK_SOP.md
 ├── 08_LEARNINGS/                     ← 經驗學習
-│   ├── LEARNINGS.md                  ← 學習筆記 (自進化防呆)
-│   ├── SELF_EVOLVING_GUARD.md        ← 防呆機制說明
-│   └── INTEGRATION_REPORT.md         ← 整合報告
-├── constraint_solver_spec.md         ← 約束求解器規格 (核心技術)
-├── karpathy_coding_standards.md      ← Karpathy 編碼標準
-├── pdca-system.html                  ← PDCA 視覺化系統
-└── skill_usage_guide.md              ← 技能使用指南
+│   └── LEARNINGS.md                  ← 學習筆記
 ```
 
 ## 文件類別定義
@@ -64,7 +54,7 @@ docs/
 | 04 | 開發指南 | 開發流程、規範、工具使用 | 開發者 |
 | 05 | 治理流程 | PDCA、品質管理、決策流程 | PM |
 | 06 | 產品化報告 | Gap Report、交付報告、驗證 | 全體 |
-| 07 | 實作練習 | 練習 SOP、專家指南 | 全體 |
+| 07 | 實作練習 | 練習 SOP、專家指南 | 全體 (已清理) |
 | 08 | 經驗學習 | 教訓記錄、防呆機制、報告 | 全體 |
 
 ## 快速連結
@@ -74,4 +64,3 @@ docs/
 - [系統設計](03_ARCHITECTURE/SYSTEM_DESIGN.md)
 - [發布門檻](02_SPEC/release-gates.md)
 - [學習筆記](08_LEARNINGS/LEARNINGS.md)
-- [自進化防呆](08_LEARNINGS/SELF_EVOLVING_GUARD.md)

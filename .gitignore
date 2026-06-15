@@ -47,3 +47,6 @@ sync.ffs_db
 
 # Cleanup scan report
 .cleanup_report.json
+
+# Simulation artifacts
+simulation_result_*.json

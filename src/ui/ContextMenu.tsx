@@ -162,6 +162,7 @@ export const ContextMenu: React.FC = () => {
         {selectedEntityIds && selectedEntityIds.length > 0 && (
           <button 
             onClick={() => {
+              useCadStore.getState().saveSnapshot();
               const newEdges = { ...sketchEdges };
               selectedEntityIds.forEach((id: string) => {
                 if (newEdges[id]) {

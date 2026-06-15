@@ -505,6 +505,11 @@ const handleBuildSweepLoft = useCallback((feat: CADFeature) => {
       profile_points: sketchFeatureTo3DPoints(profileFeat),
       path_points:    sketchFeatureTo3DPoints(pathFeat),
       guide_points:   guidePointsList,
+      // Pass thin feature params if enabled
+      thin_thickness: feat.parameters.thin_thickness ? parseFloat(feat.parameters.thin_thickness) : undefined,
+      thin_type:      feat.parameters.thin_type || undefined,
+      thin_direction1: feat.parameters.thin_direction1 ? parseFloat(feat.parameters.thin_direction1) : 0,
+      thin_direction2: feat.parameters.thin_direction2 ? parseFloat(feat.parameters.thin_direction2) : 0,
     });
   } else if (feat.type === 'HELICAL_SWEEP') {
     const profileFeat = features.find(f => f.id === feat.parameters.profile_id);

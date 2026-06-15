@@ -27,6 +27,10 @@ export const MatePanel = () => {
   const [pitch, setPitch] = React.useState<number>(1.5);
   const [alignment, setAlignment] = React.useState<'ALIGNED' | 'ANTI_ALIGNED'>('ANTI_ALIGNED');
   const [isSuggesting, setIsSuggesting] = React.useState(false);
+  const [widthOffset, setWidthOffset] = React.useState<number>(0);
+  const [snapOffsetX, setSnapOffsetX] = React.useState<number>(0);
+  const [snapOffsetY, setSnapOffsetY] = React.useState<number>(0);
+  const [snapOffsetZ, setSnapOffsetZ] = React.useState<number>(0);
 
   const assemblyService = React.useMemo(() => new AssemblyService(), []);
 
@@ -84,7 +88,9 @@ export const MatePanel = () => {
             alignmentFlip: alignment === 'ANTI_ALIGNED',
             isLimitAngle: mateType === 'ANGLE' ? isLimitAngle : undefined,
             minAngle: mateType === 'ANGLE' ? minAngle : undefined,
-            maxAngle: mateType === 'ANGLE' ? maxAngle : undefined
+            maxAngle: mateType === 'ANGLE' ? maxAngle : undefined,
+            widthOffset: mateType === 'WIDTH' ? widthOffset : undefined,
+            snapOffset: mateType === 'SNAP' ? [snapOffsetX, snapOffsetY, snapOffsetZ] : undefined,
           },
         };
 
@@ -101,7 +107,7 @@ export const MatePanel = () => {
       }
     };
     updatePreview();
-  }, [mateSelection, mateType, offset, angle, alignment, components, mates, assemblyService, setAssemblyPreviewComponents]);
+  }, [mateSelection, mateType, offset, angle, alignment, widthOffset, snapOffsetX, snapOffsetY, snapOffsetZ, components, mates, assemblyService, setAssemblyPreviewComponents]);
 
   const handleApplyMate = async () => {
     if (mateSelection.length < 2) return;
@@ -120,7 +126,7 @@ export const MatePanel = () => {
 
     const newMate: CADMate = {
       id: `mate_${uuidv4()}`,
-      name: `${mateType === 'GEAR' || mateType === 'SCREW' ? '機械配合' : '配合'} ${mates.length + 1}`,
+      name: `${(mateType === 'GEAR' || mateType === 'SCREW' || mateType === 'LOCK' || mateType === 'WIDTH' || mateType === 'SNAP') ? '特殊配合' : mateType === 'SYMMETRY' ? '對稱配合' : '配合'} ${mates.length + 1}`,
       type: mateType,
       entity1: toMateEntity(mateSelection[0]),
       entity2: toMateEntity(mateSelection[1]),
@@ -131,6 +137,8 @@ export const MatePanel = () => {
         alignmentFlip: alignment === 'ANTI_ALIGNED',
         ratio: mateType === 'GEAR' ? ratio : undefined,
         pitch: mateType === 'SCREW' ? pitch : undefined,
+        widthOffset: mateType === 'WIDTH' ? widthOffset : undefined,
+        snapOffset: mateType === 'SNAP' ? [snapOffsetX, snapOffsetY, snapOffsetZ] : undefined,
         initialTransforms
       },
       offset: (mateType === 'DISTANCE' || mateType === 'COINCIDENT') ? offset : undefined,
@@ -191,6 +199,25 @@ export const MatePanel = () => {
                 }`}
               >
                 {type === 'GEAR' ? '⚙️ Gear' : '🔩 Screw'}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">特殊配合 (Special)</div>
+          <div className="grid grid-cols-4 gap-1">
+            {(['WIDTH', 'SYMMETRY', 'LOCK', 'SNAP'] as MateType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setMateType(type)}
+                className={`p-1.5 rounded border text-[10px] font-bold transition-all ${
+                  mateType === type
+                    ? 'bg-amber-50 border-amber-500 text-amber-700 shadow-sm'
+                    : 'bg-[#F8FAFC] border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {type === 'WIDTH' ? '↔ Width' : type === 'SYMMETRY' ? '⇄ Symmetry' : type === 'LOCK' ? '🔒 Lock' : '🧲 Snap'}
               </button>
             ))}
           </div>
@@ -309,6 +336,70 @@ export const MatePanel = () => {
               className="w-full bg-white border border-indigo-200 rounded px-2 py-1 text-[13px] font-mono text-right pr-12"
             />
             <span className="absolute right-2 top-1.5 text-[10px] text-indigo-400 font-bold">mm/rev</span>
+          </div>
+        </div>
+      )}
+
+      {mateType === 'WIDTH' && (
+        <div className="flex items-center gap-2 p-2 bg-amber-50/50 rounded-lg border border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <span className="text-[12px] text-amber-700 font-black whitespace-nowrap">寬度偏移 (Width Offset):</span>
+          <div className="relative flex-1">
+            <input
+              type="number"
+              value={widthOffset}
+              onChange={(e) => setWidthOffset(parseFloat(e.target.value))}
+              className="w-full bg-white border border-amber-200 rounded px-2 py-1 text-[13px] font-mono text-right"
+            />
+            <span className="absolute right-2 top-1.5 text-[11px] text-amber-400 font-bold">mm</span>
+          </div>
+        </div>
+      )}
+
+      {mateType === 'SYMMETRY' && (
+        <div className="p-2 bg-amber-50/50 rounded-lg border border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="text-[12px] text-amber-700 font-bold">對稱平面 (Symmetry Plane)</div>
+          <div className="text-[11px] text-amber-600 mt-1">選擇參考平面作為鏡射基準。系統會將元件相對於該平面对稱放置。</div>
+        </div>
+      )}
+
+      {mateType === 'LOCK' && (
+        <div className="p-2 bg-red-50/50 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="text-[12px] text-red-700 font-black">鎖定所有自由度 (Lock All 6-DOF)</div>
+          <div className="text-[11px] text-red-600 mt-1">完全固定兩個元件之間的相對位置和旋轉。無法移動或旋轉。</div>
+        </div>
+      )}
+
+      {mateType === 'SNAP' && (
+        <div className="space-y-2 p-2 bg-amber-50/50 rounded-lg border border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="text-[12px] text-amber-700 font-black">偏移 (Snap Offset):</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-[10px] text-amber-500 font-bold">X</span>
+              <input
+                type="number"
+                value={snapOffsetX}
+                onChange={(e) => setSnapOffsetX(parseFloat(e.target.value))}
+                className="w-full bg-white border border-amber-200 rounded pl-5 pr-2 py-1 text-[12px] font-mono text-right"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-[10px] text-amber-500 font-bold">Y</span>
+              <input
+                type="number"
+                value={snapOffsetY}
+                onChange={(e) => setSnapOffsetY(parseFloat(e.target.value))}
+                className="w-full bg-white border border-amber-200 rounded pl-5 pr-2 py-1 text-[12px] font-mono text-right"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-[10px] text-amber-500 font-bold">Z</span>
+              <input
+                type="number"
+                value={snapOffsetZ}
+                onChange={(e) => setSnapOffsetZ(parseFloat(e.target.value))}
+                className="w-full bg-white border border-amber-200 rounded pl-5 pr-2 py-1 text-[12px] font-mono text-right"
+              />
+            </div>
           </div>
         </div>
       )}

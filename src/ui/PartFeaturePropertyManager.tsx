@@ -116,7 +116,7 @@ export function PartFeaturePropertyManager({
   const pendingFeatureCommand = useCadStore((state: CadState) => state.pendingFeatureCommand);
 
   const handleConfirm = () => {
-    if (onBuildSweepLoft && ['SWEEP', 'LOFT', 'HELICAL_SWEEP', 'FILLET', 'CHAMFER', 'SURFACE_OFFSET', 'SURFACE_KNIT'].includes(selectedFeature.type)) {
+    if (onBuildSweepLoft && ['SWEEP', 'LOFT', 'HELICAL_SWEEP', 'FILLET', 'CHAMFER', 'SURFACE_OFFSET', 'SURFACE_KNIT', 'THICKEN', 'DRAFT', 'SURFACE_CUT', 'SHELL', 'DOME'].includes(selectedFeature.type)) {
       onBuildSweepLoft(selectedFeature);
     }
     setSelectedId(null);
@@ -212,6 +212,53 @@ export function PartFeaturePropertyManager({
                   </div>
                   <div className="p-2 bg-amber-50 border border-amber-100 rounded text-[10px] text-amber-700 font-bold">
                     Removes material from the side indicated by the surface normal.
+                  </div>
+                </div>
+              </Rollout>
+            )}
+
+            {selectedFeature.type === 'DRAFT' && (
+              <Rollout title="Draft" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>}>
+                <div className="space-y-3">
+                  <ParamInput 
+                    label="Draft Angle" 
+                    value={selectedFeature.parameters.draftAngle || selectedFeature.parameters.angle || 5} 
+                    onChange={(v) => onParamChange('angle', v)} 
+                    unit="deg" 
+                    badge="ANG" 
+                  />
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase">Outward Direction</label>
+                    <button 
+                      onClick={() => onParamChange('outward', !selectedFeature.parameters.outward)}
+                      className={`px-3 py-1 rounded text-[10px] font-black border transition-all ${selectedFeature.parameters.outward ? 'bg-[#005B9A] text-white border-[#005B9A]' : 'bg-white text-slate-400 border-slate-200'}`}
+                    >
+                      {selectedFeature.parameters.outward ? 'OUTWARD' : 'INWARD'}
+                    </button>
+                  </div>
+                  <SelectionBox 
+                    label="Neutral Plane/Axis" 
+                    items={(selectedFeature.parameters.neutral_plane_refs || []).map((ref: any, idx: number) => ({ id: ref.id || `${idx}`, name: ref.type === 'FACE' ? `Face ${ref.id.slice(0,4)}` : `Axis ${idx + 1}` }))}
+                    onRemove={() => onParamChange('neutral_plane_refs', [])}
+                    onClear={() => onParamChange('neutral_plane_refs', [])}
+                    placeholder="Select neutral plane or axis"
+                    maxHeight="60px"
+                  />
+                </div>
+              </Rollout>
+            )}
+
+            {selectedFeature.type === 'THICKEN' && (
+              <Rollout title="Thicken" icon={<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 12 17.19 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>}>
+                <div className="space-y-3">
+                  <ParamInput 
+                    label="Thickness" 
+                    value={selectedFeature.parameters.thickness || 1.0} 
+                    onChange={(v) => onParamChange('thickness', v)} 
+                    badge="T1" 
+                  />
+                  <div className="p-2 bg-orange-50 border border-orange-100 rounded text-[10px] text-orange-700 font-bold">
+                    Converts a surface or shell into a solid by adding the specified thickness.
                   </div>
                 </div>
               </Rollout>
@@ -782,6 +829,42 @@ export function PartFeaturePropertyManager({
                       />
                       <label htmlFor="sweep-flip" className="text-[10px] font-bold text-slate-600 uppercase">Flip Profile (翻轉截面)</label>
                     </div>
+                    <div className="flex items-center gap-2 pt-1 border-t border-slate-200 mt-2">
+                      <input 
+                        type="checkbox"
+                        id="sweep-thin"
+                        checked={!!selectedFeature.parameters.thin_thickness}
+                        onChange={(e) => onParamChange('thin_enabled', e.target.checked ? 'true' : 'false')}
+                        className="w-4 h-4 accent-primary"
+                      />
+                      <label htmlFor="sweep-thin" className="text-[10px] font-bold text-slate-600 uppercase">Thin Feature (薄壁)</label>
+                    </div>
+                    {(selectedFeature.parameters.thin_enabled === 'true' || selectedFeature.parameters.thin_thickness) && (
+                      <div className="space-y-2 pl-6 border-l-2 border-primary/30">
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Thickness (厚度)</label>
+                          <input 
+                            type="number" 
+                            step="0.1"
+                            value={selectedFeature.parameters.thin_thickness || ''} 
+                            onChange={(e) => onParamChange('thin_thickness', e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                            placeholder="e.g. 2.0"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase">Thin Type</label>
+                          <select 
+                            value={selectedFeature.parameters.thin_type || 'ONE_DIRECTION'} 
+                            onChange={(e) => onParamChange('thin_type', e.target.value)}
+                            className="w-full bg-white border border-slate-300 rounded px-2 py-1 text-[12px] font-bold"
+                          >
+                            <option value="ONE_DIRECTION">One-Direction (單方向)</option>
+                            <option value="MID_PLANE">Mid-Plane (中位面)</option>
+                          </select>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Rollout>
               </>

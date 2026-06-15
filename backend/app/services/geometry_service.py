@@ -8,7 +8,8 @@ from collections import OrderedDict
 # Global flags and placeholders
 HAS_OCC = False
 
-# Try loading OpenCASCADE (pythonocc-core)
+# Try loading OpenCASCADE (pythonocc-core with OCC module)
+# pyocc conda env provides pythonocc-core 7.9.3 which exports OCC.Core.*
 try:
     from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
     from OCC.Core.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
@@ -27,8 +28,22 @@ try:
     from OCC.Core.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
     from OCC.Core.GProp import GProp_GProps
     from OCC.Core.BRepGProp import brepgprop
-    from OCC.Core.IGESControl import IGESControl_Writer
-    from OCC.Core.StlAPI import StlAPI_Writer
+    # from OCC.Core.IGESControl import IGESControl_Writer  # needs freeimageplus
+    try:
+        from OCC.Core.StlAPI import StlAPI_Writer
+        HAS_STL = True
+    except ImportError:
+        StlAPI_Writer = None
+        HAS_STL = False
+
+    try:
+        from OCC.Core.IGESControl import IGESControl_Writer, IGESControl_Reader
+        HAS_IGES = True
+    except ImportError:
+        IGESControl_Writer = None
+        IGESControl_Reader = None
+        HAS_IGES = False
+
     from OCC.Core.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
     from OCC.Core.BRepLProp import BRepLProp_SLProps
     from OCC.Core.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Ellipse
@@ -38,7 +53,15 @@ try:
     from OCC.Core.GeomAPI import GeomAPI_Interpolate
     from OCC.Core.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
     from OCC.Core.Geom2d import Geom2d_Line
-    from OCC.Core.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
+    try:
+        from OCC.Core.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
+        HAS_STEP = True
+    except ImportError:
+        STEPControl_Reader = None
+        STEPControl_Writer = None
+        STEPControl_AsIs = None
+        HAS_STEP = False
+
     from OCC.Core.IFSelect import IFSelect_RetDone
     from OCC.Core.BRepCheck import BRepCheck_Analyzer
     from OCC.Core.IntCurvesFace import IntCurvesFace_ShapeIntersector
@@ -49,67 +72,40 @@ try:
     from OCC.Core.BRepClass3d import BRepClass3d_SolidClassifier
     from OCC.Core.BRepTopAdaptor import BRepTopAdaptor_FClass2d
     from OCC.Core.HLRAlgo import HLRAlgo_Projector
-    from OCC.Core.TDocStd import TDocStd_Document
+    HAS_OCC = True
+except ImportError as e:
+    HAS_OCC = False
+    print(f"[WARNING] OpenCASCADE (OCC.Core) not found: {e}")
+    print("  To fix: conda activate pyocc && pip install numpy")
+
+# XDE (XCAF) imports for STEP assembly export (independent of OCC availability check)
+try:
     from OCC.Core.XCAFApp import XCAFApp_Application
+    from OCC.Core.TDocStd import TDocStd_Document
+    from OCC.Core.TCollection import TCollection_ExtendedString
     from OCC.Core.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
     from OCC.Core.TDataStd import TDataStd_Name
-    from OCC.Core.TCollection import TCollection_ExtendedString
     from OCC.Core.Quantity import Quantity_Color, Quantity_TOC_RGB
-    from OCC.Core.STEPCAFControl import STEPCAFControl_Writer
-    HAS_OCC = True
+    from OCC.Core.STEPControl import STEPCAFControl_Writer
+    HAS_XCAF = True
 except ImportError:
-    # Try loading OCP (CadQuery engine)
-    try:
-        from OCP.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
-        from OCP.gp import gp_Ax2, gp_Dir, gp_Pnt, gp_Ax3, gp_Trsf, gp_Vec, gp_Ax1, gp_Lin2d, gp_Pnt2d, gp_Dir2d, gp_Pln, gp_Circ, gp_Lin, gp_Trsf2d
-        from OCP.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeHalfSpace, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeRevol, BRepPrimAPI_MakeCone
-        from OCP.BRepMesh import BRepMesh_IncrementalMesh
-        from OCP.TopExp import TopExp_Explorer, topexp
-        from OCP.TopAbs import TopAbs_FACE, TopAbs_SOLID, TopAbs_EDGE, TopAbs_VERTEX, TopAbs_REVERSED, TopAbs_IN, TopAbs_ON
-        from OCP.BRep import BRep_Tool, BRep_Builder
-        from OCP.TopLoc import TopLoc_Location
-        from OCP.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace, BRepBuilderAPI_Sewing, BRepBuilderAPI_Transform
-        from OCP.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Section
-        from OCP.BRepFill import BRepFill_PipeShell
-        from OCP.BRepOffsetAPI import BRepOffsetAPI_ThruSections, BRepOffsetAPI_MakeOffsetShape, BRepOffsetAPI_MakeThickSolid, BRepOffsetAPI_MakeOffset, BRepOffsetAPI_DraftAngle, BRepOffsetAPI_MakePipe
-        from OCP.GC import GC_MakeArcOfCircle
-        from OCP.TopoDS import topods, TopoDS_Compound
-        from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet, BRepFilletAPI_MakeChamfer
-        from OCP.GProp import GProp_GProps
-        from OCP.BRepGProp import brepgprop
-        from OCP.IGESControl import IGESControl_Writer
-        from OCP.StlAPI import StlAPI_Writer
-        from OCP.BRepAdaptor import BRepAdaptor_Surface, BRepAdaptor_Curve
-        from OCP.BRepLProp import BRepLProp_SLProps
-        from OCP.GeomAbs import GeomAbs_Cylinder, GeomAbs_Plane, GeomAbs_Arc, GeomAbs_Circle, GeomAbs_Line, GeomAbs_Cone, GeomAbs_Sphere, GeomAbs_Torus, GeomAbs_Ellipse
-        from OCP.TopTools import TopTools_ListOfShape, TopTools_IndexedDataMapOfShapeListOfShape, TopTools_ListIteratorOfListOfShape
-        from OCP.BRepOffset import BRepOffset_Skin
-        from OCP.TColgp import TColgp_HArray1OfPnt
-        from OCP.GeomAPI import GeomAPI_Interpolate
-        from OCP.Geom import Geom_CylindricalSurface, Geom_ConicalSurface, Geom_Plane
-        from OCP.Geom2d import Geom2d_Line
-        from OCP.STEPControl import STEPControl_Reader, STEPControl_Writer, STEPControl_AsIs
-        from OCP.IFSelect import IFSelect_RetDone
-        from OCP.BRepCheck import BRepCheck_Analyzer
-        from OCP.IntCurvesFace import IntCurvesFace_ShapeIntersector
-        from OCP.GeomFill import GeomFill_IsFrenet
-        from OCP.BRepTools import breptools
-        from OCP.Bnd import Bnd_Box
-        from OCP.BRepBndLib import brepbndlib
-        from OCP.BRepClass3d import BRepClass3d_SolidClassifier
-        from OCP.BRepTopAdaptor import BRepTopAdaptor_FClass2d
-        from OCP.HLRAlgo import HLRAlgo_Projector
-        from OCP.TDocStd import TDocStd_Document
-        from OCP.XCAFApp import XCAFApp_Application
-        from OCP.XCAFDoc import XCAFDoc_DocumentTool, XCAFDoc_ColorGen, XCAFDoc_ColorSurf
-        from OCP.TDataStd import TDataStd_Name
-        from OCP.TCollection import TCollection_ExtendedString
-        from OCP.Quantity import Quantity_Color, Quantity_TOC_RGB
-        from OCP.STEPCAFControl import STEPCAFControl_Writer
-        HAS_OCC = True
-    except ImportError:
-        print("[WARNING] OpenCASCADE (OCC or OCP) not found. Geometric kernel disabled.")
-        HAS_OCC = False
+    XCAFApp_Application = None
+    TDocStd_Document = None
+    TCollection_ExtendedString = None
+    XCAFDoc_DocumentTool = None
+    XCAFDoc_ColorGen = None
+    XCAFDoc_ColorSurf = None
+    TDataStd_Name = None
+    Quantity_Color = None
+    Quantity_TOC_RGB = None
+    STEPCAFControl_Writer = None
+    HAS_XCAF = False
+
+try:
+    import threading
+    HAS_THREADING = True
+except ImportError:
+    HAS_THREADING = False
 
 def get_shape_hash(shape, upper=10000000):
     """Robust hashing for OCC shapes across different versions."""
@@ -601,6 +597,9 @@ def import_step_file(filepath):
     Imports a STEP file and returns its B-Rep shape.
     """
     if not HAS_OCC:
+        return None
+    if not HAS_STEP:
+        print("[ERROR] STEP import not available — missing OCC.Core.STEPControl")
         return None
     try:
         reader = STEPControl_Reader()
@@ -3472,7 +3471,7 @@ def find_matching_face(shape, ref_origin, ref_normal, signature=None):
     return best_candidate["center"], best_candidate["normal"], best_candidate["face"]
 
 
-def convert_entities(features, topology, plane_type, face_origin=None, face_normal=None):
+def convert_entities(features, topology, plane_type, face_origin=None, face_normal=None, section_plane=None):
     """Projects outer boundaries of 3D selected faces or selected edges onto the sketch plane's LCS UV space."""
     if not HAS_OCC:
         return []
@@ -3482,7 +3481,7 @@ def convert_entities(features, topology, plane_type, face_origin=None, face_norm
         return []
 
     # --- P5-2 Section View Support ---
-    if section_plane and HAS_OCC:
+    if section_plane and isinstance(section_plane, dict) and HAS_OCC:
         try:
             
             p_ori = section_plane.get('origin', [0,0,0])
@@ -3665,7 +3664,7 @@ def offset_entities(points_2d, distance, plane_type, face_origin=None, face_norm
         return offset_points
 
 
-def get_intersection_curve(features, plane_type, face_origin=None, face_normal=None):
+def get_intersection_curve(features, plane_type, face_origin=None, face_normal=None, section_plane=None):
     """Intersects 3D solid with the active sketch plane using BRepAlgoAPI_Section and returns the 2D UV wire points."""
     if not HAS_OCC:
         return []
@@ -3675,7 +3674,7 @@ def get_intersection_curve(features, plane_type, face_origin=None, face_normal=N
         return []
 
     # --- P5-2 Section View Support ---
-    if section_plane and HAS_OCC:
+    if section_plane and isinstance(section_plane, dict) and HAS_OCC:
         try:
             
             p_ori = section_plane.get('origin', [0,0,0])
@@ -4193,19 +4192,27 @@ def export_cad_file(features, format_type, filepath):
 
         format_type = format_type.upper()
         if format_type == 'STEP':
+            if not HAS_STEP:
+                print("[ERROR] STEP export not available — missing OCC.Core.STEPControl")
+                return False
             writer = STEPControl_Writer()
             writer.Transfer(shape, STEPControl_AsIs)
             status = writer.Write(filepath)
             return status == 1
 
         elif format_type == 'IGES':
+            if not HAS_IGES:
+                print("[ERROR] IGES export not available — missing OCC.Core.IGESControl (FreeImage dependency)")
+                return False
             writer = IGESControl_Writer()
             writer.AddShape(shape)
             status = writer.Write(filepath)
-            # IGES status is returned as boolean or 1/0
             return bool(status)
 
         elif format_type == 'STL':
+            if not HAS_STL:
+                print("[ERROR] STL export not available — missing OCC.Core.StlAPI (FreeImage dependency)")
+                return False
             # Run incremental mesh first to triangulate surfaces
             BRepMesh_IncrementalMesh(shape, 0.1)
             writer = StlAPI_Writer()
@@ -4293,6 +4300,71 @@ def check_interferences(components_data):
 
     return interferences
 
+def build_feature_chain(features: list) -> tuple:
+    """
+    Incrementally builds a shape by applying features one by one.
+    Returns (final_shape, list_of_intermediate_shapes).
+    Used by interference detection to get per-component shapes.
+    """
+    if not HAS_OCC or not features:
+        return None, []
+    
+    shapes = []
+    cumulative_shape = None
+    
+    for feat in features:
+        if isinstance(feat, dict):
+            f_type = feat.get('type', '')
+            params = feat.get('parameters', {})
+            f_id = feat.get('id', '')
+        else:
+            f_type = getattr(feat, 'type', '')
+            params = getattr(feat, 'parameters', {})
+            f_id = getattr(feat, 'id', '')
+        
+        # Skip reference geometry — doesn't contribute to solid
+        if f_type in ('REFERENCE_PLANE', 'REFERENCE_AXIS', 'REFERENCE_POINT'):
+            continue
+        
+        # Build this feature in isolation
+        feature_shape = build_feature_shape_in_isolation(f_type, params, cumulative_shape, features)
+        
+        if feature_shape and not feature_shape.IsNull():
+            if cumulative_shape is None:
+                cumulative_shape = feature_shape
+            else:
+                # Determine if this is a cut or additive feature
+                operation = params.get('operation', 'ADD') if isinstance(params, dict) else 'ADD'
+                if operation == 'REMOVE' or f_type in ('EXTRUDE_CUT', 'REVOLVE_CUT'):
+                    try:
+                        cutter = BRepAlgoAPI_Cut(cumulative_shape, feature_shape)
+                        cutter.Build()
+                        if cutter.IsDone():
+                            cumulative_shape = cutter.Shape()
+                        else:
+                            shapes.append(cumulative_shape)
+                            continue
+                    except Exception:
+                        shapes.append(cumulative_shape)
+                        continue
+                else:
+                    try:
+                        fused = BRepAlgoAPI_Fuse(cumulative_shape, feature_shape)
+                        fused.Build()
+                        if fused.IsDone():
+                            cumulative_shape = fused.Shape()
+                        else:
+                            shapes.append(cumulative_shape)
+                            continue
+                    except Exception:
+                        shapes.append(cumulative_shape)
+                        continue
+            
+            shapes.append(cumulative_shape)
+    
+    return cumulative_shape, shapes
+
+
 def analyze_topology(shape, subshape_id):
     """
     Analyzes a specific subshape (face/edge) to extract geometric properties 
@@ -4352,6 +4424,10 @@ def export_assembly_step(components_data, filepath):
     components_data is a list of dicts with 'id', 'features', and 'transform' (position, rotation).
     """
     if not HAS_OCC:
+        return False
+
+    if not HAS_XCAF or XCAFApp_Application is None:
+        print("[WARNING] XCAF not available, assembly STEP export disabled")
         return False
 
     try:

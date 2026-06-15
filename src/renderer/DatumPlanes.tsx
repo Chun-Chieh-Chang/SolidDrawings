@@ -10,6 +10,7 @@ import { ArcToolHandler } from '../utils/sketch/ToolHandlers/ArcTool';
 import { SplineToolHandler } from '../utils/sketch/ToolHandlers/SplineTool';
 import { CircleToolHandler } from '../utils/sketch/ToolHandlers/CircleTool';
 import { RectangleToolHandler, CenterRectangleToolHandler } from '../utils/sketch/ToolHandlers/RectangleTool';
+import { PolygonToolHandler } from '../utils/sketch/ToolHandlers/PolygonTool';
 import { sketchActions } from '../store/sketchActions';
 import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
@@ -503,10 +504,11 @@ export const DatumPlanes = () => {
          }
        }
 
-       if (targetEdgeId) {
-         const edge = nodes_to_be_extended_find(targetEdgeId, rawU, rawV, nodes, edges);
-         if (edge) {
-            useCadStore.setState(state => {
+        if (targetEdgeId) {
+          const edge = nodes_to_be_extended_find(targetEdgeId, rawU, rawV, nodes, edges);
+          if (edge) {
+             useCadStore.getState().saveSnapshot();
+             useCadStore.setState(state => {
               const nextNodes = { ...state.sketchNodes };
               nextNodes[edge.nodeId] = { ...nextNodes[edge.nodeId], x: edge.newX, y: edge.newY };
               return { sketchNodes: nextNodes };
@@ -591,6 +593,12 @@ export const DatumPlanes = () => {
       syncLastClickedUV();
       return;
     }
+    if (sketchTool === 'POLYGON') {
+      new PolygonToolHandler().onPointerDown(ctx);
+      syncLastClickedUV();
+      return;
+    }
+    useCadStore.getState().saveSnapshot();
     useCadStore.setState((state) => {
       const nextNodes = { ...state.sketchNodes };
       const nextEdges = { ...state.sketchEdges };
@@ -990,6 +998,7 @@ export const DatumPlanes = () => {
                 {sketchTool === 'LINE' && '╱'}
                 {sketchTool === 'CIRCLE' && '○'}
                 {sketchTool === 'RECTANGLE' && '▭'}
+                {sketchTool === 'POLYGON' && '⬡'}
                 {sketchTool === 'ARC' && '⌒'}
                 {sketchTool === 'SMART_DIMENSION' && '📏'}
                 {sketchTool === 'TRIM' && '✂️'}
@@ -1097,6 +1106,28 @@ export const DatumPlanes = () => {
                 <Line points={diagonals} color="#94A3B8" lineWidth={0.5} dashed dashSize={0.5} gapSize={0.5} />
               </group>
             );
+          })()}
+          {sketchTool === 'POLYGON' && (() => {
+            const lastNodeId = useCadStore.getState().lastClickedNodeId;
+            const centerNode = useCadStore.getState().sketchNodes[lastNodeId || ''];
+            if (!centerNode) return null;
+            const cx = centerNode.x;
+            const cy = centerNode.y;
+            const dx = cursorState.u - cx;
+            const dy = cursorState.v - cy;
+            const radius = Math.hypot(dx, dy);
+            if (radius < 0.5) return null;
+            const pm = useCadStore.getState().activePropertyManager;
+            const sides = (pm?.polygonSides && typeof pm.polygonSides === 'number') ? Math.max(3, Math.min(100, Math.round(pm.polygonSides))) : 6;
+            const angleStep = (2 * Math.PI) / sides;
+            const startAngle = Math.atan2(dy, dx);
+            const pts: [number, number, number][] = [];
+            for (let i = 0; i <= sides; i++) {
+              const angle = startAngle + i * angleStep;
+              const p = get3DPnt(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+              pts.push([p.x, p.y, p.z]);
+            }
+            return <Line points={pts} color="#F59E0B" lineWidth={1.2} transparent opacity={0.6} />;
           })()}
         </group>
       )}

@@ -60,6 +60,7 @@ export class LineToolHandler implements SketchToolHandler {
         useCadStore.getState().sketchConstraints,
         4
       );
+      useCadStore.getState().saveSnapshot();
       useCadStore.setState({ sketchNodes: { ...useCadStore.getState().sketchNodes, ...solved } });
     }
 

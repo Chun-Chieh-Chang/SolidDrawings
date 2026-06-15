@@ -119,7 +119,7 @@ export default function OcctShape({
       let filterType = 'ALL';
       if (pendingFeatureCommand === 'FILLET' || pendingFeatureCommand === 'CHAMFER' || pendingFeatureCommand === 'PATTERN') {
         filterType = 'EDGE_ONLY';
-      } else if (pendingFeatureCommand === 'DRAFT' || pendingFeatureCommand === 'MIRROR' || pendingFeatureCommand === 'THICKEN' || pendingFeatureCommand === 'SHELL' || pendingFeatureCommand === 'HOLE_WIZARD' || pendingFeatureCommand === 'PLANE') {
+      } else if (pendingFeatureCommand === 'DRAFT' || pendingFeatureCommand === 'MIRROR' || pendingFeatureCommand === 'THICKEN' || pendingFeatureCommand === 'SHELL' || pendingFeatureCommand === 'HOLE_WIZARD' || pendingFeatureCommand === 'PLANE' || pendingFeatureCommand === 'DOME') {
         filterType = 'FACE_ONLY';
       } else if (activePropertyManager?.selectionFilter) {
         filterType = activePropertyManager.selectionFilter;
@@ -199,6 +199,18 @@ export default function OcctShape({
               state.updateFeatureParams(featId, { hole_placement_refs: [selected] });
             } else if (pendingFeatureCommand === 'PLANE') {
               state.updateFeatureParams(featId, { reference_refs: [selected] });
+            } else if (pendingFeatureCommand === 'THICKEN') {
+              const currentRefs = params.refs || [];
+              const alreadyExists = currentRefs.some((r: any) => r.id === selected.id);
+              if (!alreadyExists) {
+                state.updateFeatureParams(featId, { refs: [...currentRefs, selected] });
+              }
+            } else if (pendingFeatureCommand === 'SURFACE_OFFSET' || pendingFeatureCommand === 'SURFACE_KNIT' || pendingFeatureCommand === 'SURFACE_CUT') {
+              const currentRefs = params.refs || [];
+              const alreadyExists = currentRefs.some((r: any) => r.id === selected.id);
+              if (!alreadyExists) {
+                state.updateFeatureParams(featId, { refs: [...currentRefs, selected] });
+              }
             } else {
               const currentRefs = params.refs || [];
               const alreadyExists = currentRefs.some((r: any) => r.id === selected.id);

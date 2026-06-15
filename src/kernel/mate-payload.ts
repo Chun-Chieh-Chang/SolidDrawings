@@ -36,6 +36,9 @@ export function mateToSolverPayload(
       offset,
       angle,
       alignmentFlip: mate.parameters?.alignmentFlip ?? mate.alignment === 'ANTI_ALIGNED',
+      widthOffset: mate.parameters?.widthOffset,
+      symmetryPlane: mate.parameters?.symmetryPlane,
+      snapOffset: mate.parameters?.snapOffset,
     },
   };
 }

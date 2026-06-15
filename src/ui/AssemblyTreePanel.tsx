@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useCadStore } from '../store/useCadStore';
 import { HeavyEngineClient } from '../kernel/HeavyEngineClient';
 
@@ -17,9 +17,17 @@ export const AssemblyTreePanel = () => {
     explodedView,
     setExplodedView,
     setExplosionFactor,
+    setExplodedDirection,
     calculateAutoExplosion,
+    saveExplodeStep,
+    loadExplodeStep,
+    deleteExplodeStep,
     setShowExportModal,
   } = useCadStore();
+
+  const [newStepName, setNewStepName] = useState('');
+  const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
+  const [showStepManager, setShowStepManager] = useState(false);
 
   const handleToggleVisibility = (id: string) => {
     setComponents(components.map(c => c.id === id ? { ...c, visible: !c.visible } : c));
@@ -34,6 +42,39 @@ export const AssemblyTreePanel = () => {
       setComponents(components.filter(c => c.id !== id));
       if (activeComponentId === id) setActiveComponentId(null);
     }
+  };
+
+  const handleDirectionChange = (componentId: string, axis: 0 | 1 | 2, delta: number) => {
+    const currentDir = explodedView.directions[componentId] || [0, 0, 1];
+    const newDir = [...currentDir] as [number, number, number];
+    newDir[axis] = Math.max(-1, Math.min(1, newDir[axis] + delta));
+    // Renormalize
+    const len = Math.sqrt(newDir[0]**2 + newDir[1]**2 + newDir[2]**2);
+    if (len > 1e-6) {
+      newDir[0] /= len;
+      newDir[1] /= len;
+      newDir[2] /= len;
+    }
+    setExplodedDirection(componentId, newDir);
+  };
+
+  const handleToggleDirPanel = (id: string) => {
+    setExpandedDirs(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleSaveStep = () => {
+    const name = newStepName.trim() || `View ${explodedView.steps.length + 1}`;
+    saveExplodeStep(name);
+    setNewStepName('');
+  };
+
+  const handleDeleteStep = (index: number) => {
+    deleteExplodeStep(index);
   };
 
   return (
@@ -103,22 +144,35 @@ export const AssemblyTreePanel = () => {
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-black text-indigo-700 uppercase tracking-tight">爆炸視圖 (Exploded)</span>
           </div>
-          <button
-            onClick={() => {
-              const nextActive = !explodedView.isActive;
-              setExplodedView({ isActive: nextActive });
-              if (nextActive && Object.keys(explodedView.directions).length === 0) {
-                calculateAutoExplosion();
-              }
-            }}
-            className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-              explodedView.isActive 
-                ? 'bg-indigo-600 text-white shadow-sm' 
-                : 'bg-white text-indigo-600 border border-indigo-200'
-            }`}
-          >
-            {explodedView.isActive ? 'ON' : 'OFF'}
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setShowStepManager(!showStepManager)}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                showStepManager 
+                  ? 'bg-indigo-600 text-white shadow-sm' 
+                  : 'bg-white text-indigo-600 border border-indigo-200'
+              }`}
+              title="爆炸步驟管理"
+            >
+              📋 Steps
+            </button>
+            <button
+              onClick={() => {
+                const nextActive = !explodedView.isActive;
+                setExplodedView({ isActive: nextActive });
+                if (nextActive && Object.keys(explodedView.directions).length === 0) {
+                  calculateAutoExplosion();
+                }
+              }}
+              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
+                explodedView.isActive 
+                  ? 'bg-indigo-600 text-white shadow-sm' 
+                  : 'bg-white text-indigo-600 border border-indigo-200'
+              }`}
+            >
+              {explodedView.isActive ? 'ON' : 'OFF'}
+            </button>
+          </div>
         </div>
         
         {explodedView.isActive && (
@@ -136,12 +190,124 @@ export const AssemblyTreePanel = () => {
               onChange={(e) => setExplosionFactor(parseFloat(e.target.value))}
               className="w-full h-1.5 bg-indigo-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
             />
+            
+            {/* Step Manager */}
+            {showStepManager && (
+              <div className="mt-2 p-2 bg-white border border-indigo-100 rounded-lg space-y-1.5 animate-in fade-in duration-150">
+                <div className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={newStepName}
+                    onChange={(e) => setNewStepName(e.target.value)}
+                    placeholder="Step name..."
+                    className="flex-1 text-[10px] px-1.5 py-0.5 border border-indigo-200 rounded outline-none focus:border-indigo-400"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSaveStep()}
+                  />
+                  <button
+                    onClick={handleSaveStep}
+                    className="px-2 py-0.5 text-[10px] font-bold bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors"
+                  >
+                    + Save
+                  </button>
+                </div>
+                
+                {explodedView.steps.length > 0 && (
+                  <div className="space-y-0.5 max-h-24 overflow-y-auto">
+                    {explodedView.steps.map((step, idx) => (
+                      <div key={idx} className={`flex items-center justify-between px-1.5 py-0.5 rounded text-[10px] ${idx === explodedView.currentStepIndex ? 'bg-indigo-100' : 'bg-slate-50'}`}>
+                        <button
+                          onClick={() => loadExplodeStep(idx)}
+                          className="flex-1 text-left font-medium truncate"
+                        >
+                          {step.name}
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStep(idx)}
+                          className="ml-1 px-1 text-[9px] text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            
             <button
               onClick={() => calculateAutoExplosion()}
               className="w-full mt-1 py-1 text-[9px] font-bold text-indigo-500 bg-white border border-indigo-100 rounded hover:bg-indigo-100 transition-colors"
             >
               重新計算爆炸向量
             </button>
+          </div>
+        )}
+
+        {/* Per-Component Direction Editor */}
+        {explodedView.isActive && explodedView.directions && Object.keys(explodedView.directions).length > 0 && (
+          <div className="mt-2 border-t border-indigo-100 pt-2">
+            <div className="text-[10px] font-bold text-indigo-600 mb-1">組件爆炸方向 (Per-Component Direction)</div>
+            <div className="max-h-40 overflow-y-auto space-y-0.5 pr-0.5">
+              {components.map((comp) => {
+                const dir = explodedView.directions[comp.id];
+                const isExpanded = expandedDirs.has(comp.id);
+                if (!dir) return null;
+                
+                return (
+                  <div key={comp.id} className="border border-indigo-50 rounded overflow-hidden">
+                    <button
+                      onClick={() => handleToggleDirPanel(comp.id)}
+                      className={`w-full flex items-center justify-between px-1.5 py-0.5 text-[10px] transition-colors ${
+                        activeComponentId === comp.id ? 'bg-indigo-50 text-indigo-700' : 'bg-white text-slate-600 hover:bg-indigo-50/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1">
+                        <span>{comp.isFixed ? '📌' : '📦'}</span>
+                        <span className="font-bold truncate">{comp.instanceName}</span>
+                      </div>
+                      <span className="text-[8px]">{isExpanded ? '▾' : '▸'}</span>
+                    </button>
+                    
+                    {isExpanded && (
+                      <div className="p-1.5 bg-indigo-50/30 space-y-1">
+                        {(['X', 'Y', 'Z'] as const).map((axis, ai) => (
+                          <div key={axis} className="flex items-center justify-between">
+                            <span className="text-[9px] font-bold text-indigo-500 w-3">{axis}</span>
+                            <div className="flex items-center gap-0.5">
+                              <button
+                                onClick={() => handleDirectionChange(comp.id, ai as 0 | 1 | 2, -0.1)}
+                                className="w-4 h-4 flex items-center justify-center bg-white border border-indigo-200 rounded text-[8px] font-bold text-indigo-600 hover:bg-indigo-100 transition-colors"
+                              >
+                                −
+                              </button>
+                              <span className="w-8 text-center text-[9px] font-mono text-indigo-700">
+                                {dir[ai].toFixed(2)}
+                              </span>
+                              <button
+                                onClick={() => handleDirectionChange(comp.id, ai as 0 | 1 | 2, 0.1)}
+                                className="w-4 h-4 flex items-center justify-center bg-white border border-indigo-200 rounded text-[8px] font-bold text-indigo-600 hover:bg-indigo-100 transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => {
+                            handleDirectionChange(comp.id, 0, 0);
+                            handleDirectionChange(comp.id, 1, 0);
+                            handleDirectionChange(comp.id, 2, 0);
+                          }}
+                          className="w-full py-0.5 text-[8px] font-bold text-indigo-400 bg-white border border-indigo-100 rounded hover:bg-indigo-50 transition-colors"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

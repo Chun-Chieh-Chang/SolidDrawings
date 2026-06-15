@@ -1,10 +1,10 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
 
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING' | 'RENDER';
 export type MeasurementMode = 'NONE' | 'DISTANCE' | 'ANGLE' | 'AREA' | 'VOLUME';
-export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT' | 'ANGLE' | 'GEAR' | 'SCREW';
+export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT' | 'ANGLE' | 'GEAR' | 'SCREW' | 'WIDTH' | 'SYMMETRY' | 'LOCK' | 'SNAP';
 
 export interface MateEntity {
   componentId: string;
@@ -29,6 +29,9 @@ export interface CADMate {
     ratio?: number; // For Gear
     pitch?: number; // For Screw
     initialTransforms?: Record<string, { position: [number, number, number], rotation: [number, number, number] }>;
+    widthOffset?: number; // For WIDTH mate
+    symmetryPlane?: string; // For SYMMETRY mate
+    snapOffset?: [number, number, number]; // For SNAP mate
   };
   alignment?: 'ALIGNED' | 'ANTI_ALIGNED';
   offset?: number;
@@ -148,10 +151,18 @@ export interface SectionViewState {
   flip: boolean;
 }
 
+export interface ExplodedViewStep {
+  name: string;
+  factor: number;
+  directions: Record<string, [number, number, number]>;
+}
+
 export interface ExplodedViewState {
   isActive: boolean;
   factor: number;
   directions: Record<string, [number, number, number]>;
+  steps: ExplodedViewStep[];
+  currentStepIndex: number;
 }
 
 export interface MotionDriver {
@@ -169,6 +180,23 @@ export interface MotionStudyState {
 }
 
 export type CadToastType = 'error' | 'warning' | 'info';
+
+export interface DrawingSheetData {
+  id: string;
+  name: string;
+  views: DrawingSheetViewData[];
+}
+
+export interface DrawingSheetViewData {
+  id: string;
+  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION';
+  title: string;
+  position: { x: number; y: number; w: number; h: number };
+  scale: string;
+  showDimensions: boolean;
+  parentViewId?: string;
+  sectionLine?: { u1: number; v1: number; u2: number; v2: number };
+}
 
 export interface CadToastItem {
   id: string;
@@ -355,7 +383,7 @@ export interface CadState {
   setInterferenceResults: (results: any[]) => void;
   interferenceActive: boolean;
   setInterferenceActive: (active: boolean) => void;
-  solverReport: { dof: number; residual: number; nodes: Record<string, any> } | null;
+  solverReport: { dof: number; residual: number; nodes: Record<string, any>; max_residual?: number; iterations?: number; converged?: boolean } | null;
   setSolverReport: (report: { dof: number; residual: number; nodes: Record<string, any> } | null) => void;
   assemblyPreviewComponents: CADComponent[] | null;
   setAssemblyPreviewComponents: (components: CADComponent[] | null) => void;
@@ -416,6 +444,10 @@ export interface CadState {
   setExplodedView: (view: Partial<ExplodedViewState>) => void;
   setExplosionFactor: (factor: number) => void;
   calculateAutoExplosion: () => void;
+  setExplodedDirection: (componentId: string, direction: [number, number, number]) => void;
+  saveExplodeStep: (name: string) => void;
+  loadExplodeStep: (index: number) => void;
+  deleteExplodeStep: (index: number) => void;
 
   motionStudy: MotionStudyState;
   setMotionStudy: (study: Partial<MotionStudyState>) => void;
@@ -451,6 +483,20 @@ export interface CadState {
     features: string[];
     faces: string[];
   };
+
+  drawingSheets: DrawingSheetData[];
+  activeSheetId: string;
+  setDrawingSheets: (sheets: DrawingSheetData[]) => void;
+  addDrawingSheet: (name: string) => void;
+  deleteDrawingSheet: (id: string) => void;
+  renameDrawingSheet: (id: string, name: string) => void;
+  setActiveSheet: (id: string) => void;
+  updateViewPosition: (sheetId: string, viewId: string, position: { x: number; y: number; w: number; h: number }) => void;
+  updateViewScale: (sheetId: string, viewId: string, scale: string) => void;
+  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION', sheetId?: string, parentViewId?: string) => void;
+  removeViewFromSheet: (sheetId: string, viewId: string) => void;
+  updateViewTitle: (sheetId: string, viewId: string, title: string) => void;
+  toggleViewDimensions: (sheetId: string, viewId: string) => void;
 }
 
 export const MATERIAL_PRESETS: Record<string, {
@@ -474,7 +520,7 @@ export const MATERIAL_PRESETS: Record<string, {
 
 export const DEFAULT_RIBBON_LAYOUT: RibbonLayout = {
   FEATURES: ['EXTRUDE', 'REVOLVE', 'EXTRUDE_CUT', 'REVOLVED_CUT', 'SWEEP', 'LOFT', 'FILLET', 'CHAMFER', 'MIRROR', 'PATTERN', 'SHELL', 'DOME', 'DRAFT', 'REFERENCE_PLANE', 'REFERENCE_AXIS', 'REFERENCE_POINT', 'HOLE_WIZARD'],
-  SKETCH: ['LINE', 'CIRCLE', 'ARC', 'RECTANGLE', 'SMART_DIMENSION', 'TRIM', 'EXTEND', 'OFFSET', 'MIRROR', 'PATTERN', 'TEXT', 'SPLINE'],
+  SKETCH: ['LINE', 'CIRCLE', 'ARC', 'RECTANGLE', 'POLYGON', 'SMART_DIMENSION', 'TRIM', 'EXTEND', 'OFFSET', 'MIRROR', 'PATTERN', 'TEXT', 'SPLINE'],
   EVALUATE: ['MEASURE', 'MASS_PROPS', 'INTERFERENCE', 'SECTION_VIEW', 'EQUATIONS']
 };
 
@@ -585,6 +631,7 @@ export const useCadStore = create<CadState>()(
       setFirstChainNodeId: (firstChainNodeId) => set({ firstChainNodeId }),
       
       convertEntities: (selectedEdgeIds) => set((state) => {
+        get().saveSnapshot();
         const nextNodes = { ...state.sketchNodes };
         const nextEdges = { ...state.sketchEdges };
         selectedEdgeIds.forEach((id, idx) => {
@@ -600,11 +647,11 @@ export const useCadStore = create<CadState>()(
       selectedEntityIds: [],
       setSelectedEntityIds: (ids) => set((state) => ({ selectedEntityIds: typeof ids === 'function' ? ids(state.selectedEntityIds) : ids })),
       sketchNodes: {},
-      setSketchNodes: (nodes) => { get().markRebuildDirty(0); set((state) => ({ sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes })); },
+      setSketchNodes: (nodes) => { get().saveSnapshot(); get().markRebuildDirty(0); set((state) => ({ sketchNodes: typeof nodes === 'function' ? nodes(state.sketchNodes) : nodes })); },
       sketchEdges: {},
-      setSketchEdges: (edges) => { get().markRebuildDirty(0); set((state) => ({ sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges })); },
+      setSketchEdges: (edges) => { get().saveSnapshot(); get().markRebuildDirty(0); set((state) => ({ sketchEdges: typeof edges === 'function' ? edges(state.sketchEdges) : edges })); },
       sketchConstraints: {},
-      setSketchConstraints: (constraints) => { get().markRebuildDirty(0); set((state) => ({ sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints })); },
+      setSketchConstraints: (constraints) => { get().saveSnapshot(); get().markRebuildDirty(0); set((state) => ({ sketchConstraints: typeof constraints === 'function' ? constraints(state.sketchConstraints) : constraints })); },
 
       features: [],
       setFeatures: (features) => { get().saveSnapshot(); get().markRebuildDirty(0); set({ features }); },
@@ -727,10 +774,14 @@ export const useCadStore = create<CadState>()(
       setIsCameraAnimating: (isCameraAnimating) => set({ isCameraAnimating }),
       sectionView: { isActive: false, plane: 'FRONT', offset: 0, flip: false },
       setSectionView: (view) => set((state) => ({ sectionView: { ...state.sectionView, ...view } })),
-      explodedView: { isActive: false, factor: 0, directions: {} },
+      explodedView: { isActive: false, factor: 0, directions: {}, steps: [], currentStepIndex: -1 },
       setExplodedView: (view) => set((state) => ({ explodedView: { ...state.explodedView, ...view } })),
       setExplosionFactor: (factor) => set((state) => ({ explodedView: { ...state.explodedView, factor } })),
       calculateAutoExplosion: () => { const { components } = get(); if (components.length === 0) return; let cx = 0, cy = 0, cz = 0; components.forEach(c => { cx += c.transform.position[0]; cy += c.transform.position[1]; cz += c.transform.position[2]; }); cx /= components.length; cy /= components.length; cz /= components.length; const directions: Record<string, [number, number, number]> = {}; components.forEach(c => { const dx = c.transform.position[0] - cx; const dy = c.transform.position[1] - cy; const dz = c.transform.position[2] - cz; const len = Math.sqrt(dx*dx + dy*dy + dz*dz); if (len > 1e-6) { directions[c.id] = [dx/len, dy/len, dz/len]; } else { directions[c.id] = [1, 1, 1]; } }); set({ explodedView: { ...get().explodedView, directions } }); },
+      setExplodedDirection: (componentId, direction) => set((state) => ({ explodedView: { ...state.explodedView, directions: { ...state.explodedView.directions, [componentId]: direction } } })),
+      saveExplodeStep: (name) => set((state) => ({ explodedView: { ...state.explodedView, steps: [...state.explodedView.steps, { name, factor: state.explodedView.factor, directions: { ...state.explodedView.directions } }], currentStepIndex: state.explodedView.steps.length } })),
+      loadExplodeStep: (index) => set((state) => { const step = state.explodedView.steps[index]; if (!step) return state; return { explodedView: { ...state.explodedView, factor: step.factor, directions: { ...step.directions }, currentStepIndex: index } }; }),
+      deleteExplodeStep: (index) => set((state) => { const newSteps = state.explodedView.steps.filter((_, i) => i !== index); const newIndex = state.explodedView.currentStepIndex >= newSteps.length ? newSteps.length - 1 : state.explodedView.currentStepIndex; return { explodedView: { ...state.explodedView, steps: newSteps, currentStepIndex: newSteps.length > 0 ? (newIndex >= 0 ? newIndex : 0) : -1 } }; }),
       motionStudy: { isActive: false, currentTime: 0, playbackSpeed: 1, drivers: [] },
       setMotionStudy: (study) => set((state) => ({ motionStudy: { ...state.motionStudy, ...study } })),
       addMotionDriver: (driver) => set((state) => ({ motionStudy: { ...state.motionStudy, drivers: [...state.motionStudy.drivers, driver] } })),
@@ -752,6 +803,90 @@ export const useCadStore = create<CadState>()(
       hoveredEntityId: null,
       setHoveredEntityId: (hoveredEntityId) => set({ hoveredEntityId }),
       selection: { nodes: [], edges: [], features: [], faces: [] },
+
+      drawingSheets: [{
+        id: 'sheet-1',
+        name: 'Sheet 1',
+        views: [
+          { id: 'view-front', type: 'FRONT', title: 'Front Elevation (1:1)', position: { x: 0, y: 0, w: 500, h: 350 }, scale: '1:1', showDimensions: true },
+          { id: 'view-top', type: 'TOP', title: 'Top Plan (1:1)', position: { x: 520, y: 0, w: 500, h: 350 }, scale: '1:1', showDimensions: true },
+          { id: 'view-right', type: 'RIGHT', title: 'Right Profile (1:1)', position: { x: 0, y: 370, w: 500, h: 350 }, scale: '1:1', showDimensions: true },
+          { id: 'view-iso', type: 'ISO', title: 'Isometric View', position: { x: 520, y: 370, w: 500, h: 350 }, scale: '1:1', showDimensions: false },
+        ],
+      }],
+      activeSheetId: 'sheet-1',
+      setDrawingSheets: (drawingSheets) => set({ drawingSheets }),
+      addDrawingSheet: (name) => set((state) => {
+        const id = `sheet-${Date.now()}`;
+        return {
+          drawingSheets: [...state.drawingSheets, { id, name, views: [] }],
+          activeSheetId: id,
+        };
+      }),
+      deleteDrawingSheet: (id) => set((state) => {
+        if (state.drawingSheets.length <= 1) return state;
+        const remaining = state.drawingSheets.filter(s => s.id !== id);
+        return {
+          drawingSheets: remaining,
+          activeSheetId: state.activeSheetId === id ? remaining[0].id : state.activeSheetId,
+        };
+      }),
+      renameDrawingSheet: (id, name) => set((state) => ({
+        drawingSheets: state.drawingSheets.map(s => s.id === id ? { ...s, name } : s),
+      })),
+      setActiveSheet: (id) => set({ activeSheetId: id }),
+      updateViewPosition: (sheetId, viewId, position) => set((state) => ({
+        drawingSheets: state.drawingSheets.map(s =>
+          s.id === sheetId ? { ...s, views: s.views.map(v => v.id === viewId ? { ...v, position } : v) } : s
+        ),
+      })),
+      updateViewScale: (sheetId, viewId, scale) => set((state) => ({
+        drawingSheets: state.drawingSheets.map(s =>
+          s.id === sheetId ? { ...s, views: s.views.map(v => v.id === viewId ? { ...v, scale, title: v.title.replace(/\(\d+:\d+\)/, `(${scale})`) } : v) } : s
+        ),
+      })),
+      addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION', sheetId?: string, parentViewId?: string) => set((state) => {
+        const id = `view-${Date.now()}`;
+        const scales = ['1:1', '1:2', '1:5', '2:1', '5:1'];
+        const scale = scales[Math.floor(Math.random() * scales.length)];
+        const titleMap: Record<string, string> = { FRONT: 'Front View', TOP: 'Top View', RIGHT: 'Right View', ISO: 'Isometric View', SECTION: 'Section View' };
+        const colWidth = 500;
+        const rowHeight = 350;
+        const gap = 20;
+        const col = state.drawingSheets.find(s => s.id === sheetId)?.views.length || 0;
+        const c = col % 2;
+        const r = Math.floor(col / 2);
+        const newView: DrawingSheetViewData = {
+          id,
+          type: viewType,
+          title: titleMap[viewType] + ' (' + scale + ')',
+          position: { x: c * (colWidth + gap), y: r * (rowHeight + gap), w: colWidth, h: rowHeight },
+          scale,
+          showDimensions: viewType !== 'ISO',
+          parentViewId,
+        };
+        return {
+          drawingSheets: state.drawingSheets.map(s => {
+            if (s.id !== sheetId) return s;
+            return { ...s, views: [...s.views, newView] };
+          }),
+        };
+      }),
+      removeViewFromSheet: (sheetId, viewId) => set((state) => ({
+        drawingSheets: state.drawingSheets.map(s =>
+          s.id === sheetId ? { ...s, views: s.views.filter(v => v.id !== viewId) } : s
+        ),
+      })),
+      updateViewTitle: (sheetId, viewId, title) => set((state) => ({
+        drawingSheets: state.drawingSheets.map(s =>
+          s.id === sheetId ? { ...s, views: s.views.map(v => v.id === viewId ? { ...v, title } : v) } : s
+        ),
+      })),
+      toggleViewDimensions: (sheetId, viewId) => set((state) => ({
+        drawingSheets: state.drawingSheets.map(s =>
+          s.id === sheetId ? { ...s, views: s.views.map(v => v.id === viewId ? { ...v, showDimensions: !v.showDimensions } : v) } : s
+        ),
+      })),
     }),
     {
       name: 'cad-storage',
@@ -835,6 +970,8 @@ export const useCadStore = create<CadState>()(
         targetMaterialEntity: state.targetMaterialEntity,
         hoveredEntityId: state.hoveredEntityId,
         selection: state.selection,
+        drawingSheets: state.drawingSheets,
+        activeSheetId: state.activeSheetId,
       }),
     }
   )
