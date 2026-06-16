@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useCadStore, CADConfiguration } from '../store/useCadStore';
 import { v4 as uuidv4 } from 'uuid';
-import { DesignTableModal } from './Modals/DesignTableModal';
 
 export const ConfigurationManagerPanel: React.FC = () => {
   const { 
@@ -139,7 +138,7 @@ export const ConfigurationManagerPanel: React.FC = () => {
           className="w-full flex items-center justify-center gap-2 py-2 bg-white border border-slate-300 rounded text-[11px] font-black text-slate-700 hover:bg-emerald-50 hover:border-emerald-300 hover:text-emerald-700 transition-all shadow-sm"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M3 3h18v18H3z"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
-          開啟設計表 (Design Table)
+          Open Design Table
         </button>
       </div>
 
@@ -173,7 +172,6 @@ export const ConfigurationManagerPanel: React.FC = () => {
         </div>
       </div>
 
-      {showDesignTable && <DesignTableModal onClose={() => setShowDesignTable(false)} />}
     </div>
   );
 };

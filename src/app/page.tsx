@@ -1,55 +1,47 @@
-﻿'use client';
+'use client';
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import Viewport from '../renderer/Viewport';
-import OcctShape, { type MeshData } from '../renderer/OcctShape';
-import { useCadStore, type CADFeature } from '../store/useCadStore';
+import Viewport from '@/renderer/Viewport';
+import OcctShape, { type MeshData } from '@/renderer/OcctShape';
+import { useCadStore, type CADFeature } from '@/store/useCadStore';
 import { v4 as uuidv4 } from 'uuid';
-import { HeavyEngineClient } from '../kernel/HeavyEngineClient';
-import { MeasurementPanel } from '../ui/MeasurementPanel';
-import { InterferencePanel } from '../ui/InterferencePanel';
-import { SketchHUD } from '../renderer/SketchHUD';
+import { HeavyEngineClient } from '@/kernel/HeavyEngineClient';
+import { MeasurementPanel } from '@/ui/MeasurementPanel';
+import { InterferencePanel } from '@/ui/InterferencePanel';
+import { SketchHUD } from '@/renderer/SketchHUD';
 import { fileAPI } from '../../electron/renderer';
-import { MatePanel } from '../ui/MatePanel';
-import { AssemblyTreePanel } from '../ui/AssemblyTreePanel';
-import { MotionStudyPanel } from '../ui/MotionStudyPanel';
-import { AssemblyComponent } from '../renderer/AssemblyComponent';
-import { MassPropertiesSymbol } from '../renderer/MassPropertiesSymbol';
-import { DrawingSheet } from '../ui/DrawingSheet';
-import { SketchPropertyManager } from '../ui/SketchPropertyManager';
-import { analyzeSketchDefinitions } from '../utils/geometry/ConstraintSolver';
-import { HeadsUpToolbar } from '../ui/HeadsUpToolbar';
-import { TopMenu } from '../ui/TopMenu';
-import { RibbonController } from '../ui/RibbonBar/RibbonController';
-import { StatusBar } from '../ui/StatusBar';
-import { ShortcutBox } from '../ui/ShortcutBox';
-import { ContextMenu } from '../ui/ContextMenu';
-import { usePartDocument } from '../hooks/usePartDocument';
-import { usePartRebuild } from '../hooks/usePartRebuild';
-import { FeatureManagerPanel } from '../ui/FeatureManagerPanel';
-import { PartFeaturePropertyManager } from '../ui/PartFeaturePropertyManager';
-import { SectionViewPropertyManager } from '../ui/SectionViewPropertyManager';
-import { useSelectionLogic } from '../hooks/useSelectionLogic';
-import { useFeatureBuilders } from '../hooks/useFeatureBuilders';
-import { useAppIntegrations } from '../hooks/useAppIntegrations';
-import { MassPropertiesModal } from '../ui/Modals/MassPropertiesModal';
-import { TranslatorModal } from '../ui/Modals/TranslatorModal';
-import { ExportModal } from '../ui/Modals/ExportModal';
-import { ConfigurationManagerPanel } from '../ui/ConfigurationManagerPanel';
-import { EquationsModal } from '../ui/Modals/EquationsModal';
-import { DesignLibraryPanel } from '../ui/DesignLibraryPanel';
-import { MaterialSelectorModal } from '../ui/Modals/MaterialSelectorModal';
-import { RobotHUD } from '../ui/RobotHUD';
-import { RobotOperationService } from '../ui/RobotOperationService';
-import { useAutoSave } from '../hooks/useAutoSave';
-import { SKey } from '../utils/s-key';
-import { MouseGestureOverlay } from '../utils/mouse-gestures';
-import { setupKeyboardShortcuts } from '../utils/keyboard-shortcuts';
-import { RecoveryDialog } from '../ui/Modals/RecoveryDialog';
+import { MatePanel } from '@/ui/MatePanel';
+import { AssemblyTreePanel } from '@/ui/AssemblyTreePanel';
+import { MotionStudyPanel } from '@/ui/MotionStudyPanel';
+import { AssemblyComponent } from '@/renderer/AssemblyComponent';
+import { MassPropertiesSymbol } from '@/renderer/MassPropertiesSymbol';
+import { DrawingSheet } from '@/ui/DrawingSheet';
+import { SketchPropertyManager } from '@/ui/SketchPropertyManager';
+import { analyzeSketchDefinitions } from '@/utils/geometry/ConstraintSolver';
+import { HeadsUpToolbar } from '@/ui/HeadsUpToolbar';
+import { TopMenu } from '@/ui/TopMenu';
+import { RibbonController } from '@/ui/RibbonBar/RibbonController';
+import { StatusBar } from '@/ui/StatusBar';
+import { ShortcutBox } from '@/ui/ShortcutBox';
+import { ContextMenu } from '@/ui/ContextMenu';
+import { usePartDocument } from '@/hooks/usePartDocument';
+import { usePartRebuild } from '@/hooks/usePartRebuild';
+import { FeatureManagerPanel } from '@/ui/FeatureManagerPanel';
+import { PartFeaturePropertyManager } from '@/ui/PartFeaturePropertyManager';
+import { SectionViewPropertyManager } from '@/ui/SectionViewPropertyManager';
+import { useSelectionLogic } from '@/hooks/useSelectionLogic';
+import { useFeatureBuilders } from '@/hooks/useFeatureBuilders';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
+import { useAppIntegrations } from '@/hooks/useAppIntegrations';
+import { MassPropertiesModal } from '@/ui/Modals/MassPropertiesModal';
+import { TranslatorModal } from '@/ui/Modals/TranslatorModal';
+import { ExportModal } from '@/ui/Modals/ExportModal';
+import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
+import { EquationsModal } from '@/ui/Modals/EquationsModal';
+import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
+import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
 
 export default function Home() {
-  useAutoSave();
-  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
   const [sidebarTab, setSidebarTab] = useState<'TREE' | 'PROPERTIES' | 'CONFIGS'>('TREE');
@@ -57,18 +49,6 @@ export default function Home() {
   const [showMassPropsModal, setShowMassPropsModal] = useState(false);
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
   const [showEquationsModal, setShowEquationsModal] = useState(false);
-
-  const [showSKey, setShowSKey] = useState(false);
-  const sKeyItems = useMemo(() => [
-    { label: 'Extrude', icon: '⬆️', action: () => { const h = (window as any).__handleExtrude; if(h) h('ADD'); setShowSKey(false); } },
-    { label: 'Revolve', icon: '🔄', action: () => { const h = (window as any).__handleRevolve; if(h) h('ADD'); setShowSKey(false); } },
-    { label: 'Fillet', icon: '🔘', action: () => { useCadStore.getState().setHint('Fillet: Select edge(s)'); setShowSKey(false); } },
-    { label: 'Chamfer', icon: '📐', action: () => { useCadStore.getState().setHint('Chamfer: Select edge(s)'); setShowSKey(false); } },
-    { label: 'Mirror', icon: '🪞', action: () => { useCadStore.getState().pushToast('Mirror not implemented.'); setShowSKey(false); } },
-  ], []);
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const client = HeavyEngineClient.getInstance();
   const { 
@@ -128,6 +108,7 @@ export default function Home() {
   }, []);
 
   useAppIntegrations(loadCadData, handleSaveProject, handlePrintToPDF);
+  useKeyboardShortcuts();
 
   const handleImportStep = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -217,23 +198,6 @@ export default function Home() {
     defaultFilletRadius, defaultChamferDistance, setHint,
   });
 
-  // S-Key Ring Menu Trigger
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 's' && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        // Brief press of S toggles the ring menu
-        setShowSKey(prev => !prev);
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // Setup SOLIDWORKS 2010 keyboard shortcuts
-  useEffect(() => {
-    return setupKeyboardShortcuts();
-  }, []);
-
   // Window Callbacks for Shortcuts
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -249,18 +213,10 @@ export default function Home() {
     }
   }, [handleRebuild, handleExitAndExtrude, handleRevolveFromSketch, resetSketchSession, handleSaveSketchOnly, handleConvertEntities, handleOffsetEntities, handlePrintToPDF, handleEditFeatureSketch]);
 
-  if (!mounted) return (
-    <div className="h-screen w-screen bg-[#E8E8E8] flex items-center justify-center">
-      <div className="text-[#005B9A] font-black tracking-widest animate-pulse">LOADING 3D-BUILDER...</div>
-    </div>
-  );
-
   return (
-    <main className="flex flex-col h-screen w-screen overflow-hidden bg-[#E8E8E8] text-slate-800 font-sans select-none">
-      {/* 1. Top Menu / Title Bar */}
+    <main className="flex flex-col h-screen w-screen overflow-hidden bg-background text-primary-text font-sans">
       <TopMenu engineStatus={engineStatus} onExport={() => setShowExportModal(true)} />
       
-      {/* 2. CommandManager (Ribbon) */}
       <RibbonController
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -274,48 +230,33 @@ export default function Home() {
       />
 
       {engineStatus === 'DISCONNECTED' && (
-        <div className="bg-red-600 text-white text-[11px] font-black py-1 px-4 flex items-center justify-center gap-4 animate-pulse z-[100] border-b border-red-700 shadow-lg">
-          <span className="flex items-center gap-2">⚠️ <span className="tracking-widest">GEOMETRY KERNEL OFFLINE</span></span>
-          <button onClick={() => HeavyEngineClient.getInstance().checkHealth().then(a => setEngineStatus(a?'CONNECTED':'DISCONNECTED'))} className="px-3 py-0.5 bg-white text-red-600 rounded-sm text-[9px] font-black hover:bg-slate-100 shadow-sm transition-all active:scale-95">RECONNECT</button>
+        <div className="bg-red-600 text-white text-[11px] font-black py-1 px-4 flex items-center justify-center gap-4 animate-pulse z-[100]">
+          <span>⚠️ GEOMETRY KERNEL OFFLINE</span>
+          <button onClick={() => HeavyEngineClient.getInstance().checkHealth().then(a => setEngineStatus(a?'CONNECTED':'DISCONNECTED'))} className="px-2 py-0.5 bg-white text-red-600 rounded text-[9px] font-black hover:bg-slate-100">RETRY</button>
         </div>
       )}
 
-      {/* 3. Main Workspace Area */}
       <div className="flex-1 flex w-full overflow-hidden relative">
-        
-        {/* LEFT: Consolidated Manager (FeatureManager / PropertyManager / ConfigManager) */}
-        <aside className="w-[300px] h-full bg-[#F5F6F9] border-r border-[#A0A0A0] flex flex-col z-10 shrink-0 shadow-[2px_0_10px_rgba(0,0,0,0.05)]">
-          {/* Manager Tabs */}
-          <div className="h-[36px] w-full bg-[#E8E8E8] flex items-center border-b border-[#A0A0A0] px-1 gap-1">
-            {[
-              { id: 'TREE', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>, label: 'FeatureManager' },
-              { id: 'PROPERTIES', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M3 20h4M7 20v-4M7 16h10M17 16V4M17 4H7M7 4v12"/></svg>, label: 'PropertyManager' },
-              { id: 'CONFIGS', icon: <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>, label: 'ConfigurationManager' }
-            ].map((tab) => {
-              const tabId = tab.id as 'TREE' | 'PROPERTIES' | 'CONFIGS';
+        <aside className="w-[300px] h-full bg-[#F5F6F9] border-r border-slate-300 flex flex-col z-10 shrink-0">
+          <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
+            {["Tree", "Properties", "Configs"].map((tab, idx) => {
+              const tabId = (['TREE', 'PROPERTIES', 'CONFIGS'] as const)[idx];
               const isActive = sidebarTab === tabId;
               return (
-                <button 
-                  key={tab.id} 
+                <div 
+                  key={tab} 
                   onClick={() => setSidebarTab(tabId)}
-                  title={tab.label}
-                  className={`flex-1 h-[30px] flex items-center justify-center rounded-t-md transition-all ${
-                    isActive 
-                      ? 'bg-[#F5F6F9] text-[#005B9A] border-t border-x border-[#A0A0A0] shadow-[0_-2px_5px_rgba(0,0,0,0.05)]' 
-                      : 'text-slate-400 hover:text-slate-600 hover:bg-[#D6DADC]/50'
-                  }`}
+                  className={`flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter cursor-pointer border-r border-slate-300 ${isActive ? 'bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]' : 'text-slate-500 hover:bg-slate-100'}`}
                 >
-                  {tab.icon}
-                </button>
+                  {tab}
+                </div>
               );
             })}
           </div>
-
-          {/* Manager Content */}
-          <div className="flex-grow flex flex-col overflow-hidden bg-[#F5F6F9]">
+          <div className="flex-grow flex flex-col overflow-hidden">
             {sidebarTab === 'CONFIGS' ? (
               <ConfigurationManagerPanel />
-            ) : (isSketchMode || sidebarTab === 'PROPERTIES' || (selectedId && sidebarTab !== 'TREE')) ? (
+            ) : isSketchMode || sidebarTab === 'PROPERTIES' ? (
               <div className="flex-grow flex flex-col overflow-hidden">
                 {isSketchMode ? <SketchPropertyManager /> : (
                   selectedFeature ? (
@@ -327,15 +268,11 @@ export default function Home() {
                       onSelectFeature={setSelectedId}
                       onBuildSweepLoft={handleBuildSweepLoft}
                     />
-                  ) : <div className="p-10 text-center text-slate-400 italic text-[11px] font-bold uppercase tracking-wider">No property selected</div>
+                  ) : <div className="p-10 text-center text-slate-400 italic text-[11px]">No feature selected</div>
                 )}
               </div>
             ) : activeTab === 'ASSEMBLY' ? (
-              <div className="flex-1 flex flex-col p-1 gap-1 overflow-hidden">
-                <AssemblyTreePanel />
-                <div className="h-[1px] bg-[#A0A0A0]/30 mx-2" />
-                <MatePanel />
-              </div>
+              <div className="flex-1 flex flex-col p-2 gap-2 bg-[#F8FAFC]"><AssemblyTreePanel /><MatePanel /></div>
             ) : measurementMode !== 'NONE' ? (
               <MeasurementPanel />
             ) : interferenceActive ? (
@@ -348,10 +285,7 @@ export default function Home() {
                 activePlane={activePlane}
                 setActivePlane={setActivePlane}
                 selectedId={selectedId}
-                setSelectedId={(id: string) => {
-                  setSelectedId(id);
-                  if (id) setSidebarTab('PROPERTIES'); // Auto-switch to properties like SW
-                }}
+                setSelectedId={setSelectedId}
                 selectedSubNodeType={selectedSubNodeType}
                 setSelectedSubNodeType={setSelectedSubNodeType}
                 editingFeatureId={useCadStore.getState().editingFeatureId}
@@ -370,16 +304,12 @@ export default function Home() {
           </div>
         </aside>
 
-        {/* CENTER: Graphics Area (Viewport) */}
-        <MouseGestureOverlay>
-        <section className="flex-grow h-full relative bg-[#C0C0C0]" onContextMenu={(e) => e.preventDefault()}>
-          <HeadsUpToolbar /> 
-          <ShortcutBox /> 
-          <ContextMenu />
+        <section className="flex-grow h-full relative" onContextMenu={(e) => e.preventDefault()}>
+          <HeadsUpToolbar /> <ShortcutBox /> <ContextMenu />
 
           {isSketchMode && hasConflict && (
-            <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-600 border-2 border-red-400 text-white px-6 py-2 rounded-sm shadow-2xl flex items-center gap-3 z-[999] pointer-events-none backdrop-blur-md animate-bounce">
-              <span className="text-[12px] font-black uppercase tracking-widest">Over-Constrained Conflict Detected</span>
+            <div className="absolute top-24 left-1/2 -translate-x-1/2 bg-red-500/90 border border-red-400 text-white px-5 py-3 rounded-full shadow-sm flex items-center gap-2.5 z-[999] w-[85%] max-w-[500px] pointer-events-none backdrop-blur-md">
+              <div className="flex flex-col"><span className="text-[12px] font-extrabold uppercase tracking-wider leading-none">Over-Constrained Conflict</span></div>
             </div>
           )}
 
@@ -401,11 +331,11 @@ export default function Home() {
           <SketchHUD onReset={resetSketchSession} onExit={handleExitAndExtrude} />
 
           {loading && (
-            <div className="absolute inset-0 bg-white/20 backdrop-blur-[2px] flex items-center justify-center z-[1000] p-4">
-              <div className="w-[320px] bg-[#F8FAFC]/95 border border-[#A0A0A0] rounded-lg p-6 shadow-2xl flex flex-col gap-4 text-slate-800 items-center">
-                <div className="w-8 h-8 border-4 border-slate-200 border-t-[#005B9A] rounded-full animate-spin" />
-                <span className="text-[12px] font-black text-[#005B9A] tracking-widest uppercase">Rebuilding Model...</span>
-                <button onClick={abortRebuild} className="w-full py-1.5 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-sm font-black transition-all text-[11px] uppercase tracking-tighter">Abort Rebuild</button>
+            <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center z-[1000] p-4">
+              <div className="w-[380px] bg-slate-900/90 border border-slate-700/60 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 text-slate-100 items-center">
+                <div className="w-10 h-10 border-4 border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+                <span className="text-[14px] font-bold text-slate-200 tracking-wide">Rebuilding Geometry...</span>
+                <button onClick={abortRebuild} className="w-full py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/50 text-red-400 rounded font-bold transition-all text-[13px]">Abort</button>
               </div>
             </div>
           )}
@@ -414,27 +344,21 @@ export default function Home() {
           {showEquationsModal && <EquationsModal onClose={() => setShowEquationsModal(false)} />}
           {showTranslatorModal && <TranslatorModal onClose={() => setShowTranslatorModal(false)} onOpenAlternative={async () => { setShowTranslatorModal(false); const r = await fileAPI.open(); if(r) { const res = await fileAPI.read(r.path); if(res.success && res.content) loadCadData(res.content, r.path); } }} />}
           {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} activeTab={activeTab} />}
-          <RecoveryDialog />
         </section>
-        </MouseGestureOverlay>
-          <SKey items={sKeyItems} visible={showSKey} onClose={() => setShowSKey(false)} />
 
-        {/* RIGHT: Task Pane (Design Library) */}
+        {/* Right Task Pane (Design Library) */}
         {taskPaneTab !== 'NONE' && (
-          <aside className="w-[280px] h-full bg-[#F5F6F9] border-l border-[#A0A0A0] flex flex-col z-10 shrink-0 animate-in slide-in-from-right-4 duration-300 shadow-[-2px_0_10px_rgba(0,0,0,0.05)]">
-            <div className="h-[36px] w-full bg-[#E8E8E8] flex items-center border-b border-[#A0A0A0] px-3 justify-between">
-               <div className="text-[10px] font-black uppercase tracking-widest text-slate-700 flex items-center gap-2">
-                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-                 Task Pane
+          <aside className="w-[280px] h-full bg-[#F5F6F9] border-l border-slate-300 flex flex-col z-10 shrink-0 animate-in slide-in-from-right duration-300">
+            <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
+               <div className="flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]">
+                 Library
                </div>
                <button 
                  onClick={() => setTaskPaneTab('NONE')}
-                 className="w-6 h-6 flex items-center justify-center text-slate-400 hover:text-red-500 transition-colors"
+                 className="px-2 text-slate-400 hover:text-slate-600"
                >✕</button>
             </div>
-            <div className="flex-1 overflow-hidden">
-              <DesignLibraryPanel />
-            </div>
+            <DesignLibraryPanel />
           </aside>
         )}
 
@@ -442,20 +366,14 @@ export default function Home() {
         {taskPaneTab === 'NONE' && (
           <div 
             onClick={() => setTaskPaneTab('LIBRARY')}
-            className="absolute right-0 top-24 w-6 h-32 bg-[#E8E8E8] border-l border-y border-[#A0A0A0] rounded-l-md shadow-md cursor-pointer flex items-center justify-center text-slate-500 hover:text-[#005B9A] transition-all z-20 hover:w-8 group border-r-0"
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-24 bg-white border-l border-y border-slate-300 rounded-l-md shadow-md cursor-pointer flex items-center justify-center text-slate-400 hover:text-primary transition-all z-20 hover:w-8 group"
           >
-            <span className="rotate-90 font-black text-[9px] whitespace-nowrap tracking-widest uppercase">Task Pane</span>
+            <span className="rotate-90 font-black text-[10px] whitespace-nowrap tracking-widest group-hover:text-primary transition-colors">TASK PANE</span>
           </div>
         )}
       </div>
-      
-      {/* 4. Status Bar */}
       <StatusBar />
-      
-      {/* Global Modals & Services */}
       <MaterialSelectorModal />
-      <RobotOperationService />
-      <RobotHUD />
     </main>
   );
 }

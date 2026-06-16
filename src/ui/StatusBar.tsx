@@ -82,7 +82,6 @@ export const StatusBar: React.FC = () => {
       case 'SHADED': return 'Shaded';
       case 'SHADED_EDGES': return 'Shaded w/ Edges';
       case 'WIREFRAME': return 'Wireframe';
-      case 'HIDDEN_LINES': return 'Hidden Lines Removed';
       default: return 'Shaded';
     }
   }, [viewportDisplayMode]);

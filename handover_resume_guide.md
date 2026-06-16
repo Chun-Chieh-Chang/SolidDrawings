@@ -1,5 +1,5 @@
 # Handover Resume Guide (Auto-Generated)
-**Last Saved:** 2026-06-13 13:10:31
+**Last Saved:** 2026-06-16 12:15:48
 
 > [!IMPORTANT]
 > **To the next Agent/Human taking over:** 
@@ -7,56 +7,87 @@
 
 ## 1. Current Git State
 ```shell
-6295392 feat: implement Robot HUD and Visualization Service for real-time agent operation visibility
+19757c0 Cleanup: Remove 146 obsolete files, add test infrastructure, update docs
 ```
 
 ### Uncommitted Changes
 ```shell
-M backend/app/main.py
- M backend/tests/e2e_stress_test_sim.py
- M handover_resume_guide.md
+M backend/app/routers/geometry.py
+ M backend/app/services/geometry_service.py
+ M docs/solidworks-2010-feature-matrix.csv
+ M reports/coverage-solidworks-2010.md
  M src/app/page.tsx
+ M src/hooks/useFeatureBuilders.ts
+ M src/hooks/usePartDocument.ts
+ M src/hooks/useSelectionLogic.ts
+ M src/renderer/DatumPlanes.tsx
  M src/store/useCadStore.ts
+ M src/ui/FeatureManagerPanel.tsx
+ M src/ui/HeadsUpToolbar.tsx
+ M src/ui/Modals/CustomizeRibbonModal.tsx
+ M src/ui/PartFeaturePropertyManager.tsx
  M src/ui/RibbonBar/RibbonController.tsx
- M src/ui/RobotHUD.tsx
- M src/ui/RobotOperationService.tsx
- M task_plan.md
-?? backend/app/routers/robot.py
-?? docs/governance/VIDEO_DRIVEN_VERIFICATION_PROTOCOL.md
+ M src/ui/ShortcutBox.tsx
+ M src/ui/SketchPropertyManager.tsx
+ M src/ui/TopMenu.tsx
+ M src/utils/geometry/ConstraintSolver.ts
+?? nul
+?? src/hooks/features/
+?? src/hooks/useCoordinateSystemBuilder.ts
+?? src/hooks/useKeyboardShortcuts.ts
+?? src/store/app-state.ts
+?? src/store/assembly-state.ts
+?? src/store/config-state.ts
+?? src/store/drawing-state.ts
+?? src/store/feature-state.ts
+?? src/store/history-state.ts
+?? src/store/index.ts
+?? src/store/selection-state.ts
+?? src/store/sketch-state.ts
+?? src/store/types.ts
+?? src/store/ui-state.ts
+?? src/ui/PartFeaturePropertyManager/
+?? src/ui/RecentFilesDropdown.tsx
+?? src/ui/SketchPropertyManager/
+?? src/utils/geometry/constraints/
+?? src/utils/keyboard-shortcuts.ts
+?? src/utils/mru-storage.ts
+?? src/utils/selection-filters.ts
+?? src/utils/sketch/ToolHandlers/ExtendTool.ts
 ```
 
 ## 2. Recent Development Log (DEV_LOG.md snippet)
 ```markdown
+    - Added `_build_thin_sweep()` helper function using `BRepOffsetAPI_MakeOffsetShape` for inner/outer offset surfaces with `BRepAlgoAPI_Cut` for wall extraction.
+    - Modified SWEEP feature block to check `thin_thickness` parameter before building — enables ONE_DIRECTION and MID_PLANE thin sweep modes.
+  - **Frontend UI** (`PartFeaturePropertyManager.tsx`):
+    - Added "Thin Feature (薄壁)" checkbox under Sweep property panel.
+    - When enabled, reveals Thickness input, Thin Type selector (ONE_DIRECTION / MID_PLANE).
+  - **State Flow** (`useFeatureBuilders.ts`):
+    - Extended `handleBuildSweepLoft` to pass `thin_thickness`, `thin_type`, `thin_direction1`, `thin_direction2` to backend.
+- **Phase 4 [確效閉環]**: 
+  - Created `e2e_sweep_thin_feature_sim.py` with 3 test scenarios.
+  - Results: ✅ Basic Solid Sweep | ✅ Thin ONE_DIRECTION | ✅ Thin MID_PLANE — **3/3 PASSED**
+  - Python syntax verified via `py_compile`.
+- **Phase 5 [資產交付]**:
+  - Updated `gap-checklist.md` with Thin Feature Sweep entry.
+  - Generated `docs/gap-report-sweep-LkpkpJEcT30.md` with full gap analysis.
+  - e2e test saved to `backend/tests/e2e_sweep_thin_feature_sim.py`.
+
+### Files Modified:
+- `backend/app/services/geometry_service.py` — +116 lines (_build_thin_sweep helper + thin param integration)
+- `src/ui/PartFeaturePropertyManager.tsx` — +38 lines (Thin Feature UI)
+- `src/hooks/useFeatureBuilders.ts` — +6 lines (thin param passthrough)
+- `skills/dev/solidworks-gap-analyzer/gap-checklist.md` — +1 line (Thin Feature Sweep entry)
+
+### New Files:
+- `backend/tests/e2e_sweep_thin_feature_sim.py` — e2e test suite for Thin Feature Sweep
+- `docs/gap-report-sweep-LkpkpJEcT30.md` — gap analysis report
+
 ### Status:
-- 撌脫 `docs/pdca-system.html` 銝剖祕?嚙賣迨靽桀儔嚗蕭?皜祈岫?嚙賣楛/瘛箄璅∴蕭?銝蕭??嚙?嚙踝蕭?摮噬蝡蕭??嚙賜內??100% 皜?嚙踝蕭?嚗蕭?瘥漲摰蕭???
-- 皜蕭??嚙踝蕭? `pdca-flow-diagram.html` 隞亦泵??MECE ?嚙踝蕭?銵蕭?
-
-## 2026-06-05 SkillsBuilder PDCA: SolidWorks Exercise 05 (Stepped Base with Hub)
-
-### Analysis:
-- **SolidWorks Expert**: 嚙??嚙?Stepped Base with Hub ?嚙賢遣璅∴蕭?蝔蕭?L?嚙踝蕭?璇荔蕭?嚙?(145x90) -> 銝哨蕭??嚙踝蕭???(72mm) -> 摨 70x5 鞎怎忽?嚙詡賡 -> ?嚙踝蕭?頛迎蕭? (D24, L20) -> 頛迎蕭??嚙踝蕭? (D12) -> ?嚙踝蕭??嚙賢噩??
-- **Hybrid Verification**:
-  - **Backend Simulation**: 撱綽蕭?嚙?`tests/regression/e2e_exercise_5_sim.py`嚗蕭?霅蕭??嚙賢噩?嚙踝蕭??嚙質摩嚗蕭???`MID_PLANE` ?嚙賢??`MIRROR` ?嚙賢噩??
-  - **Mirror Logic Verification**: 蝣綽蕭?敺垢 `geometry_service.py` ?嚙賣 `MIRROR` ?嚙賢噩憿蕭?嚗蕭??嚙詡賡蕭? `mirror_plane_refs` (嚙?`RIGHT` ?嚙踝蕭??? ?嚙踝蕭??嚙賢噩?嚙踝蕭???
-- **Result**: ??Passed (?嚙質摩?嚙踝蕭??嚙踝蕭?)??
-
-### Status:
-- ?嚙質摩撽蕭??嚙踝蕭?嚗歇撱綽蕭? SOP `docs/benchmarks/EXERCISE_05_SOP.md`??
-- 撌莎蕭??嚙賢嗾雿芋?嚙質?嚙踝蕭?蝣綽蕭?璈鈭箏靘迨瘚蕭??嚙踝蕭?撱箸芋??
-
-## 2026-06-05 SkillsBuilder PDCA: Spanner (Wrench) - Video 7
-
-### Analysis:
-- **SolidWorks Expert**: 嚙??嚙?Spanner ?嚙賢遣璅∴蕭?蝔蕭??嚙詡賡?嚙賢耦 (D32, D26) -> 銝哨蕭??嚙詡賡 (104x10) -> 銝蕭??嚙賢漲?嚙踝蕭???(6mm vs 3.5mm) -> ?嚙踝蕭??嚙詡賡 (18嚙? -> ?嚙踝蕭??嚙賣腹??
-- **Hybrid Verification**:
-  - **Backend Simulation**: 撱綽蕭?嚙?`tests/regression/e2e_video7_sim.py`嚗蕭??嚙賣芋?嚙踝蕭?憭蕭??嚙賢?嚙賢?嚙踝蕭??嚙踝蕭?頛荔蕭?
-  - **Feature Limitation Audit**: ?嚙賜敺垢 `geometry_service.py` 撠?嚙踝蕭??嚙賣 `midPlane` ?嚙賣嚗芋?嚙質?嚙詡賡蕭??嚙踝蕭??嚙賜宏韏瘀蕭?摨改蕭? (`y` ?嚙賜宏) 靘蕭??嚙賜?嚙踝蕭??嚙踝蕭?
-  - **Verification Checklist**: 撌脣遣嚙?`docs/benchmarks/SPANNER_VERIFICATION_SOP.md` 靘蕭?蝡荔蕭??嚙賣撽蕭?
-- **Result**: ??Passed (?嚙質摩?嚙踝蕭??嚙踝蕭?嚗芋?嚙踝蕭??嚙賜泵?嚙踝蕭?????
-
-### Status:
-- 摰蕭?撟橘蕭?璅⊥?嚙賣嚗蕭?霅蕭?銴蕭?撣蕭??嚙踝蕭?嚗蕭??嚙踝蕭??嚙賣楛摨佗蕭? Add/Cut嚗蕭?
-- 撌脩?嚙踝蕭?霅蕭??嚙踝蕭?蝣綽蕭? UI 撖佗蕭??嚙踝蕭?朣身閮蕭?蝭蕭?
+- 薄壁掃出 (Thin Feature Sweep) 功能已全面實裝：後端幾何引擎 + 前端 UI + 狀態管理。
+- Sweep 類別 SCS 從 50% 提升至 70%。
+- Remaining gaps (Medium/Low): Multiple Profiles, Sheet Metal Sweep, Advanced Options.
 
 ```
 

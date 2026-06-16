@@ -86,7 +86,7 @@ export function usePartRebuild(
       if (!isAlive) {
         if (rebuildController.current === controller) {
           useCadStore.getState().pushToast(
-            '幾何核心未連線，無法重建 B-Rep。請啟動後端服務（埠 8400）。',
+            'Geometry kernel not connected. Cannot rebuild B-Rep. Activate backend service (port 8400).',
             'warning',
           );
         }
@@ -101,7 +101,7 @@ export function usePartRebuild(
       if (rebuildController.current === controller && results && Array.isArray(results)) {
         if (results.length === 0 && activeFeatures.length > 0) {
           useCadStore.getState().pushToast(
-            '重建未產生幾何。請檢查草圖是否封閉、特徵參數是否有效。',
+            'Rebuild produced no geometry. Check if sketch is closed and feature parameters are valid.',
             'error',
           );
         } else {

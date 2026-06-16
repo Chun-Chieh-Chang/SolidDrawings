@@ -12,6 +12,9 @@ export interface SketchSolveReport {
   residual: number;
   status: string;
   nodes?: Record<string, any>;
+  max_residual?: number;
+  iterations?: number;
+  converged?: boolean;
 }
 
 /** PBD preview during drag / line chaining (60 FPS target). */
@@ -79,18 +82,32 @@ export async function preciseSolve(
 
 /** Commits precise solve into Zustand (call on mouse-up / constraint commit). */
 export async function commitPreciseSketchSolve(): Promise<SketchSolveReport> {
+  useCadStore.getState().saveSnapshot();
+  
   const state = useCadStore.getState();
   const { nodes, report } = await preciseSolve(
     state.sketchNodes,
     state.sketchEdges,
     state.sketchConstraints,
   );
-  
+
+  let solveState = report.status;
+  if (report.converged) {
+    if (report.dof === 0) solveState = 'FULLY_DEFINED';
+    else if (report.dof > 0) solveState = 'UNDER_DEFINED';
+    else solveState = 'OVER_DEFINED';
+  } else if (report.max_residual && report.max_residual > 1e-3) {
+    solveState = 'CONFLICT';
+  }
+
   useCadStore.setState({
     sketchNodes: nodes,
     solverReport: { 
       dof: report.dof, 
       residual: report.residual,
+      max_residual: report.max_residual,
+      iterations: report.iterations,
+      converged: report.converged,
       nodes: report.nodes || {}
     },
   });

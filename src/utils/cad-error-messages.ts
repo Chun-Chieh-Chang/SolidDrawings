@@ -1,42 +1,42 @@
-/** Map backend / kernel strings to user-facing 繁體中文 messages. */
+/** Map backend / kernel strings to user-facing traditional Chinese messages. */
 export function formatCadErrorMessage(raw: string): string {
   const text = (raw || '').trim();
-  if (!text) return '幾何重建失敗，請檢查特徵樹與草圖輪廓。';
+  if (!text) return 'Geometry Rebuild failed. Check Feature tree and Sketch profile.';
 
   const lower = text.toLowerCase();
 
-  if (lower.includes('fillet') || lower.includes('圓角')) {
-    if (lower.includes('radius') || lower.includes('半徑') || lower.includes('過大')) {
-      return '圓角半徑過大或與相鄰面衝突，請減小半徑或變更選邊。';
+  if (lower.includes('fillet') || lower.includes('Fillet')) {
+    if (lower.includes('radius') || lower.includes('Radius') || lower.includes('too large')) {
+      return 'Fillet radius too large or conflicts with adjacent faces. Reduce radius or select different edge.';
     }
-    return `圓角特徵失敗：${text}`;
+    return `Fillet feature failed：${text}`;
   }
 
-  if (lower.includes('chamfer') || lower.includes('倒角')) {
-    return '倒角距離過大或無法套用於所選邊，請減小距離或重新選邊。';
+  if (lower.includes('chamfer') || lower.includes('Chamfer')) {
+    return 'Chamfer distance too large or cannot apply to selected edge. Reduce distance or reselect edge.';
   }
 
-  if (lower.includes('edge_not_found') || lower.includes('找不到') && lower.includes('邊')) {
-    return '找不到先前選取的邊（可能因重建後拓撲改變）。請重新選邊並套用圓角／倒角。';
+  if (lower.includes('edge_not_found') || lower.includes('not found') && lower.includes('edge')) {
+    return 'Previously selected edge not found (topology may have changed after rebuild). Reselect edge and apply fillet/chamfer.';
   }
 
   if (lower.includes('profile') || lower.includes('loop') || lower.includes('wire')) {
     if (lower.includes('open') || lower.includes('not closed')) {
-      return '草圖輪廓未封閉或無法建立面，請檢查封閉輪廓後再拉伸。';
+      return 'Sketch profile not closed or cannot create face. Check closed profile before extruding.';
     }
-    return '草圖輪廓無法用於此特徵，請檢查封閉輪廓與自相交。';
+    return 'Sketch profile cannot be used for this feature. Check closed profile and intersection.';
   }
 
   if (lower.includes('extrude') || lower.includes('prism')) {
-    return '拉伸失敗：請確認草圖為有效封閉輪廓，且深度為正值。';
+    return 'Extrude failed. Confirm sketch is a valid closed profile and depth is positive.';
   }
 
   if (lower.includes('revolve')) {
-    return '旋轉失敗：請確認草圖為封閉輪廓，且旋轉軸與輪廓不相交。';
+    return 'Revolve failed. Confirm sketch is a closed profile and revolve axis does not intersect it.';
   }
 
   if (lower.includes('boolean') || lower.includes('cut')) {
-    return '布林切除失敗：目標實體與工具體不相交或體積為空。';
+    return 'Boolean cut failed. Target solid and tool bodies do not intersect or volume is empty.';
   }
 
   return text.length > 120 ? `${text.slice(0, 117)}…` : text;

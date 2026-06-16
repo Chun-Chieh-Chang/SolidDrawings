@@ -3,11 +3,10 @@
 import React, { useRef, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { TransformControls } from '@react-three/drei';
-import { useFrame } from '@react-three/fiber';
+import { gsap } from 'gsap';
 import { useCadStore, CADComponent } from '../store/useCadStore';
 import OcctShape, { MeshData } from './OcctShape';
 import { AssemblyService } from '../kernel/AssemblyService';
-import { AssemblyPhysicsService } from '../services/AssemblyPhysicsService';
 import { Box, Edges } from '@react-three/drei';
 
 interface AssemblyComponentProps {
@@ -17,19 +16,84 @@ interface AssemblyComponentProps {
 }
 
 export const AssemblyComponent: React.FC<AssemblyComponentProps> = ({ comp, meshes, isActive }) => {
-  const { updateComponentTransform, setComponents, components, mates, explodedView, isPhysicsActive } = useCadStore();
+  const { updateComponentTransform, setComponents, components, mates, explodedView } = useCadStore();
   const groupRef = useRef<THREE.Group>(null);
   const transformRef = useRef<any>(null);
+  const prevExplodedRef = useRef(explodedView);
+  const prevPositionRef = useRef(comp.transform.position);
 
-  useFrame(() => {
-    if (isPhysicsActive && groupRef.current) {
-      const transform = AssemblyPhysicsService.getInstance().getTransform(comp.id);
-      if (transform) {
-        groupRef.current.position.set(transform.position.x, transform.position.y, transform.position.z);
-        groupRef.current.quaternion.set(transform.rotation.x, transform.rotation.y, transform.rotation.z, transform.rotation.w);
-      }
+  // Compute the target position for this component based on exploded view state
+  const explodeOffset = useMemo(() => {
+    if (!explodedView.isActive) return [0, 0, 0] as [number, number, number];
+    const dir = explodedView.directions[comp.id];
+    if (!dir) return [0, 0, 0] as [number, number, number];
+    return [
+      dir[0] * explodedView.factor * 100,
+      dir[1] * explodedView.factor * 100,
+      dir[2] * explodedView.factor * 100,
+    ] as [number, number, number];
+  }, [explodedView, comp.id]);
+
+  const targetPosition = useMemo<[number, number, number]>(() => {
+    return [
+      comp.transform.position[0] + explodeOffset[0],
+      comp.transform.position[1] + explodeOffset[1],
+      comp.transform.position[2] + explodeOffset[2],
+    ];
+  }, [comp.transform.position, explodeOffset]);
+
+  // GSAP animation when exploded view state or component position changes
+  useEffect(() => {
+    if (!groupRef.current) return;
+
+    const prevExploded = prevExplodedRef.current;
+    const prevPosition = prevPositionRef.current;
+    const stateChanged = 
+      prevExploded !== explodedView ||
+      prevPosition[0] !== comp.transform.position[0] ||
+      prevPosition[1] !== comp.transform.position[1] ||
+      prevPosition[2] !== comp.transform.position[2];
+
+    if (!stateChanged) return;
+
+    prevExplodedRef.current = explodedView;
+    prevPositionRef.current = comp.transform.position;
+
+    const currentPos = groupRef.current.position;
+    const hasAnimationChanged = 
+      prevExploded.isActive !== explodedView.isActive ||
+      prevExploded.factor !== explodedView.factor;
+
+    if (hasAnimationChanged || explodedView.isActive) {
+      gsap.killTweensOf(currentPos);
+      gsap.to(currentPos, {
+        x: targetPosition[0],
+        y: targetPosition[1],
+        z: targetPosition[2],
+        duration: 0.35,
+        ease: 'power2.inOut',
+        onUpdate: () => {
+          if (groupRef.current) {
+            groupRef.current.position.copy(currentPos);
+          }
+        },
+      });
+    } else {
+      currentPos.set(targetPosition[0], targetPosition[1], targetPosition[2]);
     }
-  });
+  }, [explodedView, comp.transform.position, targetPosition]);
+
+  // Reset position when component is no longer active (for non-fixed components)
+  useEffect(() => {
+    if (!groupRef.current || comp.isFixed) return;
+    
+    const currentPos = groupRef.current.position;
+    currentPos.set(
+      comp.transform.position[0] + explodeOffset[0],
+      comp.transform.position[1] + explodeOffset[1],
+      comp.transform.position[2] + explodeOffset[2]
+    );
+  }, [comp.isFixed, comp.transform.position, explodeOffset]);
 
   // Compute bounding box for lightweight mode
   const boundingBox = useMemo(() => {
@@ -90,11 +154,7 @@ export const AssemblyComponent: React.FC<AssemblyComponentProps> = ({ comp, mesh
   const content = (
     <group 
       ref={groupRef} 
-      position={[
-        comp.transform.position[0] + (explodedView.isActive ? (explodedView.directions[comp.id]?.[0] || 0) * explodedView.factor * 100 : 0),
-        comp.transform.position[1] + (explodedView.isActive ? (explodedView.directions[comp.id]?.[1] || 0) * explodedView.factor * 100 : 0),
-        comp.transform.position[2] + (explodedView.isActive ? (explodedView.directions[comp.id]?.[2] || 0) * explodedView.factor * 100 : 0)
-      ]} 
+      position={targetPosition}
       rotation={comp.transform.rotation}
     >
       {comp.isLightweight && boundingBox ? (

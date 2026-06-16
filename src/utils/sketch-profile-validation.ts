@@ -12,7 +12,7 @@ export type SketchProfileIssueCode =
 export interface SketchProfileValidation {
   ok: boolean;
   code?: SketchProfileIssueCode;
-  /** User-facing message (繁體中文) */
+  /** User-facing message (traditional Chinese) */
   message: string;
   loops: any[][];
   /** Optional secondary hint for status bar */
@@ -65,9 +65,9 @@ export function validateSketchProfile(
     return {
       ok: false,
       code: 'NO_GEOMETRY',
-      message: '草圖尚無可拉伸的幾何。請先繪製線段、矩形或圓，並形成封閉輪廓。',
+      message: 'Sketch has no extrudable geometry. Draw lines, rectangles, or circles to form a closed profile.',
       loops: [],
-      hint: '草圖：無幾何',
+      hint: 'Sketch: no geometry',
     };
   }
 
@@ -77,9 +77,9 @@ export function validateSketchProfile(
       ok: false,
       code: 'SKETCH_CONFLICT',
       message:
-        '草圖過度定義或約束衝突。請刪除多餘的尺寸／幾何關係，或修正標示為紅色的實體後再拉伸。',
+        'Sketch is overdefined or has conflicting constraints. Delete extra dimensions or relations, or fix red-highlighted geometry before extruding.',
       loops: [],
-      hint: '草圖：過度定義',
+      hint: 'Sketch: overdefined',
     };
   }
 
@@ -91,18 +91,18 @@ export function validateSketchProfile(
         ok: false,
         code: 'OPEN_PROFILE',
         message:
-          '輪廓未封閉。請將最後一點與起點重合，或使用「重合」約束連接端點，再執行拉伸。',
+          'ProfProfile not closed。ConnectConnect the last point to the first，oruse a Coincident constraint tostraintConconnect endpoints before extruding。',
         loops: [],
-        hint: '草圖：開放輪廓',
+        hint: 'Sketch: open profile',
       };
     }
     return {
       ok: false,
       code: 'NO_CLOSED_LOOP',
       message:
-        '找不到封閉輪廓。請確認所有線段首尾相連，且未遺留獨立線段或開放鏈。',
+        'No closed loop found. Confirm all segments are connected end-to-end with no stray or open chains.',
       loops: [],
-      hint: '草圖：無封閉輪廓',
+      hint: 'Sketch: no closed loop',
     };
   }
 
@@ -118,9 +118,9 @@ export function validateSketchProfile(
     return {
       ok: false,
       code: 'LOOP_TOO_SMALL',
-      message: '封閉輪廓點數不足（至少需要 3 個頂點）。請補齊草圖後再拉伸。',
+      message: 'Closed loop has insufficient points (minimum 3 vertices). Complete the sketch before extruding.',
       loops,
-      hint: '草圖：輪廓過小',
+      hint: 'Sketch: loop too small',
     };
   }
 
@@ -132,8 +132,8 @@ export function validateSketchProfile(
     ok: true,
     loops,
     message: underDefined
-      ? '草圖欠定義，但已找到封閉輪廓；可繼續拉伸（建議補齊尺寸）。'
-      : '封閉輪廓有效。',
-    hint: underDefined ? '草圖：欠定義' : undefined,
+      ? 'Sketch is underdefined but closed loop found. Can proceed with extrude (recommended: add dimensions).'
+      : 'Closed loop is valid.',
+    hint: underDefined ? 'Sketch: underdefined' : undefined,
   };
 }

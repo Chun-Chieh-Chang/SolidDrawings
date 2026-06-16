@@ -3,6 +3,17 @@ from scipy.optimize import least_squares
 import math
 import json
 
+
+def _angle_diff(current: float, initial: float) -> float:
+    """Compute signed angle difference handling 360 wrap-around."""
+    diff = current - initial
+    while diff > math.pi:
+        diff -= 2 * math.pi
+    while diff < -math.pi:
+        diff += 2 * math.pi
+    return diff
+
+
 def solve_assembly_mates(components_dict, mates_list):
     """
     3D Rigid Body Constraint Solver for Assemblies.
@@ -135,9 +146,13 @@ def solve_assembly_mates(components_dict, mates_list):
                     init_t = init_transforms.get(cid, components_dict[cid]['transform'])
                     init_rot = init_t['rotation']
                     
-                    # Compute simplified delta (SW2000 style usually works on a single primary axis)
-                    # We'll use the magnitude of the rotation vector change as a proxy or specific axis
-                    return np.sum(np.array(curr_rot) - np.array(init_rot))
+                    dx = _angle_diff(curr_rot[0], init_rot[0])
+                    dy = _angle_diff(curr_rot[1], init_rot[1])
+                    dz = _angle_diff(curr_rot[2], init_rot[2])
+                    axes = [abs(dx), abs(dy), abs(dz)]
+                    primary_axis = axes.index(max(axes))
+                    deltas = [dx, dy, dz]
+                    return deltas[primary_axis]
 
                 dt1 = get_delta_theta(ent1)
                 dt2 = get_delta_theta(ent2)
@@ -158,7 +173,7 @@ def solve_assembly_mates(components_dict, mates_list):
                 else:
                     curr_rot = components_dict[cid_a]['transform']['rotation']
                 init_t_a = init_transforms.get(cid_a, components_dict[cid_a]['transform'])
-                dt_a = np.sum(np.array(curr_rot) - np.array(init_t_a['rotation']))
+                dt_a = _angle_diff(curr_rot[0], init_t_a['rotation'][0])
                 
                 # Component B (Translation)
                 if cid_b in comp_to_idx:
@@ -171,6 +186,56 @@ def solve_assembly_mates(components_dict, mates_list):
                 
                 # Linear translation = (Pitch / 2PI) * RotationInRadians
                 residuals.append(dp_b - (pitch * dt_a / (2 * math.pi)))
+
+            elif m_type == 'WIDTH':
+                # WIDTH mate: centers component symmetrically between two parallel planes
+                # Normal of entity2 should align with entity1 normal (parallel constraint)
+                residuals.extend(np.cross(n1, sign * n2))
+                # Midpoint of the two face positions should align with the component center
+                midpoint = (p1 + p2) / 2.0
+                width_offset = float(params.get('widthOffset', 0) if params else 0)
+                # Constrain the component position to be at the midpoint
+                cid2 = ent2.get('componentId')
+                if cid2 in comp_to_idx:
+                    idx = comp_to_idx[cid2]
+                    v = x_vars[idx*6 : idx*6+3]
+                    residuals.extend(midpoint - v - width_offset * n1)
+
+            elif m_type == 'SYMMETRY':
+                # SYMMETRY mate: mirrors component across a reference plane
+                # Compute reflection of entity2 across entity1's plane (or vice versa)
+                # Reflection: p_reflected = p2 - 2 * dot(p2 - p1, n1) * n1
+                dot_val = np.dot(p2 - p1, n1)
+                p_reflected = p2 - 2 * dot_val * n1
+                # Reflected normal is negated along the plane normal
+                n_reflected = n2 - 2 * np.dot(n2, n1) * n1
+                # Coincident between entity1 and reflected entity2
+                residuals.append(np.dot(p_reflected - p1, n1))
+                residuals.extend(np.cross(n1, n_reflected))
+
+            elif m_type == 'LOCK':
+                # LOCK mate: completely locks all 6-DOF between two components
+                cid1 = ent1.get('componentId')
+                cid2 = ent2.get('componentId')
+                if cid1 in comp_to_idx and cid2 in comp_to_idx:
+                    idx1 = comp_to_idx[cid1]
+                    idx2 = comp_to_idx[cid2]
+                    v1 = x_vars[idx1*6 : idx1*6+6]
+                    v2 = x_vars[idx2*6 : idx2*6+6]
+                    # Zero position difference
+                    residuals.extend(v1[:3] - v2[:3])
+                    # Zero rotation difference
+                    residuals.extend(v1[3:] - v2[3:])
+
+            elif m_type == 'SNAP':
+                # SNAP mate: aligns two vertices/edges with optional offset
+                snap_offset = params.get('snapOffset', [0, 0, 0]) if params else [0, 0, 0]
+                if isinstance(snap_offset, list):
+                    snx, sny, snz = float(snap_offset[0]), float(snap_offset[1]), float(snap_offset[2])
+                else:
+                    snx, sny, snz = 0.0, 0.0, 0.0
+                # Align the origins of both entities with the offset
+                residuals.extend(p1 - (p2 + np.array([snx, sny, snz])))
         
         # Soft spring
         for i, cid in enumerate(variable_comps):

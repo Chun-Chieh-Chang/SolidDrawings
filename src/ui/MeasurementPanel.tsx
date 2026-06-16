@@ -1,7 +1,7 @@
 /**
  * Measurement Panel
- * 顯示測量結果的 PropertyManager 面板
- * 對標 SolidWorks Evaluate > Measure 
+ * DisplayMeasureResult PropertyManager Panel
+ * Aligned with SolidWorks Evaluate > Measure 
  */
 
 import React, { useEffect } from 'react';
@@ -36,7 +36,7 @@ export const MeasurementPanel = () => {
         mode: measurementMode,
         value: dist,
         unit: 'mm',
-        details: angle > 0 ? `角度 (Angle): ${angle.toFixed(2)}°` : undefined
+        details: angle > 0 ? `Angle (Angle): ${angle.toFixed(2)}°` : undefined
       });
     } else if (measurementPoints.length === 1 && (measurementMode === 'AREA' || measurementMode === 'VOLUME')) {
        // Future: Call backend for precision area/volume
@@ -46,7 +46,7 @@ export const MeasurementPanel = () => {
             mode: 'AREA',
             value: (p.signature as any).area,
             unit: 'mm²',
-            details: `面 ID: ${p.id}`
+            details: `Face ID: ${p.id}`
           });
        }
     } else {
@@ -94,7 +94,7 @@ export const MeasurementPanel = () => {
           <div className="w-6 h-6 bg-emerald-500 text-white rounded flex items-center justify-center">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="m11 15.5 2 2 4.5-4.5"/><path d="M12 21a9 9 0 1 1 0-18 9 9 0 0 1 0 18z"/></svg>
           </div>
-          <span className="text-[13px] font-black text-slate-800 uppercase tracking-wider">幾何量測 (Measure)</span>
+          <span className="text-[13px] font-black text-slate-800 uppercase tracking-wider">Geometry Measure (Measure)</span>
         </div>
         <button 
            onClick={() => setMeasurementMode('NONE')}
@@ -124,15 +124,15 @@ export const MeasurementPanel = () => {
       {/* Selected Entities */}
       <div className="space-y-1.5">
         <div className="flex justify-between items-center px-1">
-          <span className="text-[11px] font-bold text-slate-400 uppercase">已選取實體 ({measurementPoints.length})</span>
+          <span className="text-[11px] font-bold text-slate-400 uppercase">Selected Solid ({measurementPoints.length})</span>
           {measurementPoints.length > 0 && (
-            <button onClick={handleClearSelection} className="text-[10px] text-primary font-bold hover:underline">清除</button>
+            <button onClick={handleClearSelection} className="text-[10px] text-primary font-bold hover:underline">Clear</button>
           )}
         </div>
         <div className="space-y-1 max-h-32 overflow-y-auto">
           {measurementPoints.length === 0 ? (
              <div className="py-4 text-center border border-dashed border-slate-200 rounded-lg bg-slate-50 text-[11px] text-slate-400 italic">
-               在 3D 視埠中點選面、邊或頂點
+               In 3D viewport, select Midpoint ofFace、EdgeorVertex
              </div>
           ) : (
             measurementPoints.map((point, index) => formatPoint(point, index))
@@ -144,7 +144,7 @@ export const MeasurementPanel = () => {
       {measurementResults && (
         <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] text-emerald-600 font-bold uppercase tracking-widest">{measurementResults.mode} 結果</span>
+            <span className="text-[11px] text-emerald-600 font-bold uppercase tracking-widest">{measurementResults.mode} Result</span>
             <div className="flex items-baseline gap-1.5">
               <span className="text-2xl font-black text-emerald-800 font-mono tracking-tighter">
                 {measurementResults.value?.toFixed(3) ?? '0.000'}

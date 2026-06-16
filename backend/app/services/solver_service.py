@@ -191,10 +191,16 @@ def solve_sketch_constraints(nodes_dict, edges_dict, constraints_dict):
         res, _ = residual_func(x_vars)
         return res
 
-    res = least_squares(solve_residual, x0, method='lm', ftol=1e-7, xtol=1e-7)
+    res = least_squares(solve_residual, x0, method='lm', ftol=1e-10, xtol=1e-10, gtol=1e-10, max_nfev=200)
     
     _, constraint_count = residual_func(res.x)
     estimated_dof = num_vars - constraint_count
+
+    # Convergence checking
+    max_residual = float(np.max(np.abs(res.fun))) if len(res.fun) > 0 else 0.0
+    is_converged = bool(res.success) and max_residual < 1e-6
+
+    status = "SOLVED" if is_converged else ("FAILED" if res.failure_code != 0 else "CONVERGED_SLOW")
 
     solved_nodes = json.loads(json.dumps(nodes_dict))
     for i, nid in enumerate(variable_nodes):
@@ -202,7 +208,10 @@ def solve_sketch_constraints(nodes_dict, edges_dict, constraints_dict):
         solved_nodes[nid]['y'] = float(res.x[i*2+1])
         
     return solved_nodes, {
-        "residual": float(np.sum(res.fun**2)), 
-        "status": "SOLVED" if res.success else "FAILED",
-        "dof": estimated_dof
+        "residual": float(np.sum(res.fun**2)),
+        "max_residual": float(max_residual),
+        "status": status,
+        "dof": max(0, estimated_dof),
+        "iterations": int(res.nfev),
+        "converged": is_converged,
     }

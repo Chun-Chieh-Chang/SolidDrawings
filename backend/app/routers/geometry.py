@@ -390,6 +390,16 @@ class RefPointRequest(BaseModel):
     features: List[FeatureDefinition]
     materialId: Optional[str] = "GENERIC"
 
+class RefCoordinateSystemRequest(BaseModel):
+    coordSystemType: str
+    refs: List[dict]
+    offsets: Optional[dict] = None
+    origin: Optional[List[float]] = None
+    xAxis: Optional[List[float]] = None
+    yAxis: Optional[List[float]] = None
+    features: List[FeatureDefinition]
+    materialId: Optional[str] = "GENERIC"
+
 
 @router.post("/ref_plane")
 async def create_ref_plane(request: RefPlaneRequest):
@@ -425,6 +435,23 @@ async def create_ref_point(request: RefPointRequest):
             request.pointType,
             request.refs,
             request.offset,
+            request.features
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/ref_coordinate_system")
+async def create_ref_coordinate_system(request: RefCoordinateSystemRequest):
+    try:
+        return geometry_service.generate_reference_coordinate_system(
+            request.coordSystemType,
+            request.refs,
+            request.offsets,
+            request.origin,
+            request.xAxis,
+            request.yAxis,
             request.features
         )
     except Exception as e:

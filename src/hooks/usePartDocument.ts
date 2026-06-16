@@ -3,6 +3,7 @@
 import { useCallback } from 'react';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
 import { parsePartFile, serializePartFile } from '@/utils/part-file';
+import { addMRUFile } from '@/utils/mru-storage';
 import { appAPI } from '../../electron/renderer';
 
 export function usePartDocument(features: CADFeature[]) {
@@ -21,17 +22,18 @@ export function usePartDocument(features: CADFeature[]) {
             rebuildDirty: true,
           });
           onLoaded?.();
-          appAPI.notify('專案', `已開啟：${filePath}`);
+          addMRUFile(filePath);
+          appAPI.notify('Project', `Opened: ${filePath}`);
           return true;
         }
-        appAPI.notify('專案', '無法辨識的零件檔格式');
+        appAPI.notify('Project', 'Unrecognized part file format');
         return false;
       } catch {
         const pathLower = filePath.toLowerCase();
         if (pathLower.endsWith('.sldprt') || pathLower.endsWith('.sldasm')) {
           return false;
         }
-        appAPI.notify('專案', '請使用 .3dbpart 或從 SolidWorks 匯出 STEP/IGES');
+        appAPI.notify('Project', 'Use .3dbpart or export from SolidWorks as STEP/IGES');
         return false;
       }
     },
@@ -40,7 +42,7 @@ export function usePartDocument(features: CADFeature[]) {
 
   const handleSaveProject = useCallback(async () => {
     if (typeof window === 'undefined' || !window.electronAPI) {
-      alert('儲存功能僅在 Electron 桌面版可用。');
+      alert('Save is only available in the Electron desktop version.');
       return;
     }
 
@@ -56,7 +58,8 @@ export function usePartDocument(features: CADFeature[]) {
 
     const result = await window.electronAPI.file.save(payload, { format: '3DBPART' });
     if (result?.success && result.path) {
-      appAPI.notify('專案', `已儲存：${result.path}`);
+      addMRUFile(result.path);
+      appAPI.notify('Project', `Saved: ${result.path}`);
     }
   }, [features]);
 

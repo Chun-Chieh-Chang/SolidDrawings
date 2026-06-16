@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
+import { applyFilter, getBlockedReason } from '@/utils/selection-filters';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SelectionLogicDeps {
@@ -34,13 +35,37 @@ export function useSelectionLogic(deps: SelectionLogicDeps) {
   const selectedFeature =
     selectedId ? features.find(f => f.id === selectedId) : null;
 
+  // ── Selection filter enforcement ────────────────────────────
+  useEffect(() => {
+    const topo = selectedTopology;
+    if (!topo) return;
+
+    const state = useCadStore.getState();
+    const filter = state.selectionFilter;
+    if (filter === 'NONE') return;
+
+    const entity: Record<string, unknown> = { type: topo.type };
+    if (topo.type === 'EDGE') entity.geometryType = 'EDGE';
+    if (topo.type === 'FACE') entity.geometryType = 'FACE';
+    if (topo.type === 'VERTEX') entity.geometryType = 'VERTEX';
+    if (topo.componentId) entity.componentId = topo.componentId;
+
+    if (!applyFilter(entity, filter)) {
+      const reason = getBlockedReason(entity, filter);
+      if (reason) {
+        state.pushToast(reason, 'warning');
+      }
+      setSelectedTopology(null);
+    }
+  }, [selectedTopology, setSelectedTopology]);
+
   // ── Sweep feature hint ──────────────────────────────────────
   useEffect(() => {
     if (selectedFeature?.type !== 'SWEEP') return;
     const hasProfile = selectedFeature.parameters?.profile_id;
     const hasPath = selectedFeature.parameters?.path_id;
     if (!hasProfile && !hasPath) {
-      setHint('Sweep: Select Profile (截面) and Path (路徑) in PropertyManager below.');
+      setHint('Sweep: Select Profile and Path in PropertyManager below.');
     } else if (!hasProfile) {
       setHint('Sweep: Please select a Profile sketch first.');
     } else if (!hasPath) {

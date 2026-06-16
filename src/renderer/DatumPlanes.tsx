@@ -10,6 +10,8 @@ import { ArcToolHandler } from '../utils/sketch/ToolHandlers/ArcTool';
 import { SplineToolHandler } from '../utils/sketch/ToolHandlers/SplineTool';
 import { CircleToolHandler } from '../utils/sketch/ToolHandlers/CircleTool';
 import { RectangleToolHandler, CenterRectangleToolHandler } from '../utils/sketch/ToolHandlers/RectangleTool';
+import { PolygonToolHandler } from '../utils/sketch/ToolHandlers/PolygonTool';
+import { ExtendToolHandler } from '../utils/sketch/ToolHandlers/ExtendTool';
 import { sketchActions } from '../store/sketchActions';
 import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
@@ -32,6 +34,7 @@ export const DatumPlanes = () => {
     referencePlanes,
     referenceAxes,
     referencePoints,
+    referenceCoordinateSystems,
     pendingFeatureCommand,
     selectedId,
     measurementMode,
@@ -487,35 +490,17 @@ export const DatumPlanes = () => {
       rawU = uv.u; rawV = uv.v;
     }
 
-    if (sketchTool === 'EXTEND') {
-       const edges = Object.values(useCadStore.getState().sketchEdges);
-       const nodes = useCadStore.getState().sketchNodes;
-       let targetEdgeId = null;
-       let minDist = 5.0;
-
-       for (const edge of edges) {
-         if (edge.type === 'LINE') {
-           const n1 = nodes[edge.nodeIds[0]];
-           const n2 = nodes[edge.nodeIds[1]];
-           if (!n1 || !n2) continue;
-           const d = distToSegment(rawU, rawV, n1.x, n1.y, n2.x, n2.y);
-           if (d < minDist) { minDist = d; targetEdgeId = edge.id; }
-         }
-       }
-
-       if (targetEdgeId) {
-         const edge = nodes_to_be_extended_find(targetEdgeId, rawU, rawV, nodes, edges);
-         if (edge) {
-            useCadStore.setState(state => {
-              const nextNodes = { ...state.sketchNodes };
-              nextNodes[edge.nodeId] = { ...nextNodes[edge.nodeId], x: edge.newX, y: edge.newY };
-              return { sketchNodes: nextNodes };
-            });
-            commitPreciseSketchSolve();
-         }
-       }
-       return;
-    }
+     if (sketchTool === 'EXTEND') {
+        const extendTool = new ExtendToolHandler();
+        extendTool.onPointerDown({
+          rawU, rawV,
+          snappedU: rawU, snappedV: rawV,
+          snappedNodeId: null,
+          shiftKey: event.shiftKey || false,
+          activeSnapType: undefined
+        });
+        return;
+     }
 
     let u = rawU, v = rawV, snappedId = null;
     let activeSnapType = undefined;
@@ -591,6 +576,12 @@ export const DatumPlanes = () => {
       syncLastClickedUV();
       return;
     }
+    if (sketchTool === 'POLYGON') {
+      new PolygonToolHandler().onPointerDown(ctx);
+      syncLastClickedUV();
+      return;
+    }
+    useCadStore.getState().saveSnapshot();
     useCadStore.setState((state) => {
       const nextNodes = { ...state.sketchNodes };
       const nextEdges = { ...state.sketchEdges };
@@ -990,9 +981,11 @@ export const DatumPlanes = () => {
                 {sketchTool === 'LINE' && '╱'}
                 {sketchTool === 'CIRCLE' && '○'}
                 {sketchTool === 'RECTANGLE' && '▭'}
+                {sketchTool === 'POLYGON' && '⬡'}
                 {sketchTool === 'ARC' && '⌒'}
                 {sketchTool === 'SMART_DIMENSION' && '📏'}
                 {sketchTool === 'TRIM' && '✂️'}
+                {sketchTool === 'EXTEND' && '➤'}
               </div>
             </div>
           </div>
@@ -1098,6 +1091,28 @@ export const DatumPlanes = () => {
               </group>
             );
           })()}
+          {sketchTool === 'POLYGON' && (() => {
+            const lastNodeId = useCadStore.getState().lastClickedNodeId;
+            const centerNode = useCadStore.getState().sketchNodes[lastNodeId || ''];
+            if (!centerNode) return null;
+            const cx = centerNode.x;
+            const cy = centerNode.y;
+            const dx = cursorState.u - cx;
+            const dy = cursorState.v - cy;
+            const radius = Math.hypot(dx, dy);
+            if (radius < 0.5) return null;
+            const pm = useCadStore.getState().activePropertyManager;
+            const sides = (pm?.polygonSides && typeof pm.polygonSides === 'number') ? Math.max(3, Math.min(100, Math.round(pm.polygonSides))) : 6;
+            const angleStep = (2 * Math.PI) / sides;
+            const startAngle = Math.atan2(dy, dx);
+            const pts: [number, number, number][] = [];
+            for (let i = 0; i <= sides; i++) {
+              const angle = startAngle + i * angleStep;
+              const p = get3DPnt(cx + radius * Math.cos(angle), cy + radius * Math.sin(angle));
+              pts.push([p.x, p.y, p.z]);
+            }
+            return <Line points={pts} color="#F59E0B" lineWidth={1.2} transparent opacity={0.6} />;
+          })()}
         </group>
       )}
 
@@ -1184,6 +1199,35 @@ export const DatumPlanes = () => {
             <Html position={[2, 2, 0]} center className="pointer-events-none">
               <div className="px-1 py-0.5 rounded bg-slate-900/80 backdrop-blur-sm border border-emerald-700 text-emerald-400 text-[9px] font-mono select-none">
                 {name || id}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+
+      {referenceCoordinateSystems?.map((cs) => {
+        const { id, origin, xDir, yDir, zDir, name } = cs;
+        const originVec = new THREE.Vector3(...origin);
+        const scale = 8;
+        const xVec = new THREE.Vector3(...(xDir || [1, 0, 0])).multiplyScalar(scale);
+        const yVec = new THREE.Vector3(...(yDir || [0, 1, 0])).multiplyScalar(scale);
+        const zVec = new THREE.Vector3(...(zDir || [0, 0, 1])).multiplyScalar(scale);
+        
+        return (
+          <group key={id} position={originVec}>
+            {/* X Axis (Red) */}
+            <Line points={[new THREE.Vector3(0, 0, 0), xVec]} color="#EF4444" lineWidth={2} depthTest={false} />
+            {/* Y Axis (Green) */}
+            <Line points={[new THREE.Vector3(0, 0, 0), yVec]} color="#10B981" lineWidth={2} depthTest={false} />
+            {/* Z Axis (Blue) */}
+            <Line points={[new THREE.Vector3(0, 0, 0), zVec]} color="#3B82F6" lineWidth={2} depthTest={false} />
+            {/* Origin sphere */}
+            <Sphere args={[1.2, 12, 12]}>
+              <meshBasicMaterial color="#F59E0B" depthTest={false} transparent opacity={0.9} />
+            </Sphere>
+            <Html position={[xVec.x > 0 ? xVec : yVec].length > 0 ? (xVec.length() > yVec.length() ? xVec : yVec).clone().add(new THREE.Vector3(1, 1, 0)) : new THREE.Vector3(1, 1, 0)} center className="pointer-events-none">
+              <div className="px-1 py-0.5 rounded bg-amber-500/90 text-white text-[8px] font-mono font-black select-none">
+                {name || 'CSYS'}
               </div>
             </Html>
           </group>

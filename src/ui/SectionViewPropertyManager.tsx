@@ -11,14 +11,14 @@ export function SectionViewPropertyManager() {
   return (
     <div className="h-[250px] w-full border-t border-border bg-surface flex flex-col p-3 z-10 shrink-0">
       <div className="text-[14px] uppercase tracking-wider text-secondary-text mb-2 font-bold flex justify-between items-center border-b border-border/40 pb-1">
-        <span>剖面視圖 (Section View)</span>
+        <span>Section View (Section View)</span>
         <button 
           onClick={() => {
             setSectionView({ isActive: false });
             useCadStore.getState().setActivePropertyManager(null);
           }}
           className="text-secondary-text hover:text-red-500 transition-colors"
-          title="關閉"
+          title="Deactivate"
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
         </button>
@@ -27,16 +27,16 @@ export function SectionViewPropertyManager() {
       <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">
         <div className="bg-surface p-0 rounded border border-border shadow-sm overflow-hidden text-[14px]">
           <div className="bg-slate-50 px-2 py-1.5 border-b border-border font-bold text-slate-700 text-[13px] flex items-center gap-1">
-            <span className="text-[14px]">▼</span> 剖切面 1 (Section 1)
+            <span className="text-[14px]">▼</span> Section Plane 1
           </div>
           <div className="p-2 space-y-3">
             
             {/* Reference Plane Selection */}
             <div className="flex gap-2 justify-center">
               {[
-                { id: 'FRONT', label: '前' },
-                { id: 'TOP', label: '上' },
-                { id: 'RIGHT', label: '右' }
+                { id: 'FRONT', label: 'Front' },
+                { id: 'TOP', label: 'Top' },
+                { id: 'RIGHT', label: 'Right' }
               ].map(plane => (
                 <button
                   key={plane.id}
@@ -55,7 +55,7 @@ export function SectionViewPropertyManager() {
             {/* Offset */}
             <div className="space-y-1">
               <div className="flex items-center justify-between text-[13px] text-slate-600 font-medium">
-                <span>距離 (Offset)</span>
+                <span>Distance (Offset)</span>
                 <span className="font-mono text-slate-500">{sectionView.offset} mm</span>
               </div>
               <input
@@ -83,7 +83,7 @@ export function SectionViewPropertyManager() {
                 onChange={(e) => setSectionView({ flip: e.target.checked })}
                 className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
-              <span className="font-medium">反轉方向 (Reverse Direction)</span>
+              <span className="font-medium">Reverse Direction (Reverse Direction)</span>
             </label>
 
           </div>

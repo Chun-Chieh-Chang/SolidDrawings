@@ -30,7 +30,7 @@ export const CadToast: React.FC = () => {
             type="button"
             className="shrink-0 text-slate-500 hover:text-slate-800 border-none bg-transparent cursor-pointer text-sm leading-none"
             onClick={() => dismissToast(t.id)}
-            aria-label="關閉"
+            aria-label="Deactivate"
           >
             ×
           </button>

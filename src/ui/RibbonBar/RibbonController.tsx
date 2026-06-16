@@ -57,6 +57,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
     addFeature,
     setSelectedId,
     setSelectedSubNodeType,
+    setActivePropertyManager,
     pushToast,
     components,
     viewportDisplayMode,
@@ -73,7 +74,6 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   const appliedEdgeFeatureRef = React.useRef<string | null>(null);
 
   const skipWizardIfRobotWorking = () => {
-    if (useCadStore.getState().robotStatus === "WORKING") return false;
     return true;
   };
 
@@ -177,7 +177,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               } else { 
                 setSketchMode(true); 
                 setSketchTool('SELECT'); 
-                if (solidSketchPointCount > 0) pushToast('點數不足：拉伸至少需要 3 個草圖點。', 'info');
+                if (solidSketchPointCount > 0) pushToast('Insufficient points: Extrude requires at least 3 sketch points.', 'info');
               } 
             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Boss/Base">
               <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
@@ -191,7 +191,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               } else {
                 setSketchMode(true);
                 setSketchTool('SELECT');
-                if (solidSketchPointCount > 0) pushToast('點數不足：切除至少需要 2 個草圖點。', 'info');
+                if (solidSketchPointCount > 0) pushToast('Insufficient points：Cutrequires at least 2 Sketchpoints。', 'info');
               }
             }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Extruded Cut">
               <div className="w-10 h-10 flex items-center justify-center text-red-600 transition-transform group-hover:scale-110">
@@ -257,7 +257,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   setSketchMode(true); 
                   setSketchTool('SELECT'); 
                   if (isSketchMode && loops.length === 0) {
-                    pushToast('無法旋轉：需要閉合輪廓。', 'warning');
+                    pushToast('Cannot Rotate: closed profile required。', 'warning');
                   } else {
                     setHint('Draw closed profile, then Revolved Boss/Base');
                   }
@@ -280,7 +280,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   setSketchMode(true); 
                   setSketchTool('SELECT'); 
                   if (isSketchMode && loops.length === 0) {
-                    pushToast('無法旋轉切除：需要閉合輪廓。', 'warning');
+                    pushToast('Cannot RotateCut: closed profile required。', 'warning');
                   } else {
                     setHint('Draw closed profile, then Revolved Cut');
                   }
@@ -601,32 +601,12 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
 
             <button
               onClick={() => {
-                if (solidSketchPointCount < 2) {
-                  setSketchMode(true);
-                  setSketchTool('LINE');
-                  pushToast('A Rib requires an open sketch line. Please draw one first.', 'info');
-                  return;
-                }
-                const featId = `feat_${uuidv4()}`;
-                addFeature({
-                  id: featId,
-                  type: 'RIB',
-                  name: `Rib ${features.filter(f => f.type === 'RIB').length + 1}`,
-                  parameters: { thickness: 5.0, direction: 'MID_PLANE' }
-                });
-                setSelectedId(featId);
-                appliedEdgeFeatureRef.current = null;
-                setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('RIB');
-                  setSelectedTopology(null);
-                  setHint('Configure Rib thickness and direction in the property manager.');
-                }
+                pushToast('Rib feature coming soon.', 'info');
               }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'RIB' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
-              title="Rib"
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Rib (Coming Soon)"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'RIB' ? 'text-[#005B9A] scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+              <div className="w-10 h-10 flex items-center justify-center transition-transform text-[#005B9A] group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21h18M3 14l9-9 9 9M9 14v7M15 14v7"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Rib</span>
@@ -705,6 +685,31 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Point</span>
             </button>
+
+            <button 
+              onClick={() => {
+                setActivePropertyManager({
+                  type: 'COORDINATE_SYSTEM',
+                  creationMode: 'planes',
+                });
+                setPendingFeatureCommand('COORDINATE_SYSTEM');
+                setHint('Select 3 planes/faces, 2 axes, or 3 points to define the coordinate system.');
+              }}
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Coordinate System"
+            >
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110`}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="2" y1="12" x2="22" y2="12" stroke="#EF4444" strokeWidth="3"/>
+                  <polyline points="16 8 22 12 16 16"/>
+                  <line x1="12" y1="2" x2="12" y2="22" stroke="#10B981" strokeWidth="3"/>
+                  <polyline points="8 8 12 2 16 8"/>
+                  <line x1="12" y1="12" x2="4" y2="20" stroke="#3B82F6" strokeWidth="2" strokeDasharray="2 2"/>
+                </svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>CSYS</span>
+            </button>
+
             <button
               onClick={() => {
                 const featId = `feat_${uuidv4()}`;
@@ -787,7 +792,8 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   name: `Knit-Surf ${features.filter(f => f.type === 'SURFACE_KNIT').length + 1}`,
                   parameters: { refs: [] }
                 });
-                setHint('Knit surface feature created. All current surfaces will be sewn.');
+                setPendingFeatureCommand('SURFACE_KNIT');
+                setHint('Knit surface feature created. Select surfaces to knit.');
              }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Knit Surface">
               <div className="w-10 h-10 flex items-center justify-center text-orange-700 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3H8l-5 9 5 9h8l5-9-5-9z"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>
@@ -883,6 +889,15 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19c4 0 6-8 10-8s6 8 10 8" /></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Spline</span>
+            </button>
+
+            <button onClick={() => setSketchTool('POLYGON')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'POLYGON' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Polygon">
+              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'POLYGON' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polygon points="12,2 20,8.5 20,15.5 12,22 4,15.5 4,8.5" />
+                </svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Polygon</span>
             </button>
 
             <div className="w-[1px] h-10 bg-border/50 mx-2" />
@@ -1006,7 +1021,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
  activeTab === 'RENDER' ? (
           <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
             <div className="flex flex-col gap-1 px-3 py-1 border border-[#A0A0A0] rounded bg-white">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">材質 (Material)</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Material</label>
               <select 
                 className="text-[12px] bg-slate-100 border border-slate-300 rounded px-2 py-1 outline-none font-bold text-slate-800"
                 value={partMaterial}
@@ -1019,18 +1034,18 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
             </div>
             <div className="w-px h-[60%] bg-slate-300 mx-1"></div>
             <div className="flex flex-col gap-1 px-3 py-1 border border-[#A0A0A0] rounded bg-white">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">環境光 (Environment)</label>
+              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Environment</label>
               <select 
                 className="text-[12px] bg-slate-100 border border-slate-300 rounded px-2 py-1 outline-none font-bold text-slate-800"
                 value={environmentMap}
                 onChange={(e) => setEnvironmentMap(e.target.value)}
               >
-                <option value="studio">Studio (攝影棚)</option>
-                <option value="city">City (城市)</option>
-                <option value="forest">Forest (森林)</option>
-                <option value="sunset">Sunset (日落)</option>
-                <option value="dawn">Dawn (黎明)</option>
-                <option value="night">Night (夜晚)</option>
+                <option value="studio">Studio</option>
+                <option value="city">City</option>
+                <option value="forest">Forest</option>
+                <option value="sunset">Sunset</option>
+                <option value="dawn">Dawn</option>
+                <option value="night">Night</option>
               </select>
             </div>
             <div className="w-px h-[60%] bg-slate-300 mx-1"></div>
@@ -1083,16 +1098,12 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button
               onClick={() => {
-                const { isPhysicsActive, setIsPhysicsActive } = useCadStore.getState();
-                setIsPhysicsActive(!isPhysicsActive);
-                if (!isPhysicsActive) {
-                  pushToast('Physics Engine Enabled. Simulation started.', 'info');
-                }
+                pushToast('Physics simulation coming soon.', 'info');
               }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${useCadStore.getState().isPhysicsActive ? 'bg-amber-50 border-amber-300 shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
-              title="Dynamic Physics Simulation (Rapier3D)"
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Physics Simulation (Coming Soon)"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${useCadStore.getState().isPhysicsActive ? 'text-amber-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+              <div className="w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Physics</span>

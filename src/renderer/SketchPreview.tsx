@@ -218,6 +218,7 @@ export const SketchPreview = () => {
       [draggingNodeId]: { ...sketchNodes[draggingNodeId], x: u, y: v }
     };
 
+    useCadStore.getState().saveSnapshot();
     const resolvedNodes = solveConstraints(nextNodes, sketchEdges, sketchConstraints, 8);
     setSketchNodes(resolvedNodes);
   }, [mousePos, draggingNodeId, activePlane, activeBasis, gridSnap, isSketchMode]);

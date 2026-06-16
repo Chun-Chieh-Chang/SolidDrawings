@@ -92,7 +92,7 @@ export const ContextMenu: React.FC = () => {
               setContextMenu(null);
             }} 
             className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors" 
-            title="選擇 (Select)"
+            title="Select"
           >
             🖱️
           </button>
@@ -105,7 +105,7 @@ export const ContextMenu: React.FC = () => {
                 setContextMenu(null);
               }} 
               className="p-1.5 hover:bg-amber-50 text-amber-600 rounded transition-colors" 
-              title="結束鏈 (End Chain)"
+              title="End Chain"
             >
               ✂️
             </button>
@@ -116,7 +116,7 @@ export const ContextMenu: React.FC = () => {
               setContextMenu(null); 
             }} 
             className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition-colors" 
-            title="正視於 (Normal To)"
+            title="Normal To"
           >
             🎯
           </button>
@@ -126,7 +126,7 @@ export const ContextMenu: React.FC = () => {
               setContextMenu(null); 
             }} 
             className="p-1.5 hover:bg-red-50 text-red-600 rounded transition-colors" 
-            title="退出草圖 (Exit Sketch)"
+            title="Exit Sketch (Exit Sketch)"
           >
             🚪
           </button>
@@ -140,7 +140,7 @@ export const ContextMenu: React.FC = () => {
           }}
           className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
         >
-          <span className="font-semibold text-blue-600">選擇 (Select)</span>
+          <span className="font-semibold text-blue-600">Select</span>
           <span className="text-[10px] text-slate-400">Esc</span>
         </button>
 
@@ -154,7 +154,7 @@ export const ContextMenu: React.FC = () => {
             }}
             className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
           >
-            <span className="font-semibold text-amber-600">結束鏈 (End Chain)</span>
+            <span className="font-semibold text-amber-600">End Chain</span>
             <span className="text-[10px] text-slate-400">Double Click</span>
           </button>
         )}
@@ -162,6 +162,7 @@ export const ContextMenu: React.FC = () => {
         {selectedEntityIds && selectedEntityIds.length > 0 && (
           <button 
             onClick={() => {
+              useCadStore.getState().saveSnapshot();
               const newEdges = { ...sketchEdges };
               selectedEntityIds.forEach((id: string) => {
                 if (newEdges[id]) {
@@ -173,7 +174,7 @@ export const ContextMenu: React.FC = () => {
             }}
             className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
           >
-            <span className="font-semibold text-indigo-600">構造幾何 (Construction)</span>
+            <span className="font-semibold text-indigo-600">Construction</span>
           </button>
         )}
 
@@ -184,7 +185,7 @@ export const ContextMenu: React.FC = () => {
           }}
           className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-slate-100 transition-colors"
         >
-          正視於 (Normal To)
+          Normal To
         </button>
 
         <div className="h-px bg-slate-100 my-1" />
@@ -196,7 +197,7 @@ export const ContextMenu: React.FC = () => {
           }}
           className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-between"
         >
-          <span className="text-red-600 font-semibold">退出草圖 (Exit Sketch)</span>
+          <span className="text-red-600 font-semibold">Exit Sketch (Exit Sketch)</span>
         </button>
       </div>
     );
@@ -213,10 +214,10 @@ export const ContextMenu: React.FC = () => {
     >
       {/* Quick Action Icons Row */}
       <div className="flex items-center justify-around px-2 py-1.5 border-b border-slate-100 mb-1">
-        <button onClick={handleEdit} className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition-colors" title="編輯草圖/特徵">✏️</button>
-        <button onClick={handleToggleSuppression} className={`p-1.5 rounded transition-colors ${selectedFeature?.isSuppressed ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'hover:bg-slate-100 text-slate-400'}`} title={selectedFeature?.isSuppressed ? "解除壓縮" : "隱藏/壓縮"}>🚫</button>
-        <button onClick={() => { triggerCameraNormal(); setContextMenu(null); }} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors" title="正視於">🎯</button>
-        <button onClick={handleDelete} className="p-1.5 hover:bg-red-50 text-red-600 rounded transition-colors" title="刪除">🗑️</button>
+        <button onClick={handleEdit} className="p-1.5 hover:bg-emerald-50 text-emerald-600 rounded transition-colors" title="EditSketch/Feature">✏️</button>
+        <button onClick={handleToggleSuppression} className={`p-1.5 rounded transition-colors ${selectedFeature?.isSuppressed ? 'bg-amber-100 text-amber-600 hover:bg-amber-200' : 'hover:bg-slate-100 text-slate-400'}`} title={selectedFeature?.isSuppressed ? "Resume/Unsuppress" : "Hide/Suppress"}>🚫</button>
+        <button onClick={() => { triggerCameraNormal(); setContextMenu(null); }} className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors" title="Normal To">🎯</button>
+        <button onClick={handleDelete} className="p-1.5 hover:bg-red-50 text-red-600 rounded transition-colors" title="Delete">🗑️</button>
       </div>
 
       {/* Menu Items */}
@@ -224,35 +225,35 @@ export const ContextMenu: React.FC = () => {
         onClick={handleEdit}
         className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-between"
       >
-        <span>編輯 (Edit)</span>
+        <span>Edit (Edit)</span>
         <span className="text-[10px] text-slate-400">Double Click</span>
       </button>
       <button 
         onClick={handleToggleSuppression}
         className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-primary/10 hover:text-primary transition-colors"
       >
-        {selectedFeature?.isSuppressed ? '解除壓縮 (Unsuppress)' : '壓縮 (Suppress)'}
+        {selectedFeature?.isSuppressed ? 'Resume/Unsuppress (Unsuppress)' : 'Suppress (Suppress)'}
       </button>
       <button 
         onClick={() => { triggerCameraNormal(); setContextMenu(null); }}
         className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-primary/10 hover:text-primary transition-colors"
       >
-        正視於 (Normal To)
+        Normal To
       </button>
       <div className="h-px bg-slate-100 my-1" />
       <button 
         className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-between"
         onClick={handleDelete}
       >
-        <span className="text-red-600">刪除 (Delete)</span>
+        <span className="text-red-600">Delete (Delete)</span>
         <span className="text-[10px] text-slate-400">Del</span>
       </button>
       <button className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-primary/10 hover:text-primary transition-colors">
-        外觀 (Appearances)
+        Appearance (Appearances)
       </button>
       <div className="h-px bg-slate-100 my-1" />
       <button className="w-full text-left px-4 py-1.5 text-[13px] text-slate-700 hover:bg-primary/10 hover:text-primary transition-colors">
-        放大選定範圍 (Zoom to Selection)
+        Zoom to Selected (Zoom to Selection)
       </button>
     </div>
   );

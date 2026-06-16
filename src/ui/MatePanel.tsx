@@ -27,6 +27,10 @@ export const MatePanel = () => {
   const [pitch, setPitch] = React.useState<number>(1.5);
   const [alignment, setAlignment] = React.useState<'ALIGNED' | 'ANTI_ALIGNED'>('ANTI_ALIGNED');
   const [isSuggesting, setIsSuggesting] = React.useState(false);
+  const [widthOffset, setWidthOffset] = React.useState<number>(0);
+  const [snapOffsetX, setSnapOffsetX] = React.useState<number>(0);
+  const [snapOffsetY, setSnapOffsetY] = React.useState<number>(0);
+  const [snapOffsetZ, setSnapOffsetZ] = React.useState<number>(0);
 
   const assemblyService = React.useMemo(() => new AssemblyService(), []);
 
@@ -84,7 +88,9 @@ export const MatePanel = () => {
             alignmentFlip: alignment === 'ANTI_ALIGNED',
             isLimitAngle: mateType === 'ANGLE' ? isLimitAngle : undefined,
             minAngle: mateType === 'ANGLE' ? minAngle : undefined,
-            maxAngle: mateType === 'ANGLE' ? maxAngle : undefined
+            maxAngle: mateType === 'ANGLE' ? maxAngle : undefined,
+            widthOffset: mateType === 'WIDTH' ? widthOffset : undefined,
+            snapOffset: mateType === 'SNAP' ? [snapOffsetX, snapOffsetY, snapOffsetZ] : undefined,
           },
         };
 
@@ -101,7 +107,7 @@ export const MatePanel = () => {
       }
     };
     updatePreview();
-  }, [mateSelection, mateType, offset, angle, alignment, components, mates, assemblyService, setAssemblyPreviewComponents]);
+  }, [mateSelection, mateType, offset, angle, alignment, widthOffset, snapOffsetX, snapOffsetY, snapOffsetZ, components, mates, assemblyService, setAssemblyPreviewComponents]);
 
   const handleApplyMate = async () => {
     if (mateSelection.length < 2) return;
@@ -120,7 +126,7 @@ export const MatePanel = () => {
 
     const newMate: CADMate = {
       id: `mate_${uuidv4()}`,
-      name: `${mateType === 'GEAR' || mateType === 'SCREW' ? '機械配合' : '配合'} ${mates.length + 1}`,
+      name: `${(mateType === 'GEAR' || mateType === 'SCREW' || mateType === 'LOCK' || mateType === 'WIDTH' || mateType === 'SNAP') ? 'Special Mate' : mateType === 'SYMMETRY' ? 'Symmetry Mate' : 'Mate'} ${mates.length + 1}`,
       type: mateType,
       entity1: toMateEntity(mateSelection[0]),
       entity2: toMateEntity(mateSelection[1]),
@@ -131,6 +137,8 @@ export const MatePanel = () => {
         alignmentFlip: alignment === 'ANTI_ALIGNED',
         ratio: mateType === 'GEAR' ? ratio : undefined,
         pitch: mateType === 'SCREW' ? pitch : undefined,
+        widthOffset: mateType === 'WIDTH' ? widthOffset : undefined,
+        snapOffset: mateType === 'SNAP' ? [snapOffsetX, snapOffsetY, snapOffsetZ] : undefined,
         initialTransforms
       },
       offset: (mateType === 'DISTANCE' || mateType === 'COINCIDENT') ? offset : undefined,
@@ -152,14 +160,14 @@ export const MatePanel = () => {
   return (
     <div className="p-3 bg-white rounded-xl border border-[#D1D5DB] shadow-sm space-y-4">
       <div className="text-[14px] text-slate-700 font-bold uppercase border-b border-[#D1D5DB]/50 pb-1 flex justify-between items-center">
-        <span>配合管理器 (Mate Manager)</span>
+        <span>Mate Manager</span>
         <span className="text-[13px] bg-slate-100 text-slate-500 px-1 py-0.5 rounded font-mono">ASSEMBLY</span>
       </div>
 
       {/* Mate Type Selection */}
       <div className="space-y-3">
         <div>
-          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">標準配合 (Standard)</div>
+          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">Standard Mates</div>
           <div className="grid grid-cols-4 gap-1">
             {(['COINCIDENT', 'PARALLEL', 'CONCENTRIC', 'DISTANCE', 'PERPENDICULAR', 'TANGENT', 'ANGLE'] as MateType[]).map((type) => (
               <button
@@ -178,7 +186,7 @@ export const MatePanel = () => {
         </div>
 
         <div>
-          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">機械配合 (Mechanical)</div>
+          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">Mechanical Mates</div>
           <div className="grid grid-cols-2 gap-1.5">
             {(['GEAR', 'SCREW'] as MateType[]).map((type) => (
               <button
@@ -195,15 +203,34 @@ export const MatePanel = () => {
             ))}
           </div>
         </div>
+
+        <div>
+          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">Special Mate (Special)</div>
+          <div className="grid grid-cols-4 gap-1">
+            {(['WIDTH', 'SYMMETRY', 'LOCK', 'SNAP'] as MateType[]).map((type) => (
+              <button
+                key={type}
+                onClick={() => setMateType(type)}
+                className={`p-1.5 rounded border text-[10px] font-bold transition-all ${
+                  mateType === type
+                    ? 'bg-amber-50 border-amber-500 text-amber-700 shadow-sm'
+                    : 'bg-[#F8FAFC] border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {type === 'WIDTH' ? '↔ Width' : type === 'SYMMETRY' ? '⇄ Symmetry' : type === 'LOCK' ? '🔒 Lock' : '🧲 Snap'}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Selection Summary */}
       <div className="space-y-2">
-        <div className="text-[12px] text-slate-500 font-bold uppercase">選取實體 ({mateSelection.length}/2)</div>
+        <div className="text-[12px] text-slate-500 font-bold uppercase">SelectedSolid ({mateSelection.length}/2)</div>
         <div className="min-h-[60px] bg-slate-50 rounded border border-dashed border-slate-300 p-2 space-y-1">
           {mateSelection.length === 0 ? (
             <div className="text-[12px] text-slate-400 italic text-center py-4">
-              在視埠中選取兩個面或邊以建立配合
+              Select two faces or edges in viewport to create a mate
             </div>
           ) : (
             mateSelection.map((ent, i) => {
@@ -213,7 +240,7 @@ export const MatePanel = () => {
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-slate-700">{ent.type}</span> 
                     {surfaceType === 'CYLINDER' && (
-                      <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-mono uppercase">圓柱軸心</span>
+                      <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-mono uppercase">Cylindrical Axis</span>
                     )}
                   </div>
                   <span className="text-slate-500 font-mono text-[10px]">{ent.id.slice(0, 8)}</span> 
@@ -226,7 +253,7 @@ export const MatePanel = () => {
       {/* Mate Settings */}
       {(mateType === 'DISTANCE' || mateType === 'COINCIDENT') && (
         <div className="flex items-center gap-2">
-          <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">距離 (Offset):</span>
+          <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">Distance (Offset):</span>
           <div className="relative flex-1">
             <input
               type="number"
@@ -242,7 +269,7 @@ export const MatePanel = () => {
       {mateType === 'ANGLE' && (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">角度 (Angle):</span>
+            <span className="text-[13px] text-slate-600 font-medium whitespace-nowrap">Angle (Angle):</span>
             <div className="relative flex-1">
               <input
                 type="number"
@@ -256,7 +283,7 @@ export const MatePanel = () => {
           
           <label className="flex items-center gap-2 text-[12px] text-slate-600 font-bold cursor-pointer">
             <input type="checkbox" checked={isLimitAngle} onChange={(e) => setIsLimitAngle(e.target.checked)} className="rounded border-slate-300" />
-            啟用極限角度 (Limit Angle)
+            EnableLimit Angle (Limit Angle)
           </label>
 
           {isLimitAngle && (
@@ -286,7 +313,7 @@ export const MatePanel = () => {
 
       {mateType === 'GEAR' && (
         <div className="flex items-center gap-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 animate-in fade-in slide-in-from-top-1 duration-200">
-          <span className="text-[12px] text-indigo-700 font-black whitespace-nowrap">比率 (Ratio):</span>
+          <span className="text-[12px] text-indigo-700 font-black whitespace-nowrap">Ratio (Ratio):</span>
           <div className="relative flex-1">
             <input
               type="number"
@@ -300,7 +327,7 @@ export const MatePanel = () => {
 
       {mateType === 'SCREW' && (
         <div className="flex items-center gap-2 p-2 bg-indigo-50/50 rounded-lg border border-indigo-100 animate-in fade-in slide-in-from-top-1 duration-200">
-          <span className="text-[12px] text-indigo-700 font-black whitespace-nowrap">節距 (Pitch):</span>
+          <span className="text-[12px] text-indigo-700 font-black whitespace-nowrap">Pitch (Pitch):</span>
           <div className="relative flex-1">
             <input
               type="number"
@@ -309,6 +336,70 @@ export const MatePanel = () => {
               className="w-full bg-white border border-indigo-200 rounded px-2 py-1 text-[13px] font-mono text-right pr-12"
             />
             <span className="absolute right-2 top-1.5 text-[10px] text-indigo-400 font-bold">mm/rev</span>
+          </div>
+        </div>
+      )}
+
+      {mateType === 'WIDTH' && (
+        <div className="flex items-center gap-2 p-2 bg-amber-50/50 rounded-lg border border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <span className="text-[12px] text-amber-700 font-black whitespace-nowrap">WidthOffset (Width Offset):</span>
+          <div className="relative flex-1">
+            <input
+              type="number"
+              value={widthOffset}
+              onChange={(e) => setWidthOffset(parseFloat(e.target.value))}
+              className="w-full bg-white border border-amber-200 rounded px-2 py-1 text-[13px] font-mono text-right"
+            />
+            <span className="absolute right-2 top-1.5 text-[11px] text-amber-400 font-bold">mm</span>
+          </div>
+        </div>
+      )}
+
+      {mateType === 'SYMMETRY' && (
+        <div className="p-2 bg-amber-50/50 rounded-lg border border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="text-[12px] text-amber-700 font-bold">Symmetry Plane (Symmetry Plane)</div>
+          <div className="text-[11px] text-amber-600 mt-1">Select Reference Plane as Mirror Datum。SystemAligns component relative to the planeFace对稱放置。</div>
+        </div>
+      )}
+
+      {mateType === 'LOCK' && (
+        <div className="p-2 bg-red-50/50 rounded-lg border border-red-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="text-[12px] text-red-700 font-black">Locked所有自由度 (Lock All 6-DOF)</div>
+          <div className="text-[11px] text-red-600 mt-1">完全Fixed兩個元件之間的相對位置和Rotate。無法移動或Rotate。</div>
+        </div>
+      )}
+
+      {mateType === 'SNAP' && (
+        <div className="space-y-2 p-2 bg-amber-50/50 rounded-lg border border-amber-100 animate-in fade-in slide-in-from-top-1 duration-200">
+          <div className="text-[12px] text-amber-700 font-black">Offset (Snap Offset):</div>
+          <div className="grid grid-cols-3 gap-1.5">
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-[10px] text-amber-500 font-bold">X</span>
+              <input
+                type="number"
+                value={snapOffsetX}
+                onChange={(e) => setSnapOffsetX(parseFloat(e.target.value))}
+                className="w-full bg-white border border-amber-200 rounded pl-5 pr-2 py-1 text-[12px] font-mono text-right"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-[10px] text-amber-500 font-bold">Y</span>
+              <input
+                type="number"
+                value={snapOffsetY}
+                onChange={(e) => setSnapOffsetY(parseFloat(e.target.value))}
+                className="w-full bg-white border border-amber-200 rounded pl-5 pr-2 py-1 text-[12px] font-mono text-right"
+              />
+            </div>
+            <div className="relative">
+              <span className="absolute left-2 top-1.5 text-[10px] text-amber-500 font-bold">Z</span>
+              <input
+                type="number"
+                value={snapOffsetZ}
+                onChange={(e) => setSnapOffsetZ(parseFloat(e.target.value))}
+                className="w-full bg-white border border-amber-200 rounded pl-5 pr-2 py-1 text-[12px] font-mono text-right"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -333,21 +424,21 @@ export const MatePanel = () => {
           disabled={mateSelection.length < 2}
           className="flex-[2] p-2 bg-primary text-white hover:bg-primary-dark disabled:opacity-50 rounded shadow-md text-[13px] font-bold transition-all"
         >
-          加入配合
+          加入Mate
         </button>
       </div>
 
       {/* Existing Mates List */}
       {mates.length > 0 && (
         <div className="pt-2 border-t border-slate-200">
-          <div className="text-[12px] text-slate-500 font-bold uppercase mb-2">現有配合 ({mates.length})</div>
+          <div className="text-[12px] text-slate-500 font-bold uppercase mb-2">現有Mate ({mates.length})</div>
           <div className="max-h-[120px] overflow-y-auto space-y-1 pr-1">
             {mates.map((mate) => (
               <div key={mate.id} className="text-[12px] p-2 bg-slate-50 rounded border border-slate-100 flex items-center justify-between group"> <div className="flex flex-col"> <span className="font-bold text-slate-700">{mate.name}</span> <span className="text-[10px] text-slate-500 uppercase">{mate.type}</span> </div> <button 
                   onClick={() => setMates(mates.filter(m => m.id !== mate.id))}
                   className="text-error opacity-0 group-hover:opacity-100 transition-all text-[11px] font-bold"
                 >
-                  刪除
+                  Delete
                 </button>
               </div>
             ))}

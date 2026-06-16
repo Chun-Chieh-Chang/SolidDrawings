@@ -76,7 +76,7 @@ export function getParentsAndChildren(targetFeature: CADFeature, allFeatures: CA
     const sketchNum = targetFeature.name.match(/\d+/)?.[0] || '1';
     parents.unshift({
       id: `${targetFeature.id}_sketch`,
-      name: `草圖 ${sketchNum}`,
+      name: `Sketch ${sketchNum}`,
       type: 'SKETCH',
     });
   }

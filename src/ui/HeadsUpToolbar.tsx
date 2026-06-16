@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react';
 import { useCadStore } from '../store/useCadStore';
+import type { SelectionFilterType } from '../utils/selection-filters';
+import { getEntityCategoryName } from '../utils/selection-filters';
 
 const ZoomIcon = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -35,6 +37,88 @@ const SectionIcon = () => (
   </svg>
 );
 
+type FilterOption = { type: SelectionFilterType; label: string; icon: React.ReactNode };
+
+const VertexIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="3" />
+    <line x1="4" y1="4" x2="8" y2="8" />
+    <line x1="16" y1="4" x2="20" y2="8" />
+    <line x1="4" y1="20" x2="8" y2="16" />
+    <line x1="16" y1="20" x2="20" y2="16" />
+  </svg>
+);
+
+const EdgeIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+    <line x1="5" y1="19" x2="19" y2="5" />
+    <polyline points="8 5 5 5 5 8" />
+    <polyline points="16 19 19 19 19 16" />
+  </svg>
+);
+
+const FaceIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polygon points="12 3 20 9 12 21 4 9" />
+  </svg>
+);
+
+const SketchEntityIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="12" y1="3" x2="12" y2="21" />
+  </svg>
+);
+
+const FeatureIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+    <path d="M2 17l10 5 10-5" />
+    <path d="M2 12l10 5 10-5" />
+  </svg>
+);
+
+const ComponentIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+    <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+    <line x1="12" y1="22.08" x2="12" y2="12" />
+  </svg>
+);
+
+const ReferenceIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="2" y1="12" x2="22" y2="12" />
+    <line x1="12" y1="2" x2="12" y2="22" />
+    <circle cx="12" cy="12" r="2" />
+    <line x1="12" y1="2" x2="12" y2="6" />
+    <line x1="12" y1="18" x2="12" y2="22" />
+  </svg>
+);
+
+const AllIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <circle cx="12" cy="12" r="3" />
+    <line x1="12" y1="2" x2="12" y2="5" />
+    <line x1="12" y1="19" x2="12" y2="22" />
+    <line x1="2" y1="12" x2="5" y2="12" />
+    <line x1="19" y1="12" x2="22" y2="12" />
+  </svg>
+);
+
+const FILTER_OPTIONS: FilterOption[] = [
+  { type: 'NONE', label: 'All', icon: <AllIcon /> },
+  { type: 'VERTEX', label: 'Vertex', icon: <VertexIcon /> },
+  { type: 'EDGE', label: 'Edge', icon: <EdgeIcon /> },
+  { type: 'FACE', label: 'Face', icon: <FaceIcon /> },
+  { type: 'SKETCH_ENTITY', label: 'Sketch Entities', icon: <SketchEntityIcon /> },
+  { type: 'FEATURE', label: 'Feature', icon: <FeatureIcon /> },
+  { type: 'COMPONENT', label: 'Components', icon: <ComponentIcon /> },
+  { type: 'REFERENCE', label: 'Reference Geometry', icon: <ReferenceIcon /> },
+];
+
 export const HeadsUpToolbar: React.FC = () => {
   const {
     triggerCameraNormal,
@@ -44,8 +128,11 @@ export const HeadsUpToolbar: React.FC = () => {
     setSketchMode,
     viewportDisplayMode,
     setViewportDisplayMode,
+    selectionFilter,
+    setSelectionFilter,
   } = useCadStore();
   const [showOrientation, setShowOrientation] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -150,6 +237,55 @@ export const HeadsUpToolbar: React.FC = () => {
 
       <div className="w-[1px] h-6 bg-slate-300/50 mx-1" />
 
+      {/* Selection Filter Dropdown */}
+      <div className="relative">
+        <button
+          onClick={() => setShowFilterMenu(!showFilterMenu)}
+          className={`w-9 h-9 flex items-center justify-center rounded-md transition-all border-none cursor-pointer ${
+            selectionFilter !== 'NONE'
+              ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20 hover:bg-blue-700'
+              : 'hover:bg-slate-200/50 text-slate-700'
+          }`}
+          title="Selection Filter"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+          </svg>
+        </button>
+
+        {showFilterMenu && (
+          <div className="absolute top-full left-0 mt-2 w-36 bg-white/95 backdrop-blur-2xl border border-slate-200 rounded-md shadow-2xl py-1.5 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+            {FILTER_OPTIONS.map((opt) => (
+              <button
+                key={opt.type}
+                onClick={() => {
+                  setSelectionFilter(opt.type);
+                  setShowFilterMenu(false);
+                }}
+                className={`w-full text-left px-3 py-2 flex items-center gap-2.5 transition-all border-none bg-transparent cursor-pointer ${
+                  selectionFilter === opt.type
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'text-slate-700 hover:bg-slate-100'
+                }`}
+                title={opt.label}
+              >
+                <span className={`flex-shrink-0 ${selectionFilter === opt.type ? 'text-blue-600' : 'text-slate-500'}`}>
+                  {opt.icon}
+                </span>
+                <span className="text-[11px] font-semibold">{opt.label}</span>
+                {selectionFilter === opt.type && (
+                  <span className="ml-auto text-blue-600">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
       <button
         onClick={() => {
           const next =
@@ -161,7 +297,7 @@ export const HeadsUpToolbar: React.FC = () => {
           setViewportDisplayMode(next);
         }}
         className="w-9 h-9 flex items-center justify-center rounded-md hover:bg-slate-200/50 text-slate-700 transition-all border-none bg-transparent cursor-pointer"
-        title="顯示樣式：著色含邊線 / 線框"
+        title="Display Style: Shaded with Edges / Wireframe"
       >
         <StyleIcon wireframe={viewportDisplayMode === 'WIREFRAME'} />
       </button>
@@ -194,6 +330,13 @@ export const HeadsUpToolbar: React.FC = () => {
             Exit
           </button>
         </>
+      )}
+
+      {/* Active filter indicator tooltip */}
+      {selectionFilter !== 'NONE' && (
+        <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 px-2 py-0.5 bg-slate-800 text-white text-[10px] font-bold rounded shadow-md whitespace-nowrap z-50">
+          {getEntityCategoryName(selectionFilter)}
+        </div>
       )}
     </div>
   );

@@ -67,6 +67,14 @@ const FEATURE_ICONS: Record<string, React.ReactNode> = {
   ),
   REFERENCE_AXIS: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="2" x2="12" y2="22"/><polyline points="5 12 12 12 19 12"/></svg>
+  ),
+  REFERENCE_COORDINATE_SYSTEM: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+      <line x1="2" y1="12" x2="22" y2="12" stroke="#EF4444" strokeWidth="3"/>
+      <polyline points="16 8 22 12 16 16"/>
+      <line x1="12" y1="2" x2="12" y2="22" stroke="#10B981" strokeWidth="3"/>
+      <polyline points="8 8 12 2 16 8"/>
+    </svg>
   )
 };
 
@@ -96,7 +104,7 @@ function SortableRollbackBar({ id, rollbackIndex, setRollbackIndex }: { id: stri
           e.stopPropagation();
           setRollbackIndex(rollbackIndex === -1 ? null : -1);
         }}
-        title="特徵控制棒 (Rollback Bar)"
+        title="Feature Rollback Bar"
       />
     </div>
   );
@@ -167,7 +175,7 @@ function SortableFeatureItem({
         className={`group flex items-center justify-between p-1.5 rounded cursor-pointer transition-all border ${
           relationClass(relState, isSelected, isRolledBack || (feature.isSuppressed ?? false))
         } ${editingFeatureId === feature.id ? 'ring-2 ring-emerald-500 ring-offset-1' : ''}`}
-        title={feature.type === 'SKETCH' ? '雙擊進入草圖編輯' : '雙擊編輯特徵草圖'}
+        title={feature.type === 'SKETCH' ? 'Double-click to Edit Sketch' : 'Double-click to Edit Feature Sketch'}
       >
         <div className="flex items-center gap-2 truncate">
           {/* Drag Handle Visual */}
@@ -205,15 +213,15 @@ function SortableFeatureItem({
               ? 'bg-pink-100/90 border-pink-300 text-pink-700 font-bold shadow-xs'
               : 'text-slate-500 hover:text-[#005B9A] hover:bg-slate-100/50'
           }`}
-          title="雙擊編輯此特徵所屬的草圖幾何"
+          title="Double-click to Edit Sketch geometry for this feature"
         >
           <div className="flex items-center gap-1.5 overflow-hidden">
             <span className="opacity-60">↳ ✏️</span>
-            <span className="italic truncate">草圖{sketchNum} (Sketch{sketchNum})</span>
+            <span className="italic truncate">Sketch{sketchNum} (Sketch{sketchNum})</span>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             {editingFeatureId === feature.id && (
-              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono animate-pulse">編輯中</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-bold font-mono animate-pulse">Editing</span>
             )}
             <button
               onClick={(e) => {
@@ -223,7 +231,7 @@ function SortableFeatureItem({
               className={`p-0.5 rounded transition-all hover:bg-slate-200 ${
                 visibleSketches?.includes(feature.id) ? 'text-[#005B9A]' : 'text-slate-300'
               }`}
-              title={visibleSketches?.includes(feature.id) ? "隱藏草圖" : "顯示草圖"}
+              title={visibleSketches?.includes(feature.id) ? "HideSketch" : "DisplaySketch"}
             >
               {visibleSketches?.includes(feature.id) ? (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>

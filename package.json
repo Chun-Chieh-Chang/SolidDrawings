@@ -29,9 +29,12 @@
     "graphify:update": "graphify . --no-viz --update",
     "graphify:query": "graphify query",
     "postinstall": "node -e \"if (require('fs').existsSync('vendor/SkillsBuilder/skills/dev/git-push-guardian/scripts/install-hook.js')) require('child_process').execSync('node vendor/SkillsBuilder/skills/dev/git-push-guardian/scripts/install-hook.js', {stdio: 'inherit'})\"",
-    "test:golden": "python tests/regression/run_golden.py",
+    "test:golden": "python backend/tests/run_golden.py",
     "test:backend": "uv run --directory backend pytest backend/tests",
-    "test:regression": "npm run test:golden && npm run test:backend"
+    "test:regression": "npm run test:golden && npm run test:backend",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:codegen": "playwright codegen http://localhost:3000"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
@@ -49,7 +52,9 @@
     "zustand": "^5.0.13"
   },
   "devDependencies": {
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
+    "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -60,7 +65,10 @@
     "electron-builder": "^25.1.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "jest": "^30.4.2",
+    "playwright": "^1.60.0",
     "tailwindcss": "^4",
+    "ts-jest": "^29.4.11",
     "ts-morph": "^28.0.0",
     "typescript": "^5"
   },

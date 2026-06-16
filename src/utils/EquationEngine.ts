@@ -72,9 +72,14 @@ export class EquationEngine {
     const solved: Record<string, number> = {};
     const unsolved = { ...variables };
     let changed = true;
+    let iterations = 0;
+    const maxIterations = Object.keys(variables).length + 1;
 
     // Iterative resolution (Topological-lite)
     while (changed) {
+      iterations++;
+      if (iterations >= maxIterations) break;
+
       changed = false;
       for (const [name, formula] of Object.entries(unsolved)) {
         // If formula is pure numeric
@@ -102,6 +107,52 @@ export class EquationEngine {
       }
     }
 
+    const remainingUnsolved = Object.keys(unsolved);
+    if (remainingUnsolved.length > 0) {
+      console.warn(`[EquationEngine] Circular dependency detected among: ${remainingUnsolved.join(', ')}`);
+      for (const key of remainingUnsolved) {
+        solved[key] = 0;
+      }
+    }
+
     return solved;
+  }
+
+  public static hasCircularDependency(variables: Record<string, string>): string[] {
+    const solved: Record<string, number> = {};
+    const unsolved = { ...variables };
+    let changed = true;
+    let iterations = 0;
+    const maxIterations = Object.keys(variables).length + 1;
+
+    while (changed) {
+      iterations++;
+      if (iterations >= maxIterations) break;
+
+      changed = false;
+      for (const [name, formula] of Object.entries(unsolved)) {
+        if (!isNaN(parseFloat(formula)) && !/[a-zA-Z]/.test(formula)) {
+          solved[name] = parseFloat(formula);
+          delete unsolved[name];
+          changed = true;
+          continue;
+        }
+
+        try {
+          const requiredVars = formula.match(/[a-zA-Z_][a-zA-Z0-9_]*/g) || [];
+          const allResolved = requiredVars.every(v => solved.hasOwnProperty(v));
+
+          if (allResolved) {
+            solved[name] = this.evaluate(formula, solved);
+            delete unsolved[name];
+            changed = true;
+          }
+        } catch (e) {
+          // Skip
+        }
+      }
+    }
+
+    return Object.keys(unsolved);
   }
 }

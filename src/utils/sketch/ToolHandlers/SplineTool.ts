@@ -24,6 +24,7 @@ export class SplineToolHandler implements SketchToolHandler {
       }
       if (activeSplineEdgeId) {
         // Splines mutate nodeIds array
+        useCadStore.getState().saveSnapshot();
         const updatedEdges = { ...state.sketchEdges };
         updatedEdges[activeSplineEdgeId].nodeIds.push(nId);
         useCadStore.setState({ sketchEdges: updatedEdges });

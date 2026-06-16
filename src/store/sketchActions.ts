@@ -41,6 +41,8 @@ export const sketchActions = {
   addNode: (u: number, v: number, isFixed: boolean = false): string | null => {
     if (!requireValidPoint(u, v, 'addNode')) return null;
     
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const nId = uuidv4();
     const newNode: SketchNode = { id: nId, x: u, y: v, isFixed };
@@ -53,6 +55,8 @@ export const sketchActions = {
   },
 
   addEdge: (type: 'LINE' | 'ARC' | 'SPLINE' | 'CIRCLE' | 'CENTER_LINE', nodeIds: string[]): string => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const eId = uuidv4();
     const newEdge: SketchEdge = { 
@@ -70,6 +74,8 @@ export const sketchActions = {
   },
 
   addConstraint: (type: string, edgeIds: string[] = [], nodeIds: string[] = [], value?: number): string => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const cId = uuidv4();
     const newConstraint: SketchConstraint = { id: cId, type: type as any, edgeIds, nodeIds, value };
@@ -82,6 +88,8 @@ export const sketchActions = {
   },
 
   deleteEdges: (edgeIdsToDelete: string[]) => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const nextEdges = { ...state.sketchEdges };
     const nextNodes = { ...state.sketchNodes };
@@ -99,6 +107,8 @@ export const sketchActions = {
   },
 
   deleteNodes: (nodeIdsToDelete: string[]) => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const nextNodes = { ...state.sketchNodes };
     const nextEdges = { ...state.sketchEdges };
@@ -125,6 +135,8 @@ export const sketchActions = {
   },
 
   deleteEntities: (entityIds: string[]) => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const nextNodes = { ...state.sketchNodes };
     const nextEdges = { ...state.sketchEdges };
@@ -156,6 +168,7 @@ export const sketchActions = {
     if (!requireValidPoint(u, v, 'updateNodePosition')) return;
     const state = useCadStore.getState();
     if (state.sketchNodes[nodeId]) {
+      useCadStore.getState().saveSnapshot();
       useCadStore.setState({
         sketchNodes: { 
           ...state.sketchNodes, 
@@ -166,6 +179,8 @@ export const sketchActions = {
   },
 
   splitEdge: (edgeId: string, x: number, y: number): string[] => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     const edge = state.sketchEdges[edgeId];
     if (!edge || edge.type !== 'LINE') return [];
@@ -243,6 +258,8 @@ export const sketchActions = {
     newEdges: Record<string, SketchEdge>,
     newConstraints: Record<string, SketchConstraint>
   ) => {
+    useCadStore.getState().saveSnapshot();
+    
     useCadStore.setState({
       sketchNodes: newNodes,
       sketchEdges: newEdges,
@@ -251,6 +268,8 @@ export const sketchActions = {
   },
 
   addConstraintObj: (constraint: SketchConstraint) => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     useCadStore.setState({
       sketchConstraints: { ...state.sketchConstraints, [constraint.id]: constraint }
@@ -258,6 +277,8 @@ export const sketchActions = {
   },
   
   updateConstraint: (id: string, updates: Partial<SketchConstraint>) => {
+    useCadStore.getState().saveSnapshot();
+    
     const state = useCadStore.getState();
     if (state.sketchConstraints[id]) {
       useCadStore.setState({

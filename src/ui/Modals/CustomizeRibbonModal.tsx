@@ -12,7 +12,7 @@ export const CustomizeRibbonModal: React.FC<CustomizeRibbonModalProps> = ({ onCl
   const { ribbonLayout, setRibbonLayout } = useCadStore();
 
   const AVAILABLE_BUTTONS: Record<string, string[]> = {
-    FEATURES: ['EXTRUDE', 'REVOLVE', 'EXTRUDE_CUT', 'REVOLVED_CUT', 'SWEEP', 'LOFT', 'FILLET', 'CHAMFER', 'MIRROR', 'PATTERN', 'SHELL', 'DOME', 'DRAFT', 'REFERENCE_PLANE', 'REFERENCE_AXIS', 'HOLE_WIZARD'],
+    FEATURES: ['EXTRUDE', 'REVOLVE', 'EXTRUDE_CUT', 'REVOLVED_CUT', 'SWEEP', 'LOFT', 'FILLET', 'CHAMFER', 'MIRROR', 'PATTERN', 'SHELL', 'DOME', 'DRAFT', 'REFERENCE_PLANE', 'REFERENCE_AXIS', 'REFERENCE_POINT', 'REFERENCE_COORDINATE_SYSTEM', 'HOLE_WIZARD'],
     SKETCH: ['LINE', 'CIRCLE', 'ARC', 'RECTANGLE', 'SMART_DIMENSION', 'TRIM', 'EXTEND', 'OFFSET', 'MIRROR', 'PATTERN', 'TEXT', 'SPLINE'],
     EVALUATE: ['MEASURE', 'MASS_PROPS', 'INTERFERENCE', 'SECTION_VIEW', 'EQUATIONS']
   };
@@ -30,7 +30,7 @@ export const CustomizeRibbonModal: React.FC<CustomizeRibbonModalProps> = ({ onCl
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white rounded-lg shadow-2xl border border-slate-300 w-[400px] flex flex-col overflow-hidden">
         <div className="px-4 py-3 bg-slate-100 border-b border-slate-300 flex items-center justify-between">
-          <h3 className="text-sm font-black text-slate-700 uppercase tracking-tighter">自訂工具列 (Customize {tab})</h3>
+          <h3 className="text-sm font-black text-slate-700 uppercase tracking-tighter">Customize Toolbar (Customize {tab})</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-red-500 transition-colors">
              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
           </button>
