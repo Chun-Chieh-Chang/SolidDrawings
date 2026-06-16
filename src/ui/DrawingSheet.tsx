@@ -705,12 +705,12 @@ export const DrawingSheet = () => {
   }, [features, components, mode]);
 
   // Drag handlers
-  const activeDragId = useRef<string | null>(null);
+  const [draggingViewId, setDraggingViewId] = React.useState<string | null>(null);
   const dragOffsets = useRef<{x: number, y: number} | null>(null);
 
   const handleDragStart = (event: DragStartEvent) => {
     const viewId = event.active.id as string;
-    activeDragId.current = viewId;
+    setDraggingViewId(viewId);
     const sheet = drawingSheets.find(s => s.id === activeSheetId);
     const view = sheet?.views.find(v => v.id === viewId);
     if (view && containerRef.current) {
@@ -723,14 +723,14 @@ export const DrawingSheet = () => {
   };
 
   const handleDragMove = (event: DragMoveEvent) => {
-    if (!activeDragId.current || !dragOffsets.current) return;
+    if (!draggingViewId || !dragOffsets.current) return;
     const sheet = drawingSheets.find(s => s.id === activeSheetId);
-    const view = sheet?.views.find(v => v.id === activeDragId.current);
+    const view = sheet?.views.find(v => v.id === draggingViewId);
     if (!view) return;
 
     const newX = (event.delta.x) ;
     const newY = event.delta.y;
-    updateViewPosition(activeSheetId, activeDragId.current, {
+    updateViewPosition(activeSheetId, draggingViewId, {
       ...view.position,
       x: Math.max(0, newX),
       y: Math.max(0, newY),
@@ -738,7 +738,7 @@ export const DrawingSheet = () => {
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
-    activeDragId.current = null;
+    setDraggingViewId(null);
     dragOffsets.current = null;
   };
 
@@ -829,7 +829,7 @@ export const DrawingSheet = () => {
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
           >
-            <div className="grid gap-3 h-full" style={{ // eslint-disable-line react-hooks/refs
+            <div className="grid gap-3 h-full" style={{ 
               gridTemplateColumns: `repeat(${activeSheetData?.views.length && activeSheetData.views.length % 2 !== 0 ? activeSheetData.views.length : Math.ceil((activeSheetData?.views.length || 0) / 1) / 2 || 2}, 1fr)`,
               gridTemplateRows: `repeat(${activeSheetData && activeSheetData.views.length > 0 ? Math.ceil(activeSheetData.views.length / 2) : 2}, 1fr)` ,
             }}>
@@ -846,7 +846,7 @@ export const DrawingSheet = () => {
                   viewId={viewData.id}
                   parentViewId={viewData.parentViewId}
                   sectionLine={viewData.sectionLine}
-                  isDragging={activeDragId.current === viewData.id} // eslint-disable-line react-hooks/refs
+                  isDragging={draggingViewId === viewData.id}
                 />
               ))}
             </div>

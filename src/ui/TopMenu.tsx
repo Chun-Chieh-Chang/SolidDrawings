@@ -91,6 +91,7 @@ export const TopMenu: React.FC<TopMenuProps> = ({
                     最近使用
                   </span>
                   <RecentFilesDropdown
+                    key={showRecentFiles ? Date.now() : 0}
                     visible={showRecentFiles}
                     onFileSelect={handleRecentFileSelect}
                     onClose={() => setShowRecentFiles(false)}

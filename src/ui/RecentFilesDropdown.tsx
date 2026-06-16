@@ -16,13 +16,6 @@ export const RecentFilesDropdown: React.FC<RecentFilesDropdownProps> = ({
 }) => {
   const [mruFiles, setMruFiles] = React.useState<string[]>(() => getMRUFiles());
 
-  // eslint-disable-next-line react-hooks/set-state-in-effect
-  React.useEffect(() => {
-    if (visible) {
-      setMruFiles(getMRUFiles());
-    }
-  }, [visible]);
-
   const handleClear = React.useCallback(() => {
     clearMRU();
     setMruFiles([]);
