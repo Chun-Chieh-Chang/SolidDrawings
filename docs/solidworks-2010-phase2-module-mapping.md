@@ -48,7 +48,7 @@
 | SW2010-SK-008 | 智慧尺寸 | `src/ui/SketchPropertyManager.tsx` | 已實作 |
 | SW2010-SK-009~016 | 幾何關係 | `src/utils/geometry/ConstraintSolver.ts` + `src/store/sketchActions.ts` | 已實作 |
 | SW2010-SK-017 | 修剪實體 | `src/utils/sketch/ToolHandlers/TrimTool.ts` | 已實作 |
-| SW2010-SK-018 | 延伸實體 | 待建立 | 未實作 |
+| SW2010-SK-018 | 延伸實體 | `src/utils/sketch/ToolHandlers/ExtendTool.ts` | 已實作 |
 | SW2010-SK-019 | 鏡射實體 | `src/ui/SketchPropertyManager.tsx` (鏡射圖案) | 已實作 |
 | SW2010-SK-020 | 偏移實體 | `backend/app/routers/geometry.py` (/offset_entities) | 已實作 |
 | SW2010-SK-021 | 草圖狀態顯示 | `src/ui/SketchHUD.tsx` + `src/store/useCadStore.ts` (solveState) | 已實作 |

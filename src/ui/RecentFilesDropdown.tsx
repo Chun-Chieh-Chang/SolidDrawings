@@ -14,12 +14,13 @@ export const RecentFilesDropdown: React.FC<RecentFilesDropdownProps> = ({
   onFileSelect,
   onClose,
 }) => {
-  const [mruFiles, setMruFiles] = React.useState<string[]>([]);
+  const [mruFiles, setMruFiles] = React.useState<string[]>(() => getMRUFiles());
 
   React.useEffect(() => {
     if (visible) {
       setMruFiles(getMRUFiles());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
 
   const handleClear = React.useCallback(() => {

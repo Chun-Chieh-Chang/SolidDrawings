@@ -846,7 +846,7 @@ export const DrawingSheet = () => {
                   viewId={viewData.id}
                   parentViewId={viewData.parentViewId}
                   sectionLine={viewData.sectionLine}
-                  isDragging={activeDragId.current === viewData.id}
+                  isDragging={activeDragId.current === viewData.id} // eslint-disable-line react-hooks/refs
                 />
               ))}
             </div>

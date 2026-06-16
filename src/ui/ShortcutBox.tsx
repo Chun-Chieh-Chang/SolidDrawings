@@ -146,6 +146,12 @@ export const ShortcutBox: React.FC = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [shortcutBox, setShortcutBox]);
 
+  const grouped = useMemo(() => groupShortcutsByCategory(KEYBOARD_SHORTCUTS), []);
+  const sortedCategories = useMemo(
+    () => Object.entries(SHORTCUT_CATEGORIES).sort((a, b) => a[1].order - b[1].order),
+    [],
+  );
+
   if (!shortcutBox?.visible) return null;
 
   const handleAction = (tool: any) => {
@@ -189,13 +195,6 @@ export const ShortcutBox: React.FC = () => {
   ];
 
   const tools = isSketchMode ? sketchTools : featureTools;
-
-  const grouped = useMemo(() => groupShortcutsByCategory(KEYBOARD_SHORTCUTS), []);
-
-  const sortedCategories = useMemo(
-    () => Object.entries(SHORTCUT_CATEGORIES).sort((a, b) => a[1].order - b[1].order),
-    [],
-  );
 
   return (
     <div

@@ -15,6 +15,26 @@
 
 ... [rest of the section] ...
 
+# Code Review Compliance — 500-Line Limit Rule (Global Rule)
+
+**當提交程式碼時若遇到 Code Review 平台 500 行變更限制，必須執行以下流程：**
+
+1. **審查大檔案：** 使用 `Get-ChildItem -Recurse | ForEach-Object { (Get-Content $_.FullName | Measure-Object -Line).Lines }` 找出超過 400 行的檔案。
+2. **分析拆分點：** 判斷哪些邏輯可抽離為獨立子組件（Components）或 Utility 函式。拆分原則：
+   - 每個子模組不超過 100 行
+   - 單一職責原則（SRP）：每個檔案只做一件事
+   - 保持公共 API 不變（backward-compatible re-exports）
+3. **自動重構：** 將大檔案拆分為多個小檔案，組織為子目錄結構：
+   - TypeScript 元件 → `src/ui/ComponentName/` 目錄（index.tsx + rollouts/）
+   - TypeScript hook → `src/hooks/category/` 目錄
+   - TypeScript 工具 → `src/utils/geometry/constraints/` 目錄
+   - Zustand store → `src/store/slice-name.ts` 檔案
+4. **驗證：** 重構後必須執行 `npx tsc --noEmit` 與 `npx jest` 確認零錯誤。
+5. **分批提交：** 拆分後的變更應按依賴順序建立 Small PRs：
+   - PR 順序：新功能 → Store 拆分 → 工具層拆分 → Hook 拆分 → UI 組件拆分
+   - 每個 PR 附帶 `npx tsc` 和 `npx jest` 通過截圖
+   - PR title 遵循 conventional commits（`feat:`, `refactor:`）
+
 # OpenCASCADE & Backend Engineering Standards (Industrial Parity)
 
 為了確保在 GitHub Actions CI 與工業級建模環境下的魯棒性，所有 Agent 必須遵守以下幾何引擎開發規範：
