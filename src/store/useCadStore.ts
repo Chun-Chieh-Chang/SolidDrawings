@@ -1,4 +1,4 @@
-﻿export { useCadStore } from './index';
+export { useCadStore } from './index';
 export type {
   CadState,
   CombinedState,
