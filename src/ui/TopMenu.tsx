@@ -20,6 +20,7 @@ export const TopMenu: React.FC<TopMenuProps> = ({
   const activePlane = useCadStore((state) => state.activePlane);
   const [showFileMenu, setShowFileMenu] = React.useState(false);
   const [showRecentFiles, setShowRecentFiles] = React.useState(false);
+  const [recentKey, setRecentKey] = React.useState(0);
 
   const handleRecentFileSelect = React.useCallback(
     (filePath: string) => {
@@ -40,7 +41,7 @@ export const TopMenu: React.FC<TopMenuProps> = ({
         <nav className="flex items-center gap-4 text-[12px] text-[#404040] font-semibold relative">
           <div className="relative">
             <span 
-              onClick={() => { setShowFileMenu(!showFileMenu); setShowRecentFiles(false); }}
+              onClick={() => { setShowFileMenu(!showFileMenu); setShowRecentFiles(false); setRecentKey(k => k + 1); }}
               className={`hover:text-[#005B9A] cursor-pointer transition-colors px-1 uppercase tracking-wider ${showFileMenu ? 'text-[#005B9A]' : ''}`}
             >
               File
@@ -91,7 +92,7 @@ export const TopMenu: React.FC<TopMenuProps> = ({
                     最近使用
                   </span>
                   <RecentFilesDropdown
-                    key={showRecentFiles ? Date.now() : 0}
+                    key={recentKey}
                     visible={showRecentFiles}
                     onFileSelect={handleRecentFileSelect}
                     onClose={() => setShowRecentFiles(false)}
