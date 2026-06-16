@@ -829,7 +829,7 @@ export const DrawingSheet = () => {
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
           >
-            <div className="grid gap-3 h-full" style={{ 
+            <div className="grid gap-3 h-full" style={{ // eslint-disable-line react-hooks/refs
               gridTemplateColumns: `repeat(${activeSheetData?.views.length && activeSheetData.views.length % 2 !== 0 ? activeSheetData.views.length : Math.ceil((activeSheetData?.views.length || 0) / 1) / 2 || 2}, 1fr)`,
               gridTemplateRows: `repeat(${activeSheetData && activeSheetData.views.length > 0 ? Math.ceil(activeSheetData.views.length / 2) : 2}, 1fr)` ,
             }}>
