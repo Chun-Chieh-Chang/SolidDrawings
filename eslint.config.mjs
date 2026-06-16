@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     "build/**",
     ".miniforge/**",
     "next-env.d.ts",
+    "backend/**",
+    "vendor/**",
   ]),
   {
     rules: {

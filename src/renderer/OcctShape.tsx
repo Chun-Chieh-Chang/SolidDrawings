@@ -59,6 +59,8 @@ export default function OcctShape({
     measurementMode,
     measurementPoints,
     setMeasurementPoints,
+    isPhysicsActive,
+    setDraggedComponentId,
   } = useCadStore();
 
   const clippingPlanes = useMemo(() => {
@@ -250,6 +252,18 @@ export default function OcctShape({
       rotation={rotation} 
       userData={{ type: 'B_REP_SHAPE', face_metadata: data.face_metadata, componentId }}
       onClick={handleMeshClick}
+      onPointerDown={(e) => {
+        if (isPhysicsActive && componentId) {
+          e.stopPropagation();
+          setDraggedComponentId(componentId);
+        }
+      }}
+      onPointerUp={(e) => {
+        if (isPhysicsActive) {
+          e.stopPropagation();
+          setDraggedComponentId(null);
+        }
+      }}
     >
       <meshPhysicalMaterial
         vertexColors={!!data.colors && data.colors.length > 0}

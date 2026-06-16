@@ -1,0 +1,83 @@
+﻿// SOLIDWORKS 2010 Compatible Keyboard Shortcuts
+// Maps SW 2010 shortcuts to 3D-Builder actions
+
+import { useCadStore } from '../store/useCadStore';
+
+export interface ShortcutDef {
+  key: string;
+  ctrl?: boolean;
+  shift?: boolean;
+  alt?: boolean;
+  action: () => void;
+  description: string;
+}
+
+export const SHORTCUTS: ShortcutDef[] = [
+  // File operations
+  { key: 'N', ctrl: true, action: () => { const h = (window as any).__handleFileNew; if (h) h(); }, description: 'New Document' },
+  { key: 'O', ctrl: true, action: () => { const h = (window as any).__handleFileOpen; if (h) h(); }, description: 'Open Document' },
+  { key: 'S', ctrl: true, action: () => { const h = (window as any).__handleFileSave; if (h) h(); }, description: 'Save' },
+  { key: 'S', ctrl: true, shift: true, action: () => { const h = (window as any).__handleFileSaveAs; if (h) h(); }, description: 'Save As' },
+  
+  // Edit operations
+  { key: 'Z', ctrl: true, action: () => {
+    const store = useCadStore.getState();
+    if (store.undoStack && store.undoStack.length > 0) {
+      const prev = store.undoStack.pop()!;
+      if (store.redoStack) store.redoStack.push(store.snapshot);
+      useCadStore.setState(prev);
+    }
+  }, description: 'Undo' },
+  { key: 'Y', ctrl: true, action: () => {
+    const store = useCadStore.getState();
+    if (store.redoStack && store.redoStack.length > 0) {
+      const next = store.redoStack.pop()!;
+      if (store.undoStack) store.undoStack.push(store.snapshot);
+      useCadStore.setState(next);
+    }
+  }, description: 'Redo' },
+  { key: 'Delete', action: () => {
+    const store = useCadStore.getState();
+    if (store.selectedId && store.removeFeature) {
+      store.removeFeature(store.selectedId);
+    }
+  }, description: 'Delete Selected' },
+  
+  // View operations
+  { key: 'F10', action: () => {
+    const store = useCadStore.getState();
+    if (store.controls) {
+      store.controls.object.position.set(150, 150, 150);
+      store.controls.target.set(0, 0, 0);
+      store.controls.update();
+    }
+  }, description: 'Toggle Isometric View' },
+  
+  // Navigation
+  { key: 'Escape', action: () => {
+    const store = useCadStore.getState();
+    store.setSketchMode(false);
+    store.setSketchTool('SELECT');
+    store.setPendingFeatureCommand(null);
+    store.setSelectedTopology(null);
+  }, description: 'Cancel Current Command' },
+];
+
+export function setupKeyboardShortcuts() {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    const matched = SHORTCUTS.find(s => {
+      return s.key === e.key.toUpperCase() &&
+        (!!s.ctrl === e.ctrlKey) &&
+        (!!s.shift === e.shiftKey) &&
+        (!!s.alt === e.altKey);
+    });
+    
+    if (matched) {
+      e.preventDefault();
+      matched.action();
+    }
+  };
+
+  document.addEventListener('keydown', handleKeyDown);
+  return () => document.removeEventListener('keydown', handleKeyDown);
+}

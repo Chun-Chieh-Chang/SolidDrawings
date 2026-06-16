@@ -57,7 +57,6 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
     addFeature,
     setSelectedId,
     setSelectedSubNodeType,
-    setActivePropertyManager,
     pushToast,
     components,
     viewportDisplayMode,
@@ -72,11 +71,6 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   } = useCadStore();
 
   const appliedEdgeFeatureRef = React.useRef<string | null>(null);
-
-  const skipWizardIfRobotWorking = () => {
-    if (useCadStore.getState().robotStatus === "WORKING") return false;
-    return true;
-  };
 
   return (
     <div className="h-[110px] w-full bg-[#E8E8E8] border-b border-[#A0A0A0] flex flex-col z-20 shrink-0 select-none">
@@ -427,12 +421,10 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setSelectedId(featId);
                 
                 appliedEdgeFeatureRef.current = null; 
-                setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('FILLET'); 
-                  setSelectedTopology(null); 
-                  setHint('Select an edge to fillet, then adjust parameters.');
-                }
+                setActiveTab('FEATURES'); 
+                setPendingFeatureCommand('FILLET'); 
+                setSelectedTopology(null); 
+                setHint('Select an edge to fillet, then adjust parameters.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'FILLET' ? 'border-[#005B9A] bg-white shadow-sm' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Fillet"
@@ -443,7 +435,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Fillet</span>
             </button>
             <button
-              onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); if (skipWizardIfRobotWorking()) { setPendingFeatureCommand('CHAMFER'); setSelectedTopology(null); } }}
+              onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); setPendingFeatureCommand('CHAMFER'); setSelectedTopology(null); }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'CHAMFER' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Chamfer"
             >
@@ -453,7 +445,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Chamfer</span>
             </button>
             <button
-              onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); if (skipWizardIfRobotWorking()) { setPendingFeatureCommand('THICKEN'); setSelectedTopology(null); } }}
+              onClick={() => { appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); setPendingFeatureCommand('THICKEN'); setSelectedTopology(null); }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'THICKEN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Thicken"
             >
@@ -477,11 +469,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setSelectedId(featId);
                 appliedEdgeFeatureRef.current = null;
                 setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('PATTERN');
-                  setSelectedTopology(null);
-                  setHint('Select a target feature, then select a linear edge for direction.');
-                }
+                setPendingFeatureCommand('PATTERN');
+                setSelectedTopology(null);
+                setHint('Select a target feature, then select a linear edge for direction.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'PATTERN' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Pattern"
@@ -504,11 +494,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setSelectedId(featId);
                 appliedEdgeFeatureRef.current = null;
                 setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('MIRROR');
-                  setSelectedTopology(null);
-                  setHint('Select a plane or planar face to mirror about.');
-                }
+                setPendingFeatureCommand('MIRROR');
+                setSelectedTopology(null);
+                setHint('Select a plane or planar face to mirror about.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'MIRROR' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Mirror"
@@ -531,11 +519,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setSelectedId(featId);
                 appliedEdgeFeatureRef.current = null;
                 setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('DRAFT');
-                  setSelectedTopology(null);
-                  setHint('Step 1: Select a neutral plane. Step 2: Select faces to draft.');
-                }
+                setPendingFeatureCommand('DRAFT');
+                setSelectedTopology(null);
+                setHint('Step 1: Select a neutral plane. Step 2: Select faces to draft.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'DRAFT' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Draft"
@@ -560,11 +546,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setSelectedId(featId);
                 appliedEdgeFeatureRef.current = null;
                 setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('SHELL');
-                  setSelectedTopology(null);
-                  setHint('Select faces to remove to create a shell.');
-                }
+                setPendingFeatureCommand('SHELL');
+                setSelectedTopology(null);
+                setHint('Select faces to remove to create a shell.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'SHELL' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Shell"
@@ -577,6 +561,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
 
             <button
               onClick={() => {
+                const { robotStatus } = useCadStore.getState();
                 const featId = `feat_${uuidv4()}`;
                 addFeature({
                   id: featId,
@@ -585,7 +570,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   parameters: { distance: 2.0, refs: [], reverse: false }
                 });
                 setSelectedId(featId);
-                if (skipWizardIfRobotWorking()) {
+                
+                // --- SURGERY: Suppress wizard if robot is working ---
+                if (robotStatus !== 'WORKING') {
                   setPendingFeatureCommand('DOME');
                   setSelectedTopology(null);
                   setHint('Select a face to apply a Dome feature.');
@@ -618,11 +605,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setSelectedId(featId);
                 appliedEdgeFeatureRef.current = null;
                 setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('RIB');
-                  setSelectedTopology(null);
-                  setHint('Configure Rib thickness and direction in the property manager.');
-                }
+                setPendingFeatureCommand('RIB');
+                setSelectedTopology(null);
+                setHint('Configure Rib thickness and direction in the property manager.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'RIB' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Rib"
@@ -646,9 +631,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 });
                 setSelectedId(featId);
                 setSelectedSubNodeType('FEATURE');
-                if (skipWizardIfRobotWorking()) {
-                  setHint('Select entities (faces, points, edges) to define the reference plane.');
-                }
+                setHint('Select entities (faces, points, edges) to define the reference plane.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
               title="Reference Plane"
@@ -670,9 +653,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 });
                 setSelectedId(featId);
                 setSelectedSubNodeType('FEATURE');
-                if (skipWizardIfRobotWorking()) {
-                  setHint('Select entities to define the reference axis.');
-                }
+                setHint('Select entities to define the reference axis.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
               title="Reference Axis"
@@ -694,9 +675,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 });
                 setSelectedId(featId);
                 setSelectedSubNodeType('FEATURE');
-                if (skipWizardIfRobotWorking()) {
-                  setHint('Select entities to define the reference point.');
-                }
+                setHint('Select entities to define the reference point.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
               title="Reference Point"
@@ -706,31 +685,6 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>Point</span>
             </button>
-
-            <button 
-              onClick={() => {
-                setActivePropertyManager({
-                  type: 'COORDINATE_SYSTEM',
-                  creationMode: 'planes',
-                });
-                setPendingFeatureCommand('COORDINATE_SYSTEM');
-                setHint('Select 3 planes/faces, 2 axes, or 3 points to define the coordinate system.');
-              }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
-              title="Coordinate System"
-            >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110`}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="2" y1="12" x2="22" y2="12" stroke="#EF4444" strokeWidth="3"/>
-                  <polyline points="16 8 22 12 16 16"/>
-                  <line x1="12" y1="2" x2="12" y2="22" stroke="#10B981" strokeWidth="3"/>
-                  <polyline points="8 8 12 2 16 8"/>
-                  <line x1="12" y1="12" x2="4" y2="20" stroke="#3B82F6" strokeWidth="2" strokeDasharray="2 2"/>
-                </svg>
-              </div>
-              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Ref<br/>CSYS</span>
-            </button>
-
             <button
               onClick={() => {
                 const featId = `feat_${uuidv4()}`;
@@ -745,9 +699,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 setActiveTab('FEATURES');
                 setPendingFeatureCommand('HOLE_WIZARD');
                 setSelectedTopology(null);
-                if (skipWizardIfRobotWorking()) {
-                  setHint('Click on a face to place the hole.');
-                }
+                setHint('Click on a face to place the hole.');
               }}
               className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'HOLE_WIZARD' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
               title="Hole Wizard"
@@ -796,9 +748,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   parameters: { distance: 1.0, refs: [] }
                 });
                 setPendingFeatureCommand('SURFACE_OFFSET');
-                if (skipWizardIfRobotWorking()) {
-                  setHint('Select faces to offset as a surface.');
-                }
+                setHint('Select faces to offset as a surface.');
              }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Offset Surface">
               <div className="w-10 h-10 flex items-center justify-center text-orange-600 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M16 14l4-4-4-4"/><path d="M20 10H4"/></svg>
@@ -813,8 +763,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   name: `Knit-Surf ${features.filter(f => f.type === 'SURFACE_KNIT').length + 1}`,
                   parameters: { refs: [] }
                 });
-                setPendingFeatureCommand('SURFACE_KNIT');
-                setHint('Knit surface feature created. Select surfaces to knit.');
+                setHint('Knit surface feature created. All current surfaces will be sewn.');
              }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Knit Surface">
               <div className="w-10 h-10 flex items-center justify-center text-orange-700 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M16 3H8l-5 9 5 9h8l5-9-5-9z"/><path d="M12 3v18"/><path d="M3 12h18"/></svg>
@@ -830,9 +779,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                   parameters: { tool_feature_id: '', flip: false }
                 });
                 setPendingFeatureCommand('SURFACE_CUT');
-                if (skipWizardIfRobotWorking()) {
-                  setHint('Select a surface to cut the solid body.');
-                }
+                setHint('Select a surface to cut the solid body.');
              }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Surface Cut">
               <div className="w-10 h-10 flex items-center justify-center text-amber-600 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="7.5 4.21 12 6.81 16.5 4.21"/><polyline points="7.5 19.79 7.5 14.6 3 12"/><polyline points="21 12 16.5 14.6 16.5 19.79"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
@@ -910,15 +857,6 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 19c4 0 6-8 10-8s6 8 10 8" /></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Spline</span>
-            </button>
-
-            <button onClick={() => setSketchTool('POLYGON')} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[65px] transition-all border ${sketchTool === 'POLYGON' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Polygon">
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${sketchTool === 'POLYGON' ? 'text-[#005B9A] scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <polygon points="12,2 20,8.5 20,15.5 12,22 4,15.5 4,8.5" />
-                </svg>
-              </div>
-              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Polygon</span>
             </button>
 
             <div className="w-[1px] h-10 bg-border/50 mx-2" />

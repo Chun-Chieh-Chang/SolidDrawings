@@ -135,13 +135,48 @@ def solve_sketch_constraints(nodes_dict, edges_dict, constraints_dict):
                 if e1 and e2 and e1.get('type') == 'LINE' and e2.get('type') == 'LINE':
                     p1ax, p1ay = get_node_coords(e1['nodeIds'][0], x_vars); p1bx, p1by = get_node_coords(e1['nodeIds'][1], x_vars)
                     p2ax, p2ay = get_node_coords(e2['nodeIds'][0], x_vars); p2bx, p2by = get_node_coords(e2['nodeIds'][1], x_vars)
+                    # Dot product should be 0
                     dx1, dy1 = p1bx - p1ax, p1by - p1ay
                     dx2, dy2 = p2bx - p2ax, p2by - p2ay
-                    # Dot product should be 0
-                    dot_prod = dx1 * dx2 + dy1 * dy2
                     len1 = math.sqrt(dx1**2 + dy1**2 + 1e-9)
                     len2 = math.sqrt(dx2**2 + dy2**2 + 1e-9)
-                    residuals.append((dot_prod / (len1 * len2)) * 10.0)
+                    residuals.append((dx1 * dx2 + dy1 * dy2) / (len1 * len2) * 10.0)
+            elif ctype == 'COLLINEAR' and len(c_edge_ids) == 2:
+                e1 = edges_dict.get(c_edge_ids[0]); e2 = edges_dict.get(c_edge_ids[1])
+                if e1 and e2 and e1.get('type') in ['LINE', 'CENTER_LINE'] and e2.get('type') in ['LINE', 'CENTER_LINE']:
+                    p1ax, p1ay = get_node_coords(e1['nodeIds'][0], x_vars); p1bx, p1by = get_node_coords(e1['nodeIds'][1], x_vars)
+                    p2ax, p2ay = get_node_coords(e2['nodeIds'][0], x_vars); p2bx, p2by = get_node_coords(e2['nodeIds'][1], x_vars)
+                    dx1, dy1 = p1bx - p1ax, p1by - p1ay
+                    len1 = math.sqrt(dx1**2 + dy1**2 + 1e-9)
+                    # p2a and p2b must both lie on infinite line p1a-p1b
+                    # Distance formula: |(x2-x1)(y1-y0) - (x1-x0)(y2-y1)| / L
+                    res_a = (dx1 * (p1ay - p2ay) - (p1ax - p2ax) * dy1) / len1
+                    res_b = (dx1 * (p1ay - p2by) - (p1ax - p2bx) * dy1) / len1
+                    residuals.extend([res_a * 5.0, res_b * 5.0])
+            elif ctype == 'MIDPOINT' and len(c_node_ids) == 1 and len(c_edge_ids) == 1:
+                target_x, target_y = get_node_coords(c_node_ids[0], x_vars)
+                edge = edges_dict.get(c_edge_ids[0])
+                if edge and len(edge['nodeIds']) >= 2:
+                    p1x, p1y = get_node_coords(edge['nodeIds'][0], x_vars)
+                    p2x, p2y = get_node_coords(edge['nodeIds'][1], x_vars)
+                    mid_x, mid_y = (p1x + p2x) / 2.0, (p1y + p2y) / 2.0
+                    residuals.extend([(target_x - mid_x) * 5.0, (target_y - mid_y) * 5.0])
+            elif ctype == 'SYMMETRIC' and len(c_node_ids) == 2 and len(c_edge_ids) == 1:
+                p1x, p1y = get_node_coords(c_node_ids[0], x_vars)
+                p2x, p2y = get_node_coords(c_node_ids[1], x_vars)
+                axis = edges_dict.get(c_edge_ids[0])
+                if axis and len(axis['nodeIds']) >= 2:
+                    a1x, a1y = get_node_coords(axis['nodeIds'][0], x_vars)
+                    a2x, a2y = get_node_coords(axis['nodeIds'][1], x_vars)
+                    dx, dy = a2x - a1x, a2y - a1y
+                    L2 = dx*dx + dy*dy + 1e-9
+                    # Reflected point P1' across line A1-A2
+                    # P1' = P1 - 2 * dot(P1-A1, N) * N
+                    nx, ny = -dy / math.sqrt(L2), dx / math.sqrt(L2)
+                    dot = (p1x - a1x) * nx + (p1y - a1y) * ny
+                    ref1x, ref1y = p1x - 2 * dot * nx, p1y - 2 * dot * ny
+                    residuals.extend([(p2x - ref1x) * 5.0, (p2y - ref1y) * 5.0])
+
 
         # Estimated DOF = Total Variables - Rank of Jacobian (effectively)
         # For simplicity in this mock-oriented NR, we count constraints

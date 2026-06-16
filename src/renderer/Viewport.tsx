@@ -10,6 +10,8 @@ import { DatumPlanes } from './DatumPlanes';
 import { SketchPreview } from './SketchPreview';
 import { TopologySelector } from '../kernel/TopologySelector';
 
+import { useAssemblyPhysics } from '../hooks/useAssemblyPhysics';
+
 const CameraHandler = () => {
   const activePlane = useCadStore(state => state.activePlane);
   const isSketchMode = useCadStore(state => state.isSketchMode);
@@ -969,6 +971,7 @@ const PerspectiveCameraWrapper = React.memo(() => {
 PerspectiveCameraWrapper.displayName = 'PerspectiveCameraWrapper';
 
 const Viewport = ({ children }: ViewportProps) => {
+  useAssemblyPhysics();
   const isSketchMode = useCadStore(state => state.isSketchMode);
   const setSketchMode = useCadStore(state => state.setSketchMode);
   const setSelectedId = useCadStore(state => state.setSelectedId);
@@ -982,6 +985,28 @@ const Viewport = ({ children }: ViewportProps) => {
   // Handle Global Key Events (SolidWorks Style)
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // === File Management Shortcuts (Highest Priority) ===
+      if (e.ctrlKey && e.shiftKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        (window as any).__handleFileSaveAs?.();
+        return;
+      }
+      if (e.ctrlKey && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        (window as any).__handleFileSave?.();
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'o' || e.key === 'O')) {
+        e.preventDefault();
+        (window as any).__handleFileOpen?.();
+        return;
+      }
+      if (e.ctrlKey && (e.key === 'n' || e.key === 'N')) {
+        e.preventDefault();
+        (window as any).__handleFileNew?.();
+        return;
+      }
+
       // Escape: Stop current drafting chain
       if (e.key === 'Escape') {
         if (isSketchMode) {

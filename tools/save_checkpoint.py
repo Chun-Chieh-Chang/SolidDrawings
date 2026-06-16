@@ -5,7 +5,7 @@ import sys
 
 def run_cmd(cmd):
     try:
-        return subprocess.check_output(cmd, shell=True, text=True, stderr=subprocess.STDOUT).strip()
+        return subprocess.check_output(cmd, shell=True, encoding="utf-8", stderr=subprocess.STDOUT).strip()
     except subprocess.CalledProcessError as e:
         return f"Error: {e.output}"
 
@@ -20,9 +20,13 @@ def generate_handover():
     # 2. Last 30 lines of DEV_LOG.md
     dev_log = ""
     try:
-        with open("DEV_LOG.md", "r", encoding="utf-8") as f:
-            lines = f.readlines()
-            dev_log = "".join(lines[-30:])
+        try:
+            with open("DEV_LOG.md", "r", encoding="utf-16") as f:
+                lines = f.readlines()
+        except Exception:
+            with open("DEV_LOG.md", "r", encoding="utf-8") as f:
+                lines = f.readlines()
+        dev_log = "".join(lines[-30:])
     except Exception as e:
         dev_log = f"Could not read DEV_LOG.md: {e}"
 

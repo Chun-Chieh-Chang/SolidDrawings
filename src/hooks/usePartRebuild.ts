@@ -66,25 +66,30 @@ export function usePartRebuild(
       return;
     }
 
+    const controller = new AbortController();
     rebuildController.current?.abort();
-    rebuildController.current = new AbortController();
-    const signal = rebuildController.current.signal;
+    rebuildController.current = controller;
+    const signal = controller.signal;
 
     const fromFeatureIndex =
       dirtyFromFeatureIndex >= Number.MAX_SAFE_INTEGER
         ? 0
-        : Math.min(dirtyFromFeatureIndex, activeFeatures.length - 1);
+        : Math.max(0, Math.min(dirtyFromFeatureIndex, activeFeatures.length - 1));
 
     setLoading(true);
     try {
       const isAlive = await client.checkHealth();
-      setEngineStatus(isAlive ? 'CONNECTED' : 'DISCONNECTED');
+      if (rebuildController.current === controller) {
+        setEngineStatus(isAlive ? 'CONNECTED' : 'DISCONNECTED');
+      }
 
       if (!isAlive) {
-        useCadStore.getState().pushToast(
-          '幾何核心未連線，無法重建 B-Rep。請啟動後端服務（埠 8400）。',
-          'warning',
-        );
+        if (rebuildController.current === controller) {
+          useCadStore.getState().pushToast(
+            '幾何核心未連線，無法重建 B-Rep。請啟動後端服務（埠 8400）。',
+            'warning',
+          );
+        }
         return;
       }
 
@@ -93,7 +98,7 @@ export function usePartRebuild(
         featureFingerprint: fingerprint,
       });
 
-      if (results && Array.isArray(results)) {
+      if (rebuildController.current === controller && results && Array.isArray(results)) {
         if (results.length === 0 && activeFeatures.length > 0) {
           useCadStore.getState().pushToast(
             '重建未產生幾何。請檢查草圖是否封閉、特徵參數是否有效。',
@@ -152,11 +157,15 @@ export function usePartRebuild(
       if ((err as Error).name !== 'AbortError') {
         console.error('[API] Rebuild request failed:', err);
         const detail = err instanceof RebuildError ? err.detail : (err as Error).message;
-        useCadStore.getState().pushToast(formatCadErrorMessage(detail || ''), 'error');
-        setEngineStatus('DISCONNECTED');
+        if (rebuildController.current === controller) {
+          useCadStore.getState().pushToast(formatCadErrorMessage(detail || ''), 'error');
+          setEngineStatus('DISCONNECTED');
+        }
       }
     } finally {
-      setLoading(false);
+      if (rebuildController.current === controller) {
+        setLoading(false);
+      }
     }
   }, [features, setMeshData, setLoading, setEngineStatus, client]);
 
