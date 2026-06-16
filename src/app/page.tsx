@@ -31,6 +31,7 @@ import { PartFeaturePropertyManager } from '@/ui/PartFeaturePropertyManager';
 import { SectionViewPropertyManager } from '@/ui/SectionViewPropertyManager';
 import { useSelectionLogic } from '@/hooks/useSelectionLogic';
 import { useFeatureBuilders } from '@/hooks/useFeatureBuilders';
+import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAppIntegrations } from '@/hooks/useAppIntegrations';
 import { MassPropertiesModal } from '@/ui/Modals/MassPropertiesModal';
 import { TranslatorModal } from '@/ui/Modals/TranslatorModal';
@@ -107,6 +108,7 @@ export default function Home() {
   }, []);
 
   useAppIntegrations(loadCadData, handleSaveProject, handlePrintToPDF);
+  useKeyboardShortcuts();
 
   const handleImportStep = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

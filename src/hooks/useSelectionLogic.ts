@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
+import { applyFilter, getBlockedReason } from '@/utils/selection-filters';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SelectionLogicDeps {
@@ -33,6 +34,30 @@ export function useSelectionLogic(deps: SelectionLogicDeps) {
 
   const selectedFeature =
     selectedId ? features.find(f => f.id === selectedId) : null;
+
+  // ── Selection filter enforcement ────────────────────────────
+  useEffect(() => {
+    const topo = selectedTopology;
+    if (!topo) return;
+
+    const state = useCadStore.getState();
+    const filter = state.selectionFilter;
+    if (filter === 'NONE') return;
+
+    const entity: Record<string, unknown> = { type: topo.type };
+    if (topo.type === 'EDGE') entity.geometryType = 'EDGE';
+    if (topo.type === 'FACE') entity.geometryType = 'FACE';
+    if (topo.type === 'VERTEX') entity.geometryType = 'VERTEX';
+    if (topo.componentId) entity.componentId = topo.componentId;
+
+    if (!applyFilter(entity, filter)) {
+      const reason = getBlockedReason(entity, filter);
+      if (reason) {
+        state.pushToast(reason, 'warning');
+      }
+      setSelectedTopology(null);
+    }
+  }, [selectedTopology, setSelectedTopology]);
 
   // ── Sweep feature hint ──────────────────────────────────────
   useEffect(() => {

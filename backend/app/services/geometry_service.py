@@ -4043,6 +4043,121 @@ def generate_reference_point(point_type, refs, offset=0.0, features=[]):
         return { "origin": origin }
 
 
+def generate_reference_coordinate_system(coord_system_type, refs, offsets=None, origin=None, x_axis=None, y_axis=None, features=[]):
+    """
+    Computes a reference coordinate system from topology references.
+    Returns: { "origin": [x,y,z], "xAxis": [x,y,z], "yAxis": [x,y,z], "zAxis": [x,y,z] }
+    """
+    result = {
+        "origin": origin or [0.0, 0.0, 0.0],
+        "xAxis": x_axis or [1.0, 0.0, 0.0],
+        "yAxis": y_axis or [0.0, 1.0, 0.0],
+        "zAxis": [0.0, 0.0, 1.0],
+    }
+
+    try:
+        if coord_system_type == 'planes' and len(refs) >= 3:
+            # First reference defines origin
+            p1 = refs[0].get('coordinates', [0.0, 0.0, 0.0])
+            result['origin'] = list(p1)
+            
+            # Second reference defines X-axis direction (from origin towards second plane center)
+            p2 = refs[1].get('coordinates', [0.0, 0.0, 0.0])
+            x_dir = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]]
+            x_len = math.sqrt(x_dir[0]**2 + x_dir[1]**2 + x_dir[2]**2)
+            if x_len > 1e-6:
+                result['xAxis'] = [x_dir[0]/x_len, x_dir[1]/x_len, x_dir[2]/x_len]
+            
+            # Third reference helps compute Y-axis
+            p3 = refs[2].get('coordinates', [0.0, 0.0, 0.0])
+            # Use cross product to compute proper orthogonal basis
+            nx = result['xAxis']
+            # Y = normalize((P3 - P1) x X)
+            v3 = [p3[0] - p1[0], p3[1] - p1[1], p3[2] - p1[2]]
+            y_cross = [
+                v3[1] * nx[2] - v3[2] * nx[1],
+                v3[2] * nx[0] - v3[0] * nx[2],
+                v3[0] * nx[1] - v3[1] * nx[0]
+            ]
+            y_len = math.sqrt(y_cross[0]**2 + y_cross[1]**2 + y_cross[2]**2)
+            if y_len > 1e-6:
+                result['yAxis'] = [y_cross[0]/y_len, y_cross[1]/y_len, y_cross[2]/y_len]
+            else:
+                result['yAxis'] = [0.0, 1.0, 0.0]
+            
+            # Z = X x Y (right-handed)
+            result['zAxis'] = [
+                nx[1] * result['yAxis'][2] - nx[2] * result['yAxis'][1],
+                nx[2] * result['yAxis'][0] - nx[0] * result['yAxis'][2],
+                nx[0] * result['yAxis'][1] - nx[1] * result['yAxis'][0]
+            ]
+
+        elif coord_system_type == 'axes' and len(refs) >= 2:
+            # Use axis origins and directions
+            a1 = refs[0]
+            a2 = refs[1]
+            result['origin'] = list(a1.get('coordinates', [0.0, 0.0, 0.0]))
+            result['xAxis'] = list(a1.get('direction', [1.0, 0.0, 0.0]))
+            result['yAxis'] = list(a2.get('direction', [0.0, 1.0, 0.0]))
+            
+            # Compute Z as cross product
+            nx = result['xAxis']
+            ny = result['yAxis']
+            result['zAxis'] = [
+                nx[1] * ny[2] - nx[2] * ny[1],
+                nx[2] * ny[0] - nx[0] * ny[2],
+                nx[0] * ny[1] - nx[1] * ny[0]
+            ]
+
+        elif coord_system_type == 'points' and len(refs) >= 3:
+            p1 = refs[0].get('coordinates', [0.0, 0.0, 0.0])
+            p2 = refs[1].get('coordinates', [0.0, 0.0, 0.0])
+            p3 = refs[2].get('coordinates', [0.0, 0.0, 0.0])
+            result['origin'] = list(p1)
+            
+            # X axis: from P1 to P2
+            x_dir = [p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2]]
+            x_len = math.sqrt(x_dir[0]**2 + x_dir[1]**2 + x_dir[2]**2)
+            if x_len > 1e-6:
+                result['xAxis'] = [x_dir[0]/x_len, x_dir[1]/x_len, x_dir[2]/x_len]
+            
+            # Y axis: use P3 to compute perpendicular direction
+            v3 = [p3[0] - p1[0], p3[1] - p1[1], p3[2] - p1[2]]
+            nx = result['xAxis']
+            y_cross = [
+                v3[1] * nx[2] - v3[2] * nx[1],
+                v3[2] * nx[0] - v3[0] * nx[2],
+                v3[0] * nx[1] - v3[1] * nx[0]
+            ]
+            y_len = math.sqrt(y_cross[0]**2 + y_cross[1]**2 + y_cross[2]**2)
+            if y_len > 1e-6:
+                result['yAxis'] = [y_cross[0]/y_len, y_cross[1]/y_len, y_cross[2]/y_len]
+            else:
+                result['yAxis'] = [0.0, 1.0, 0.0]
+            
+            result['zAxis'] = [
+                nx[1] * result['yAxis'][2] - nx[2] * result['yAxis'][1],
+                nx[2] * result['yAxis'][0] - nx[0] * result['yAxis'][2],
+                nx[0] * result['yAxis'][1] - nx[1] * result['yAxis'][0]
+            ]
+
+        # Apply offsets if provided
+        if offsets:
+            ox = offsets.get('x', 0)
+            oy = offsets.get('y', 0)
+            oz = offsets.get('z', 0)
+            result['origin'] = [
+                result['origin'][0] + ox,
+                result['origin'][1] + oy,
+                result['origin'][2] + oz
+            ]
+
+        return result
+    except Exception as e:
+        print("[ERROR] generate_reference_coordinate_system failed:", e)
+        return result
+
+
 # --- P5-3 Material Database & Density (g/cm^3) ---
 MATERIAL_LIBRARY = {
     "STEEL": {"density": 7.85, "name": "Alloy Steel", "color": "#71717A"},
