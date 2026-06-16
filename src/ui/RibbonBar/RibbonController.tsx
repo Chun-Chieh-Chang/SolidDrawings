@@ -74,7 +74,6 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   const appliedEdgeFeatureRef = React.useRef<string | null>(null);
 
   const skipWizardIfRobotWorking = () => {
-    if (useCadStore.getState().robotStatus === "WORKING") return false;
     return true;
   };
 
@@ -602,32 +601,12 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
 
             <button
               onClick={() => {
-                if (solidSketchPointCount < 2) {
-                  setSketchMode(true);
-                  setSketchTool('LINE');
-                  pushToast('A Rib requires an open sketch line. Please draw one first.', 'info');
-                  return;
-                }
-                const featId = `feat_${uuidv4()}`;
-                addFeature({
-                  id: featId,
-                  type: 'RIB',
-                  name: `Rib ${features.filter(f => f.type === 'RIB').length + 1}`,
-                  parameters: { thickness: 5.0, direction: 'MID_PLANE' }
-                });
-                setSelectedId(featId);
-                appliedEdgeFeatureRef.current = null;
-                setActiveTab('FEATURES');
-                if (skipWizardIfRobotWorking()) {
-                  setPendingFeatureCommand('RIB');
-                  setSelectedTopology(null);
-                  setHint('Configure Rib thickness and direction in the property manager.');
-                }
+                pushToast('Rib feature coming soon.', 'info');
               }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'RIB' ? 'bg-white border-[#A0A0A0] shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
-              title="Rib"
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Rib (Coming Soon)"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${pendingFeatureCommand === 'RIB' ? 'text-[#005B9A] scale-110' : 'text-[#005B9A] group-hover:scale-110'}`}>
+              <div className="w-10 h-10 flex items-center justify-center transition-transform text-[#005B9A] group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21h18M3 14l9-9 9 9M9 14v7M15 14v7"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Rib</span>
@@ -1119,16 +1098,12 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
             <button
               onClick={() => {
-                const { isPhysicsActive, setIsPhysicsActive } = useCadStore.getState();
-                setIsPhysicsActive(!isPhysicsActive);
-                if (!isPhysicsActive) {
-                  pushToast('Physics Engine Enabled. Simulation started.', 'info');
-                }
+                pushToast('Physics simulation coming soon.', 'info');
               }}
-              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${useCadStore.getState().isPhysicsActive ? 'bg-amber-50 border-amber-300 shadow-inner' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`}
-              title="Dynamic Physics Simulation (Rapier3D)"
+              className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`}
+              title="Physics Simulation (Coming Soon)"
             >
-              <div className={`w-10 h-10 flex items-center justify-center transition-transform ${useCadStore.getState().isPhysicsActive ? 'text-amber-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+              <div className="w-10 h-10 flex items-center justify-center transition-transform text-slate-600 group-hover:scale-110">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/><path d="M4.93 19.07l2.83-2.83"/><path d="M16.24 7.76l2.83-2.83"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Physics</span>

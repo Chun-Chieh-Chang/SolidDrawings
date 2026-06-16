@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { useCadStore, CADConfiguration } from '../store/useCadStore';
 import { v4 as uuidv4 } from 'uuid';
-import { DesignTableModal } from './Modals/DesignTableModal';
 
 export const ConfigurationManagerPanel: React.FC = () => {
   const { 
@@ -173,7 +172,6 @@ export const ConfigurationManagerPanel: React.FC = () => {
         </div>
       </div>
 
-      {showDesignTable && <DesignTableModal onClose={() => setShowDesignTable(false)} />}
     </div>
   );
 };
