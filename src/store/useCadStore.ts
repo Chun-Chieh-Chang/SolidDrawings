@@ -415,8 +415,8 @@ export interface CadState {
   showExportModal: boolean;
   setShowExportModal: (show: boolean) => void;
 
-  viewportDisplayMode: 'SHADED' | 'SHADED_EDGES' | 'WIREFRAME';
-  setViewportDisplayMode: (mode: 'SHADED' | 'SHADED_EDGES' | 'WIREFRAME') => void;
+  viewportDisplayMode: 'SHADED' | 'SHADED_EDGES' | 'WIREFRAME' | 'HIDDEN_LINES';
+  setViewportDisplayMode: (mode: 'SHADED' | 'SHADED_EDGES' | 'WIREFRAME' | 'HIDDEN_LINES') => void;
 
   cameraNormalTrigger: number;
   cameraNormalFlip: boolean;

@@ -1,4 +1,4 @@
-﻿// SOLIDWORKS 2010 Compatible Keyboard Shortcuts
+// SOLIDWORKS 2010 Compatible Keyboard Shortcuts
 // Full mapping: SW 2010 shortcuts to 3D-Builder actions
 
 import { useCadStore } from '../store/useCadStore';
@@ -13,30 +13,16 @@ export interface ShortcutDef {
 }
 
 export const SHORTCUTS: ShortcutDef[] = [
-  // ═══ File Operations ═══
+  // ùùùùùù File Operations ùùùùùù
   { key: 'N', ctrl: true, action: () => { const h = (window as any).__handleFileNew; if (h) h(); }, description: 'New Document' },
   { key: 'O', ctrl: true, action: () => { const h = (window as any).__handleFileOpen; if (h) h(); }, description: 'Open Document' },
   { key: 'S', ctrl: true, action: () => { const h = (window as any).__handleFileSave; if (h) h(); }, description: 'Save' },
   { key: 'S', ctrl: true, shift: true, action: () => { const h = (window as any).__handleFileSaveAs; if (h) h(); }, description: 'Save As' },
   { key: 'E', ctrl: true, action: () => { const h = (window as any).__handleExport; if (h) h(); }, description: 'Export' },
 
-  // ═══ Edit Operations ═══
-  { key: 'Z', ctrl: true, action: () => {
-    const store = useCadStore.getState();
-    if (store.undoStack && store.undoStack.length > 0) {
-      const prev = store.undoStack.pop()!;
-      if (store.redoStack) store.redoStack.push(store.snapshot);
-      useCadStore.setState(prev);
-    }
-  }, description: 'Undo' },
-  { key: 'Y', ctrl: true, action: () => {
-    const store = useCadStore.getState();
-    if (store.redoStack && store.redoStack.length > 0) {
-      const next = store.redoStack.pop()!;
-      if (store.undoStack) store.undoStack.push(store.snapshot);
-      useCadStore.setState(next);
-    }
-  }, description: 'Redo' },
+  // ùùùùùù Edit Operations ùùùùùù
+  { key: 'Z', ctrl: true, action: () => { useCadStore.getState().undo(); }, description: 'Undo' },
+  { key: 'Y', ctrl: true, action: () => { useCadStore.getState().redo(); }, description: 'Redo' },
   { key: 'X', ctrl: true, action: () => { useCadStore.getState().pushToast('Cut not implemented.', 'info'); }, description: 'Cut' },
   { key: 'C', ctrl: true, action: () => { useCadStore.getState().pushToast('Copy not implemented.', 'info'); }, description: 'Copy' },
   { key: 'V', ctrl: true, action: () => { useCadStore.getState().pushToast('Paste not implemented.', 'info'); }, description: 'Paste' },
@@ -49,7 +35,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     }
   }, description: 'Delete Selected' },
 
-  // ═══ Selection ═══
+  // ùùùùùù Selection ùùùùùù
   { key: 'A', ctrl: true, action: () => {
     const store = useCadStore.getState();
     store.pushToast('Select All not implemented.', 'info');
@@ -71,7 +57,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     store.pushToast('Cycle Selections not implemented.', 'info');
   }, description: 'Cycle Selections' },
 
-  // ═══ View / Navigation ═══
+  // ùùùùùù View / Navigation ùùùùùù
   { key: 'F10', action: () => {
     const store = useCadStore.getState();
     if (store.controls) {
@@ -94,7 +80,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     store.pushToast('Toggle Angle not implemented.', 'info');
   }, description: 'Toggle Angle View' },
 
-  // ═══ Feature / Sketch ═══
+  // ùùùùùù Feature / Sketch ùùùùùù
   { key: 'F2', action: () => {
     const store = useCadStore.getState();
     store.pushToast('Edit Selected not implemented.', 'info');
@@ -106,7 +92,7 @@ export const SHORTCUTS: ShortcutDef[] = [
     store.setMeasurementResults(null);
   }, description: 'Measure Tool' },
 
-  // ═══ Help ═══
+  // ùùùùùù Help ùùùùùù
   { key: 'F1', action: () => {
     useCadStore.getState().pushToast('SOLIDWORKS Help not implemented.', 'info');
   }, description: 'Open Help' },
