@@ -13,6 +13,9 @@ import {
   DragEndEvent,
   DragMoveEvent,
 } from '@dnd-kit/core';
+import { DimensionOverlay } from './DrawingSheet/DimensionOverlay';
+import { AnnotationLayer } from './DrawingSheet/AnnotationLayer';
+import { SheetFormatSelector } from './DrawingSheet/SheetFormatSelector';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -556,6 +559,21 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
               strokeDasharray="6,3"
             />
           )}
+
+          {/* Dimension overlay for auto-generated linear dimensions */}
+          <DimensionOverlay 
+            lines={normalizedLines}
+            viewId={viewId}
+            viewData={{ id: viewId, type: type as any, title, position: { x: 0, y: 0, w: 0, h: 0 }, scale, showDimensions }}
+            showDimensions={showDimensions}
+          />
+
+          {/* Centerlines and annotation overlay */}
+          <AnnotationLayer
+            lines={normalizedLines}
+            showCenterlines={showDimensions}
+            annotations={[]}
+          />
         </svg>
       </div>
 
@@ -955,6 +973,22 @@ export const DrawingSheet = () => {
 
       {/* Sheet Tabs Bar */}
       <div className="mt-2 mx-auto w-[1120px]">
+        <div className="flex items-center gap-2 mb-1">
+          <SheetFormatSelector
+            currentSize={activeSheetData?.sheetSize || 'A4'}
+            onChange={(size: string) => {
+              const validSizes = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
+              const sheetSize = validSizes.includes(size as any) ? size : 'A4';
+              // Update active sheet with new size
+              setDrawingSheets(drawingSheets.map(s => 
+                s.id === activeSheetId ? { ...s, sheetSize: sheetSize as any } : s
+              ));
+            }}
+          />
+          <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+            Third Angle Projection
+          </span>
+        </div>
         <div className="flex items-center gap-0 bg-slate-300/50 border border-slate-400 rounded-t-lg overflow-x-auto">
           {drawingSheets.map(sheet => (
             <SheetTab

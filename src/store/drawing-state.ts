@@ -21,6 +21,7 @@ export const createDrawingState = (set: any, get: any) => ({
     {
       id: 'sheet-1',
       name: 'Sheet 1',
+      sheetSize: 'A4',
       views: [
         { id: 'view-front', type: 'FRONT', title: 'Front Elevation (1:1)', position: { x: 0, y: 0, w: 500, h: 350 }, scale: '1:1', showDimensions: true },
         { id: 'view-top', type: 'TOP', title: 'Top Plan (1:1)', position: { x: 520, y: 0, w: 500, h: 350 }, scale: '1:1', showDimensions: true },

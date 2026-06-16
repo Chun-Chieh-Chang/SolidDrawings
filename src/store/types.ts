@@ -185,6 +185,7 @@ export interface DrawingSheetData {
   id: string;
   name: string;
   views: DrawingSheetViewData[];
+  sheetSize?: 'A4' | 'A3' | 'A2' | 'A1' | 'A0';
 }
 
 // ── UI / Toast / Context types ───────────────────────────────────
