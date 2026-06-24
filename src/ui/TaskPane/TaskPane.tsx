@@ -38,7 +38,7 @@ export const TaskPane: React.FC = () => {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className=`${`px-3 py-1.5 text-[10px] font-bold border-r border-[#A0A0A0] transition-colors flex flex-col items-center gap-0.5`}`
+              className="px-3 py-1.5 text-[10px] font-bold border-r border-[#A0A0A0] transition-colors flex flex-col items-center gap-0.5"
             >
               <span className="text-sm">{tab.icon}</span>
               <span>{tab.label}</span>
