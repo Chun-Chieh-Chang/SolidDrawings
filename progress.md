@@ -1,4 +1,17 @@
-## Session: 2026-06-13 (Sprint ASM-3)
-- Charging into the final interaction sprint.
-- Phase 1: Completed advanced joint mapping with LCS anchoring.
-- Phase 2: Starting implementation of the mouse interaction system for real-time dragging.
+## Session: 2026-06-23 (STABLE-3 Closure + Sheet Metal Phase 6)
+- Closed out STABLE-3: all 4 phases superseded by STABLE-4 (RobotHUD/RobotOperationService deleted, skipWizardIfRobotWorking is no-op stub).
+- Sheet Metal Phase 6 — Edge Flange end-to-end implemented:
+  - Added 'SHEET_METALS' tab to RibbonController with Edge Flange, Miter, Hem, Flat Pattern, Bend Allow, BA Calc buttons
+  - Fixed SheetMetalPanel template literal bugs (3x `pushToast`/`setHint`/`className`/`title`)
+  - Fixed TolerancingPanel template literal bugs (same pattern)
+  - Fixed TaskPane.tsx nested template literal bug
+  - Created `src/hooks/features/sheet-metal-builders.ts` with Edge Flange handler
+  - Registered in `useFeatureBuilders` index + re-exported from `useFeatureBuilders.ts`
+  - Added `createEdgeFlange()` to HeavyEngineClient
+  - Added `/edge_flange` route to geometry.py router
+  - Added `generate_edge_flange()` to geometry_service.py (stub → mock shape hash)
+  - Created `src/utils/sheet-metal/bend-allowance.ts` with BA/SETBACK/K-factor calculations
+  - Added 'SHEET_METALS' to activeTab union in app-state.ts and store/index.ts
+  - TypeScript build passes (only pre-existing errors: playwright.config.ts, jest types)
+  - **Real Edge Flange geometry**: `generate_edge_flange()` now creates L-profile swept shape via OpenCASCADE, cached in `_EDGE_FLANGE_SHAPE_CACHE`
+  - **Rebuild pipeline**: EDGE_FLANGE case in `build_feature_shape_in_isolation` now looks up cached shape by `occt_shape_hash`, falls back to box

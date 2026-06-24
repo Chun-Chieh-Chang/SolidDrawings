@@ -1,3 +1,19 @@
+## 2026-06-23 STABLE-3 Closure + Sheet Metal Phase 6 Kickoff
+
+### STABLE-3 Resolution:
+- **All 4 phases SUPERSEDED by STABLE-4** (commit 6b7e908).
+- RobotHUD.tsx, RobotOperationService.tsx, e2e_stress_test_sim.py all deleted during STABLE-4 cleanup.
+- `skipWizardIfRobotWorking()` in RibbonController.tsx is a no-op stub (returns true unconditionally).
+- No robot architecture exists post-STABLE-4. STABLE-3 task_plan.md closed as superseded.
+
+### Sheet Metal Phase 6 (PLAN.md) — Kickoff:
+- `src/ui/SheetMetal/` skeleton exists (SheetMetalPanel.tsx, types.ts, barrel.ts) but completely disconnected.
+- No backend integration, no ribbon tab registration, no store wiring.
+- **Goal**: Implement Edge Flange as first concrete Sheet Metal feature end-to-end.
+- **Scope**: Ribbon tab → Panel wiring → Feature builder hook → Backend geometry → Bend Allowance utility.
+
+---
+
 ## 2026-06-09 SkillsBuilder PDCA: Video Q2VQuy30T-w (Dice Revolved Cut) & Revolved Cut
 
 ### Goal:
