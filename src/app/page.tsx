@@ -100,6 +100,9 @@ export default function Home() {
     handleConvertEntities,
     handleOffsetEntities,
     handleCreateEdgeFlange,
+    handleCreateMiterFlange,
+    handleCreateHem,
+    handleCreateFlatPattern,
   } = useFeatureBuilders(handleRebuild);
 
   const handlePrintToPDF = useCallback(async () => {
@@ -228,6 +231,9 @@ export default function Home() {
         handleRevolveFromSketch={handleRevolveFromSketch}
           handleImportStep={handleImportStep}
           handleCreateEdgeFlange={handleCreateEdgeFlange}
+          handleCreateMiterFlange={handleCreateMiterFlange}
+          handleCreateHem={handleCreateHem}
+          handleCreateFlatPattern={handleCreateFlatPattern}
           onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
       />

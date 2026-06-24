@@ -329,4 +329,82 @@ export class HeavyEngineClient {
       return { success: false, error: error.message || 'Unknown error' };
     }
   }
+
+  public async createMiterFlange(params: {
+    base_feature_id: string;
+    edge_refs: string[];
+    flange_height: number;
+    bend_radius: number;
+    bend_angle: number;
+    thickness: number;
+    k_factor?: number;
+    direction: 'INSIDE' | 'OUTSIDE';
+    corner_angle?: number;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/miter_flange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Miter flange error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  public async createHem(params: {
+    edge_ref: string;
+    hem_length: number;
+    hem_radius: number;
+    thickness: number;
+    hem_type?: 'CLOSED' | 'OPEN' | 'TEARDROP';
+    gap?: number;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/hem`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Hem error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  public async createFlatPattern(params: {
+    features: Array<{ id: string; type: string; parameters: Record<string, any> }>;
+    k_factor?: number;
+    thickness?: number;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/flat_pattern`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Flat pattern error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
 }

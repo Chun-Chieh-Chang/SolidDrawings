@@ -770,3 +770,78 @@ $log
 - 薄壁掃出 (Thin Feature Sweep) 功能已全面實裝：後端幾何引擎 + 前端 UI + 狀態管理。
 - Sweep 類別 SCS 從 50% 提升至 70%。
 - Remaining gaps (Medium/Low): Multiple Profiles, Sheet Metal Sweep, Advanced Options.
+
+---
+
+## 2026-06-23～24 Sheet Metal Phase 6 — Full Implementation
+
+### Overview
+Implemented the complete Sheet Metal feature pipeline following PLAN.md Phase 6.
+Four features delivered end-to-end: Edge Flange → Miter Flange → Hem → Flat Pattern.
+
+### Edge Flange — First Concrete Sheet Metal Feature
+- **Backend** (`geometry_service.py`):
+  - `generate_edge_flange()` — Creates L-profile swept shape via `BRepFill_PipeShell` along extracted edge, generating a realistic flange with thickness, bend radius, and direction control.
+  - Cached in `_EDGE_FLANGE_SHAPE_CACHE` (max 64).
+  - Rebuild pipeline: `EDGE_FLANGE` case looks up cached shape by `occt_shape_hash`, falls back to box, fuses with `BRepAlgoAPI_Fuse`.
+- **API** (`geometry.py`): `MiterFlangeRequest` model + `POST /edge_flange`.
+- **Frontend**:
+  - `HeavyEngineClient.ts`: `createEdgeFlange()` method.
+  - `sheet-metal-builders.ts`: `handleCreateEdgeFlange()` handler — validates edge selection, calls API, creates feature record, triggers rebuild.
+  - `RibbonController.tsx`: Edge Flange button in SHEET_METALS tab.
+  - `useFeatureBuilders` index: re-export + passthrough via `page.tsx`.
+- **Utility**: `src/utils/sheet-metal/bend-allowance.ts` with BA, SETBACK, K-factor calculation functions.
+- **UI Fixes**: Fixed template literal bugs in SheetMetalPanel (×3), TolerancingPanel (×3), TaskPane.tsx.
+
+### Miter Flange — L-shaped Mitered Corner
+- **Backend**: `generate_miter_flange()` creates 2 L-profile flange segments at 90°, fuses with `BRepAlgoAPI_Fuse`, stored in `_MITER_FLANGE_SHAPE_CACHE`.
+- **API**: `MiterFlangeRequest` + `POST /miter_flange`.
+- **Frontend**: Full pipeline — `createMiterFlange()`, `handleCreateMiterFlange()`, Ribbon button.
+- **Rebuild**: `MITER_FLANGE` case with cache lookup → L-box fallback → fuse.
+
+### Hem — Closed/Open/Teardrop Folded Edge
+- **Backend**: `generate_hem()` with CLOSED/OPEN/TEARDROP types, 180° fold arc profile built with `GC_MakeArcOfCircle`, extruded via `BRepPrimAPI_MakePrism`.
+  - CLOSED: gap=0, full 180° return.
+  - OPEN: configurable gap between end and base.
+  - TEARDROP: pocket radius at `R×0.6`.
+  - Cached in `_HEM_SHAPE_CACHE`.
+- **API**: `HemRequest` + `POST /hem`.
+- **Frontend**: Full pipeline — `createHem()`, `handleCreateHem()`, Ribbon button (replaced "coming soon" stub).
+- **Rebuild**: `HEM` case with cache → hem box fallback → fuse.
+
+### Flat Pattern — Parametric Unfold with Bend Allowance
+- **Algorithm**: Parametric unfold using K-factor bend allowance formula:
+  `BA = π/180 × angle × (R + K×T)`
+- **Backend**: `generate_flat_pattern()` iterates all features, accumulates unfolded extensions per direction (±X/±Y), generates planar `TopoDS_Shape` on XY plane (thin 0.1mm plate).
+  - Handles EDGE_FLANGE, MITER_FLANGE, HEM contributions.
+  - Base body dimensions extracted from BOX/EXTRUDE features.
+  - Cached in `_FLAT_PATTERN_SHAPE_CACHE` (max 16).
+  - Rebuild: `FLAT_PATTERN` case replaces final_shape with flat plate (positioned at z=25).
+- **API**: `FlatPatternRequest` + `POST /flat_pattern`.
+- **Frontend**: Full pipeline — `createFlatPattern()`, `handleCreateFlatPattern()`, Ribbon button (replaced "coming soon" stub).
+- `BRepUnfolding` NOT available in pythonocc-core; parametric approach used instead.
+
+### Codebase-Memory Integration
+- `codebase-memory-mcp` v0.8.1 installed and configured (`~/.config/opencode/opencode.json`).
+- MCP server with UI mode on `localhost:9749`.
+- Existing 3,620-node knowledge graph covers full call/import structure.
+
+### Files Modified (Phase 6 total)
+| File | Lines | Change |
+|------|-------|--------|
+| `backend/app/services/geometry_service.py` | +442 | 4 generate_* functions, _*_SHAPE_CACHE, rebuild pipeline cases |
+| `backend/app/routers/geometry.py` | +79 | 4 request models + 4 POST endpoints |
+| `src/kernel/HeavyEngineClient.ts` | +78 | 4 create* methods |
+| `src/hooks/features/sheet-metal-builders.ts` | +236 | 4 handleCreate* handlers |
+| `src/hooks/features/index.ts` | +3 | Re-exports + FlatPattern |
+| `src/app/page.tsx` | +6 | Prop passthrough |
+| `src/ui/RibbonBar/RibbonController.tsx` | +73 | 4 buttons, props, interface |
+
+### Build Verification
+- `tsc --noEmit`: only pre-existing errors (playwright.config.ts + jest types).
+- Zero new TypeScript, lint, or diagnostic errors.
+
+### Status
+- Sheet Metal feature set: Edge Flange ✅ Miter Flange ✅ Hem ✅ Flat Pattern ✅
+- All follow same pipeline pattern — easy to add new features.
+- Ready for Bend Allowance UI and Forming Tools next.

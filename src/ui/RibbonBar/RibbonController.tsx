@@ -14,6 +14,9 @@ interface RibbonControllerProps {
   handleRevolveFromSketch: (op?: 'ADD' | 'CUT') => void;
   handleImportStep: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleCreateEdgeFlange?: (params: any) => void;
+  handleCreateMiterFlange?: (params: any) => void;
+  handleCreateHem?: (params: any) => void;
+  handleCreateFlatPattern?: () => void;
   onShowMassProps?: () => void;
   onShowEquations?: () => void;
 }
@@ -27,6 +30,9 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   handleRevolveFromSketch,
   handleImportStep,
   handleCreateEdgeFlange,
+  handleCreateMiterFlange,
+  handleCreateHem,
+  handleCreateFlatPattern,
   onShowMassProps,
   onShowEquations,
 }) => {
@@ -862,24 +868,71 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Edge<br/>Flange</span>
             </button>
-            <button onClick={() => { pushToast('Miter Flange coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Miter Flange">
-              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+            <button onClick={() => {
+              if (!selectedTopology || selectedTopology.type !== 'EDGE') {
+                setHint('Miter Flange: Click on a solid body edge first, then press this button.');
+                pushToast('Select an edge on the model, then apply Miter Flange.', 'warning');
+                return;
+              }
+              if (handleCreateMiterFlange) {
+                handleCreateMiterFlange({
+                  edgeRefs: [],
+                  flangeHeight: 10,
+                  bendRadius: 0.5,
+                  bendAngle: 90,
+                  thickness: 1.0,
+                  kFactor: 0.5,
+                  direction: 'OUTSIDE',
+                  cornerAngle: 90,
+                });
+              } else {
+                setHint('Miter Flange: Select an edge on the solid body, then set parameters.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Miter Flange">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21V3h18v18H3z"/><path d="M12 3l9 9H3z"/></svg>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Miter</span>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Miter</span>
             </button>
-            <button onClick={() => { pushToast('Hem coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Hem">
-              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+            <button onClick={() => {
+              if (!selectedTopology || selectedTopology.type !== 'EDGE') {
+                setHint('Hem: Click on a solid body edge first, then press this button.');
+                pushToast('Select an edge on the model, then apply Hem.', 'warning');
+                return;
+              }
+              if (handleCreateHem) {
+                handleCreateHem({
+                  edgeId: selectedTopology.id,
+                  hemLength: 5,
+                  hemRadius: 1,
+                  thickness: 1.0,
+                  hemType: 'CLOSED',
+                  gap: 0,
+                });
+              } else {
+                setHint('Hem: Select an edge on the solid body, then set parameters.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Hem">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21V3h18v18H3z"/><path d="M3 21c4-2 8-2 12 0 4 2 6 0 6 0"/></svg>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Hem</span>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Hem</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
-            <button onClick={() => { pushToast('Flat Pattern coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Flat Pattern">
-              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18"/></svg>
+<button onClick={() => {
+              if (handleCreateFlatPattern) {
+                handleCreateFlatPattern();
+              } else {
+                setHint('Flat Pattern: compute unfolded geometry from all sheet metal features.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Flat Pattern">
+              <div className="w-10 h-10 flex items-center justify-center text-amber-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="1"/><line x1="2" y1="8" x2="22" y2="8"/><line x1="8" y1="2" x2="8" y2="22"/><line x1="12" y1="8" x2="12" y2="10" strokeDasharray="2 1"/><line x1="16" y1="8" x2="16" y2="10" strokeDasharray="2 1"/></svg>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Flat<br/>Pattern</span>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Flat Pattern</span>
             </button>
             <button onClick={() => { pushToast('Bend Allowance coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bend Allowance">
               <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">

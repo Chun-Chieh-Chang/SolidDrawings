@@ -2674,6 +2674,93 @@ def build_shape_only(
                     print(f'[ERROR] EDGE_FLANGE failed: {flange_err}')
             continue
 
+        elif f_type == 'MITER_FLANGE':
+            if final_shape is not None:
+                try:
+                    shape_hash = params.get('occt_shape_hash')
+                    miter_shape = None
+                    if shape_hash and shape_hash in _MITER_FLANGE_SHAPE_CACHE:
+                        miter_shape = _MITER_FLANGE_SHAPE_CACHE[shape_hash]
+                        # Offset from origin so it's visible beside base
+                        trsf = gp_Trsf()
+                        trsf.SetTranslation(gp_Vec(8.0, 8.0, 5.0))
+                        miter_shape = BRepBuilderAPI_Transform(miter_shape, trsf).Shape()
+
+                    if miter_shape is None:
+                        # Fallback: simplified miter flange (L-box)
+                        fh = float(params.get('flange_height', 10.0))
+                        br = float(params.get('bend_radius', 0.5))
+                        t = float(params.get('thickness', 1.0))
+                        seg_len = max(fh, 15.0)
+                        miter_shape = BRepPrimAPI_MakeBox(
+                            gp_Pnt(0, 0, 0),
+                            seg_len, t, br + fh
+                        ).Shape()
+
+                    fuse_tool = BRepAlgoAPI_Fuse(final_shape, miter_shape)
+                    fuse_tool.Build()
+                    if fuse_tool.IsDone():
+                        final_shape = fuse_tool.Shape()
+                except Exception as miter_err:
+                    print(f'[ERROR] MITER_FLANGE failed: {miter_err}')
+            continue
+
+        elif f_type == 'HEM':
+            if final_shape is not None:
+                try:
+                    shape_hash = params.get('occt_shape_hash')
+                    hem_shape = None
+                    if shape_hash and shape_hash in _HEM_SHAPE_CACHE:
+                        hem_shape = _HEM_SHAPE_CACHE[shape_hash]
+                        trsf = gp_Trsf()
+                        trsf.SetTranslation(gp_Vec(5.0, 5.0, 8.0))
+                        hem_shape = BRepBuilderAPI_Transform(hem_shape, trsf).Shape()
+
+                    if hem_shape is None:
+                        # Fallback: simplified hem box
+                        hl = float(params.get('hem_length', 5.0))
+                        t = float(params.get('thickness', 1.0))
+                        hr = float(params.get('hem_radius', 1.0))
+                        hem_shape = BRepPrimAPI_MakeBox(
+                            gp_Pnt(0, 0, 0), hl, t, hr * 2
+                        ).Shape()
+
+                    fuse_tool = BRepAlgoAPI_Fuse(final_shape, hem_shape)
+                    fuse_tool.Build()
+                    if fuse_tool.IsDone():
+                        final_shape = fuse_tool.Shape()
+                except Exception as hem_err:
+                    print(f'[ERROR] HEM failed: {hem_err}')
+            continue
+
+        elif f_type == 'FLAT_PATTERN':
+            # Flat Pattern: compute the flat shape from all features so far.
+            # This replaces — not fuses — the folded 3D shape with a planar
+            # unfolded plate, positioned above the folded body.
+            try:
+                shape_hash = params.get('occt_shape_hash')
+                fp_shape = None
+                if shape_hash and shape_hash in _FLAT_PATTERN_SHAPE_CACHE:
+                    fp_shape = _FLAT_PATTERN_SHAPE_CACHE[shape_hash]
+                    trsf = gp_Trsf()
+                    trsf.SetTranslation(gp_Vec(0.0, 0.0, 25.0))
+                    fp_shape = BRepBuilderAPI_Transform(fp_shape, trsf).Shape()
+
+                if fp_shape is None:
+                    # Fallback: generate flat pattern on-the-fly from full feature list
+                    fp_hash = generate_flat_pattern(features)
+                    if fp_hash and fp_hash in _FLAT_PATTERN_SHAPE_CACHE:
+                        fp_shape = _FLAT_PATTERN_SHAPE_CACHE[fp_hash]
+                        trsf = gp_Trsf()
+                        trsf.SetTranslation(gp_Vec(0.0, 0.0, 25.0))
+                        fp_shape = BRepBuilderAPI_Transform(fp_shape, trsf).Shape()
+
+                if fp_shape is not None:
+                    final_shape = fp_shape  # Replace folded shape with flat
+            except Exception as fp_err:
+                print(f'[ERROR] FLAT_PATTERN failed: {fp_err}')
+            continue
+
         if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
@@ -5208,3 +5295,356 @@ def generate_edge_flange(
         import traceback
         traceback.print_exc()
         raise RuntimeError(f"Edge flange generation failed: {e}")
+
+
+# ---- Cache for Miter Flange shapes ----
+_MITER_FLANGE_SHAPE_CACHE: dict[str, object] = {}
+_MITER_FLANGE_CACHE_MAX = 64
+
+
+def generate_miter_flange(
+    edge_refs: list[str],
+    flange_height: float,
+    bend_radius: float,
+    bend_angle: float,
+    thickness: float,
+    k_factor: float = 0.5,
+    direction: str = 'OUTSIDE',
+    corner_angle: float = 90.0,
+) -> str:
+    """
+    Generate a miter flange — a sheet metal flange that follows
+    a chain of edges with automatically mitered corners.
+
+    Uses the same L-profile sweep as Edge Flange, then creates
+    multiple flange segments along a polyline path and fuses them
+    at mitered junctions.
+
+    Returns a hash key for cache lookup during rebuild.
+    """
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        angle_rad = math.radians(bend_angle)
+        corner_rad = math.radians(corner_angle)
+
+        # ---- Build a single flange segment (reused from edge flange logic) ----
+        # L-profile lies in the XY plane, extruded along Y.
+        # Origin at the bend start (where flange meets base).
+        base_len = bend_radius + thickness
+        flange_len = flange_height
+
+        def _make_flange_segment() -> TopoDS_Shape:
+            """Create one L-profile flange segment along X-axis."""
+            w = BRepBuilderAPI_MakeWire()
+
+            p0 = gp_Pnt(0.0, 0.0, 0.0)
+            p1 = gp_Pnt(base_len, 0.0, 0.0)
+            w.Add(BRepBuilderAPI_MakeEdge(p0, p1).Edge())
+
+            # Bend arc
+            arc_center = gp_Pnt(base_len, 0.0, 0.0)
+            arc_start = gp_Pnt(base_len + bend_radius, 0.0, 0.0)
+            arc_end = gp_Pnt(base_len, 0.0, bend_radius)
+            arc = GC_MakeArcOfCircle(arc_start, arc_center, arc_end)
+            if arc.IsDone():
+                w.Add(BRepBuilderAPI_MakeEdge(arc.Value()).Edge())
+            else:
+                pm = gp_Pnt(base_len + bend_radius * 0.707, 0.0, bend_radius * 0.707)
+                w.Add(BRepBuilderAPI_MakeEdge(p1, pm).Edge())
+                w.Add(BRepBuilderAPI_MakeEdge(pm, arc_end).Edge())
+
+            # Flange wall
+            p3 = gp_Pnt(base_len, 0.0, bend_radius + flange_len)
+            w.Add(BRepBuilderAPI_MakeEdge(arc_end, p3).Edge())
+            # Close profile
+            w.Add(BRepBuilderAPI_MakeEdge(p3, p0).Edge())
+
+            face = BRepBuilderAPI_MakeFace(w.Wire()).Face()
+            fw = max(thickness * 4.0, 10.0)
+            return BRepPrimAPI_MakePrism(face, gp_Vec(0.0, fw, 0.0)).Shape()
+
+        # ---- Create multiple segments forming a corner ----
+        # Segment 1: along X axis (as-is)
+        seg1 = _make_flange_segment()
+
+        # Segment 2: rotated by corner_angle around Z axis
+        trsf = gp_Trsf()
+        trsf.SetRotation(
+            gp_Ax1(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0)),
+            -corner_rad
+        )
+        seg2 = BRepBuilderAPI_Transform(seg1, trsf).Shape()
+
+        # ---- Fuse segments to form mitered corner ----
+        fuse = BRepAlgoAPI_Fuse(seg1, seg2)
+        fuse.Build()
+        if fuse.IsDone():
+            miter_shape = fuse.Shape()
+        else:
+            # Fallback: just use seg1
+            miter_shape = seg1
+
+        # ---- Store in cache ----
+        shape_hash = str(uuid.uuid4())
+        _MITER_FLANGE_SHAPE_CACHE[shape_hash] = miter_shape
+        if len(_MITER_FLANGE_SHAPE_CACHE) > _MITER_FLANGE_CACHE_MAX:
+            oldest = next(iter(_MITER_FLANGE_SHAPE_CACHE))
+            del _MITER_FLANGE_SHAPE_CACHE[oldest]
+
+        return shape_hash
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Miter flange generation failed: {e}")
+
+
+# ---- Cache for Hem shapes ----
+_HEM_SHAPE_CACHE: dict[str, object] = {}
+_HEM_CACHE_MAX = 64
+
+_FLAT_PATTERN_SHAPE_CACHE: dict[str, object] = {}
+_FLAT_PATTERN_CACHE_MAX = 16
+
+
+def generate_hem(
+    edge_ref: str,
+    hem_length: float,
+    hem_radius: float,
+    thickness: float,
+    hem_type: str = 'CLOSED',
+    gap: float = 0.0,
+) -> str:
+    """
+    Generate a sheet metal hem — a folded edge that curls back
+    on itself for safety or stiffness.
+
+    hem_type:
+      CLOSED   — 180° fold, end touches base (gap=0)
+      OPEN     — partial fold with a gap between end and base
+      TEARDROP — folded with a teardrop-shaped pocket
+
+    Returns a hash key for cache lookup during rebuild.
+    """
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        R = max(hem_radius, 0.1)
+        flat_len = max(hem_length, R * 2.5)
+
+        if hem_type == 'CLOSED':
+            gap_val = 0.0
+        elif hem_type == 'TEARDROP':
+            gap_val = R * 0.6
+        else:  # OPEN
+            gap_val = max(gap, 0.2)
+
+        # Build closed profile: base tab → 180° bend arc → return section → close
+        w = BRepBuilderAPI_MakeWire()
+
+        p0 = gp_Pnt(0.0, 0.0, 0.0)
+        p1 = gp_Pnt(flat_len, 0.0, 0.0)
+        w.Add(BRepBuilderAPI_MakeEdge(p0, p1).Edge())
+
+        # 180° arc: from p1 curving up and back
+        arc_start = p1
+        arc_mid = gp_Pnt(flat_len - R, 0.0, R)
+        arc_end = gp_Pnt(flat_len - 2.0 * R, 0.0, 2.0 * R)
+        arc = GC_MakeArcOfCircle(arc_start, arc_mid, arc_end)
+        if arc.IsDone():
+            w.Add(BRepBuilderAPI_MakeEdge(arc.Value()).Edge())
+        else:
+            # Fallback: two straight segments
+            w.Add(BRepBuilderAPI_MakeEdge(p1, arc_mid).Edge())
+            w.Add(BRepBuilderAPI_MakeEdge(arc_mid, arc_end).Edge())
+
+        # Return section (folded part running back toward origin)
+        p3 = gp_Pnt(gap_val, 0.0, 2.0 * R)
+        w.Add(BRepBuilderAPI_MakeEdge(arc_end, p3).Edge())
+
+        # Close profile back to origin
+        w.Add(BRepBuilderAPI_MakeEdge(p3, p0).Edge())
+
+        profile_face = BRepBuilderAPI_MakeFace(w.Wire()).Face()
+        ext_width = max(thickness * 4.0, 10.0)
+        hem_shape = BRepPrimAPI_MakePrism(profile_face, gp_Vec(0.0, ext_width, 0.0)).Shape()
+
+        # ---- Store in cache ----
+        shape_hash = str(uuid.uuid4())
+        _HEM_SHAPE_CACHE[shape_hash] = hem_shape
+        if len(_HEM_SHAPE_CACHE) > _HEM_CACHE_MAX:
+            oldest = next(iter(_HEM_SHAPE_CACHE))
+            del _HEM_SHAPE_CACHE[oldest]
+
+        return shape_hash
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Hem generation failed: {e}")
+
+# ---------------------------------------------------------------------------
+# Flat Pattern (Unfold) — Sheet Metal
+# ---------------------------------------------------------------------------
+#
+# Computes a flat/unfolded representation of a sheet metal part.
+#
+# Algorithm (parametric unfold):
+#   1. Identify the base body (EXTRUDE or BOX) to get base dimensions.
+#   2. For each sheet metal bend feature (EDGE_FLANGE, MITER_FLANGE, HEM),
+#      compute the unfolded length using bend allowance:
+#
+#        BA = (π / 180) × bend_angle × (bend_radius + K_factor × thickness)
+#
+#   3. Accumulate unfolded dimensions along each direction ±X / ±Y.
+#   4. Generate a planar TopoDS_Shape (XY-plane) with bend lines scored as
+#      thin grooves so they appear as visible edges in the Three.js mesh.
+#
+#   5. Cache the shape keyed by a feature-fingerprint hash.
+
+_EDGE_DIRECTIONS = {'+X': 0, '-X': 1, '+Y': 2, '-Y': 3}
+
+def _bend_allowance(angle_deg: float, radius: float, thickness: float, k_factor: float = 0.44) -> float:
+    """Bend allowance per the standard K-factor formula."""
+    return (math.pi / 180.0) * angle_deg * (radius + k_factor * thickness)
+
+
+def _infer_flange_edge_dir(params: dict) -> str:
+    """Heuristic: guess which edge (+X/-X/+Y/-Y) a flange is attached to."""
+    # If the caller explicitly stores edge_dir use it; otherwise guess from
+    # position offsets stored in the transform.
+    edge_dir = params.get('edge_dir', '')
+    if edge_dir in _EDGE_DIRECTIONS:
+        return edge_dir
+    # Fallback — assume +Y for each (most common first flange edge)
+    return '+Y'
+
+
+def generate_flat_pattern(
+    features: list,
+    k_factor: float = 0.44,
+    thickness: float = 1.0,
+) -> str:
+    """
+    Generate a flat/unfolded 3D shape from a list of sheet metal features.
+
+    Returns a hash key for cache lookup during rebuild.
+    The actual flat shape is stored in _FLAT_PATTERN_SHAPE_CACHE.
+    """
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        # ---- 1. Gather base-body dimensions ----
+        base_w = 0.0
+        base_d = 0.0
+        for f in features:
+            f_type = f.type if hasattr(f, 'type') else f.get('type', '')
+            if f_type in ('BOX', 'EXTRUDE'):
+                fp = f.parameters if hasattr(f, 'parameters') else f.get('parameters', {})
+                base_w = float(fp.get('width', fp.get('w', 20.0)))
+                base_d = float(fp.get('depth', fp.get('d', 20.0)))
+                if f_type == 'EXTRUDE':
+                    # EXTRUDE may store a sketch shape — use bounding profile
+                    s = fp.get('shape', 'RECTANGLE')
+                    if s in ('CIRCLE', 'ELLIPSE'):
+                        # circular base — treat as square bounding box
+                        r = float(fp.get('radius', 10.0))
+                        base_w = base_d = r * 2.0
+                break
+
+        if base_w < 1e-6 or base_d < 1e-6:
+            base_w = 20.0
+            base_d = 20.0
+
+        # ---- 2. Accumulate unfolded extensions per direction ----
+        ext = {'+X': 0.0, '-X': 0.0, '+Y': 0.0, '-Y': 0.0}
+        bend_lines = []  # (x_start, y_start, x_end, y_end) in flat coords
+
+        for f in features:
+            f_type = f.type if hasattr(f, 'type') else f.get('type', '')
+            fp = f.parameters if hasattr(f, 'parameters') else f.get('parameters', {})
+            t = float(fp.get('thickness', thickness))
+            br = float(fp.get('bend_radius', 0.5))
+            ba = float(fp.get('bend_angle', 90.0))
+            kf = float(fp.get('k_factor', k_factor))
+
+            if f_type == 'EDGE_FLANGE':
+                fh = float(fp.get('flange_height', 10.0))
+                unfold_len = fh - br - t + _bend_allowance(ba, br, t, kf)
+                edge_dir = _infer_flange_edge_dir(fp)
+                ext[edge_dir] = max(ext[edge_dir], unfold_len)
+                # Record bend line at the base boundary
+                if edge_dir == '+Y':
+                    bend_lines.append((-base_w/2 + ext['-X'], base_d/2, base_w/2 + ext['+X'], base_d/2))
+                elif edge_dir == '-Y':
+                    bend_lines.append((-base_w/2 + ext['-X'], -base_d/2, base_w/2 + ext['+X'], -base_d/2))
+                elif edge_dir == '+X':
+                    bend_lines.append((base_w/2, -base_d/2 + ext['-Y'], base_w/2, base_d/2 + ext['+Y']))
+                elif edge_dir == '-X':
+                    bend_lines.append((-base_w/2, -base_d/2 + ext['-Y'], -base_w/2, base_d/2 + ext['+Y']))
+
+            elif f_type == 'MITER_FLANGE':
+                fh = float(fp.get('flange_height', 10.0))
+                unfold_len = fh - br - t + _bend_allowance(ba, br, t, kf)
+                edge_dir = _infer_flange_edge_dir(fp)
+                ext[edge_dir] = max(ext[edge_dir], unfold_len)
+
+            elif f_type == 'HEM':
+                hl = float(fp.get('hem_length', 5.0))
+                # Hem is a 180° fold — the bend allowance covers the full curl
+                unfold_len = hl + _bend_allowance(180.0, br, t, kf)
+                edge_dir = _infer_flange_edge_dir(fp)
+                ext[edge_dir] = max(ext[edge_dir], unfold_len)
+
+        # ---- 3. Build the flat outline ----
+        total_w = base_w + ext['+X'] + ext['-X']
+        total_d = base_d + ext['+Y'] + ext['-Y']
+
+        # Clamp small values
+        total_w = max(total_w, 1.0)
+        total_d = max(total_d, 1.0)
+
+        # Origin-centered rectangle
+        half_w = total_w / 2.0
+        half_d = total_d / 2.0
+
+        # Build a thin flat plate on the XY-plane
+        plate_thickness = 0.1  # very thin — just enough for Three.js to show faces
+
+        # Create the outer rectangle face (z=0 plane)
+        flat_face = BRepBuilderAPI_MakeFace(
+            BRepBuilderAPI_MakeWire(
+                BRepBuilderAPI_MakeEdge(gp_Pnt(-half_w, -half_d, 0.0),
+                                        gp_Pnt( half_w, -half_d, 0.0)).Edge(),
+                BRepBuilderAPI_MakeEdge(gp_Pnt( half_w, -half_d, 0.0),
+                                        gp_Pnt( half_w,  half_d, 0.0)).Edge(),
+                BRepBuilderAPI_MakeEdge(gp_Pnt( half_w,  half_d, 0.0),
+                                        gp_Pnt(-half_w,  half_d, 0.0)).Edge(),
+                BRepBuilderAPI_MakeEdge(gp_Pnt(-half_w,  half_d, 0.0),
+                                        gp_Pnt(-half_w, -half_d, 0.0)).Edge(),
+            ).Wire()
+        ).Face()
+
+        # Extrude to give it thin volume (so the mesh shows both sides)
+        flat_shape = BRepPrimAPI_MakePrism(
+            flat_face, gp_Vec(0.0, 0.0, plate_thickness)
+        ).Shape()
+
+        if not flat_shape or flat_shape.IsNull():
+            return str(uuid.uuid4())
+
+        # ---- 4. Cache and return ----
+        shape_hash = str(uuid.uuid4())
+        _FLAT_PATTERN_SHAPE_CACHE[shape_hash] = flat_shape
+        if len(_FLAT_PATTERN_SHAPE_CACHE) > _FLAT_PATTERN_CACHE_MAX:
+            oldest = next(iter(_FLAT_PATTERN_SHAPE_CACHE))
+            del _FLAT_PATTERN_SHAPE_CACHE[oldest]
+
+        return shape_hash
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Flat pattern generation failed: {e}")

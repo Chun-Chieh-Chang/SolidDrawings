@@ -330,5 +330,8 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     handleConvertEntities: entityModule.handleConvertEntities,
     handleOffsetEntities: entityModule.handleOffsetEntities,
     handleCreateEdgeFlange: sheetMetalModule.handleCreateEdgeFlange,
+    handleCreateMiterFlange: sheetMetalModule.handleCreateMiterFlange,
+    handleCreateHem: sheetMetalModule.handleCreateHem,
+    handleCreateFlatPattern: sheetMetalModule.handleCreateFlatPattern,
   };
 };

@@ -386,6 +386,85 @@ async def create_edge_flange(request: EdgeFlangeRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+class MiterFlangeRequest(BaseModel):
+    base_feature_id: str
+    edge_refs: list[str]          # Chain of contiguous edge IDs
+    flange_height: float
+    bend_radius: float
+    bend_angle: float
+    thickness: float
+    k_factor: Optional[float] = 0.5
+    direction: str = 'OUTSIDE'
+    corner_angle: Optional[float] = 90.0
+
+@router.post("/miter_flange")
+async def create_miter_flange(request: MiterFlangeRequest):
+    try:
+        shape_hash = geometry_service.generate_miter_flange(
+            edge_refs=request.edge_refs,
+            flange_height=request.flange_height,
+            bend_radius=request.bend_radius,
+            bend_angle=request.bend_angle,
+            thickness=request.thickness,
+            k_factor=request.k_factor,
+            direction=request.direction,
+            corner_angle=request.corner_angle,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class HemRequest(BaseModel):
+    edge_ref: str
+    hem_length: float
+    hem_radius: float
+    thickness: float
+    hem_type: str = 'CLOSED'      # CLOSED, OPEN, TEARDROP
+    gap: Optional[float] = 0.0
+
+@router.post("/hem")
+async def create_hem(request: HemRequest):
+    try:
+        shape_hash = geometry_service.generate_hem(
+            edge_ref=request.edge_ref,
+            hem_length=request.hem_length,
+            hem_radius=request.hem_radius,
+            thickness=request.thickness,
+            hem_type=request.hem_type,
+            gap=request.gap,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+class FeatureSummary(BaseModel):
+    id: str
+    type: str
+    parameters: dict = {}
+
+class FlatPatternRequest(BaseModel):
+    features: List[FeatureSummary]
+    k_factor: Optional[float] = 0.44
+    thickness: Optional[float] = 1.0
+
+@router.post("/flat_pattern")
+async def create_flat_pattern(request: FlatPatternRequest):
+    try:
+        shape_hash = geometry_service.generate_flat_pattern(
+            features=[f.dict() for f in request.features],
+            k_factor=request.k_factor,
+            thickness=request.thickness,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/intersection_curve")
 async def get_intersection_curve(request: IntersectionCurveRequest):
     try:

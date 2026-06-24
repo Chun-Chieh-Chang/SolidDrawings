@@ -50,3 +50,18 @@ sync.ffs_db
 
 # Simulation artifacts
 simulation_result_*.json
+
+# Windows NUL collision artifact
+nul
+
+# Vendor placeholder (empty directory)
+vendor/
+
+# OpenCode session state
+.omo/
+
+# Playwright test reports
+playwright-report/
+
+# IDE scaffolding
+.opencode/
