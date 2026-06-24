@@ -355,6 +355,37 @@ async def offset_entities(request: OffsetEntitiesRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+class EdgeFlangeRequest(BaseModel):
+    base_feature_id: str
+    edge_ref: str
+    flange_height: float
+    bend_radius: float
+    bend_angle: float
+    thickness: float
+    k_factor: Optional[float] = 0.5
+    direction: str = 'OUTSIDE'
+    relief_type: Optional[str] = 'RECTANGULAR'
+
+@router.post("/edge_flange")
+async def create_edge_flange(request: EdgeFlangeRequest):
+    try:
+        shape_hash = geometry_service.generate_edge_flange(
+            base_feature_id=request.base_feature_id,
+            edge_ref=request.edge_ref,
+            flange_height=request.flange_height,
+            bend_radius=request.bend_radius,
+            bend_angle=request.bend_angle,
+            thickness=request.thickness,
+            k_factor=request.k_factor,
+            direction=request.direction,
+            relief_type=request.relief_type,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/intersection_curve")
 async def get_intersection_curve(request: IntersectionCurveRequest):
     try:

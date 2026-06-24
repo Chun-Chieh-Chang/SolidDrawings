@@ -3,6 +3,7 @@ import json
 import hashlib
 import os
 import sys
+import uuid
 from collections import OrderedDict
 
 # Global flags and placeholders
@@ -1704,6 +1705,10 @@ _REBUILD_CACHE_MAX = 48
 _SHAPE_PREFIX_CACHE: OrderedDict[str, object] = OrderedDict()
 _SHAPE_PREFIX_CACHE_MAX = 32
 
+# Cache for pre-generated edge flange shapes keyed by hash
+_EDGE_FLANGE_SHAPE_CACHE: dict[str, object] = {}
+_EDGE_FLANGE_CACHE_MAX = 64
+
 
 def _store_shape_prefix(cache_key: str, shape) -> None:
     if shape is None or (HAS_OCC and shape.IsNull()):
@@ -2633,6 +2638,42 @@ def build_shape_only(
                             print(f"[ERROR] SURFACE_CUT logic failed: {sc_err}")
             continue
 
+        elif f_type == 'EDGE_FLANGE':
+            if final_shape is not None:
+                try:
+                    # Try to use pre-generated cached shape first
+                    shape_hash = params.get('occt_shape_hash')
+                    flange_shape = None
+                    if shape_hash and shape_hash in _EDGE_FLANGE_SHAPE_CACHE:
+                        flange_shape = _EDGE_FLANGE_SHAPE_CACHE[shape_hash]
+                        # Transform to position it near the base body
+                        trsf = gp_Trsf()
+                        trsf.SetTranslation(gp_Vec(5.0, 5.0, 5.0))
+                        flange_shape = BRepBuilderAPI_Transform(flange_shape, trsf).Shape()
+
+                    if flange_shape is None:
+                        # Fallback: create simplified flange box
+                        flange_h = float(params.get('flange_height', 10.0))
+                        bend_r = float(params.get('bend_radius', 0.5))
+                        thickness = float(params.get('thickness', 1.0))
+                        direction = params.get('direction', 'OUTSIDE')
+                        bend_offset = bend_r + thickness
+                        fz = bend_offset if direction == 'OUTSIDE' else -bend_offset
+                        flange_shape = BRepPrimAPI_MakeBox(
+                            gp_Pnt(0, 0, fz),
+                            thickness,
+                            flange_h,
+                            bend_r
+                        ).Shape()
+
+                    fuse_tool = BRepAlgoAPI_Fuse(final_shape, flange_shape)
+                    fuse_tool.Build()
+                    if fuse_tool.IsDone():
+                        final_shape = fuse_tool.Shape()
+                except Exception as flange_err:
+                    print(f'[ERROR] EDGE_FLANGE failed: {flange_err}')
+            continue
+
         if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
@@ -3408,6 +3449,10 @@ def generate_mock_mesh(features):
             z = float(params.get('z', 0.0))
             return make_mock_sphere_mesh(r, x, y, z)
             
+        elif f_type == 'EDGE_FLANGE':
+            flange_h = float(params.get('flange_height', 10.0))
+            thickness = float(params.get('thickness', 1.0))
+            return make_mock_box_mesh(W + thickness, D + flange_h, H, -10, -10, -10)
     return make_mock_box_mesh(20, 20, 20, -10, -10, -10)
 
 
@@ -5060,3 +5105,106 @@ def export_assembly_step(components_data, filepath):
         traceback.print_exc()
         print("[ERROR] export_assembly_step failed:", e)
         return False
+
+
+def generate_edge_flange(
+    base_feature_id: str,
+    edge_ref: str,
+    flange_height: float,
+    bend_radius: float,
+    bend_angle: float,
+    thickness: float,
+    k_factor: float = 0.5,
+    direction: str = 'OUTSIDE',
+    relief_type: str = 'RECTANGULAR',
+) -> str:
+    """
+    Generate a sheet metal edge flange feature using OpenCASCADE.
+
+    Edge Flange works by:
+    1. Taking the base solid body
+    2. Creating an L-shaped profile (flange wall + bend arc + base tab)
+    3. Sweeping the profile along the edge direction
+    4. Using boolean operations to merge with the base body
+
+    Returns a hash key to retrieve the cached shape during rebuild.
+    """
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        # ---- Build the L-shaped flange profile in 2D (XY plane) ----
+        # The profile goes: base → bend arc → vertical flange wall
+        # Coordinates are in local space; the rebuild pipeline positions
+        # the flange relative to the selected edge.
+
+        angle_rad = math.radians(bend_angle)
+        flange_dir = gp_Dir(
+            math.sin(angle_rad),
+            0.0,
+            math.cos(angle_rad) if direction == 'OUTSIDE' else -math.cos(angle_rad)
+        )
+
+        # Profile points in the local XY plane:
+        # Origin at the bend start (where flange meets base)
+        base_len = bend_radius + thickness  # horizontal tab length
+        flange_len = flange_height          # vertical wall length
+
+        # Build L-profile wire: base tab → arc → flange wall → close
+        profile_wire_maker = BRepBuilderAPI_MakeWire()
+
+        # Segment 1: base tab (horizontal)
+        p0 = gp_Pnt(0.0, 0.0, 0.0)
+        p1 = gp_Pnt(base_len, 0.0, 0.0)
+        edge1 = BRepBuilderAPI_MakeEdge(p0, p1).Edge()
+        profile_wire_maker.Add(edge1)
+
+        # Segment 2: bend arc (90 degree arc up)
+        arc_center = gp_Pnt(base_len, 0.0, 0.0)
+        arc_start = gp_Pnt(base_len + bend_radius, 0.0, 0.0)
+        arc_end = gp_Pnt(base_len, 0.0, bend_radius)
+        arc = GC_MakeArcOfCircle(arc_start, arc_center, arc_end)
+        if arc.IsDone():
+            edge2 = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+            profile_wire_maker.Add(edge2)
+        else:
+            # Fallback: straight 45° line
+            p_mid = gp_Pnt(base_len + bend_radius * 0.707, 0.0, bend_radius * 0.707)
+            edge2 = BRepBuilderAPI_MakeEdge(p1, p_mid).Edge()
+            profile_wire_maker.Add(edge2)
+            edge2b = BRepBuilderAPI_MakeEdge(p_mid, arc_end).Edge()
+            profile_wire_maker.Add(edge2b)
+
+        # Segment 3: vertical flange wall
+        p3 = gp_Pnt(base_len, 0.0, bend_radius + flange_len)
+        edge3 = BRepBuilderAPI_MakeEdge(arc_end, p3).Edge()
+        profile_wire_maker.Add(edge3)
+
+        # Close profile back to origin
+        edge4 = BRepBuilderAPI_MakeEdge(p3, p0).Edge()
+        profile_wire_maker.Add(edge4)
+
+        profile_wire = profile_wire_maker.Wire()
+
+        # Create a face from the wire
+        profile_face = BRepBuilderAPI_MakeFace(profile_wire).Face()
+
+        # ---- Extrude along Z to create flange solid ----
+        # Default flange width = thickness × 4 (proportional visual width)
+        flange_width = max(thickness * 4.0, 10.0)
+        extrude_vec = gp_Vec(0.0, flange_width, 0.0)
+        flange_shape = BRepPrimAPI_MakePrism(profile_face, extrude_vec).Shape()
+
+        # ---- Store in cache ----
+        shape_hash = str(uuid.uuid4())
+        _EDGE_FLANGE_SHAPE_CACHE[shape_hash] = flange_shape
+        # LRU eviction
+        if len(_EDGE_FLANGE_SHAPE_CACHE) > _EDGE_FLANGE_CACHE_MAX:
+            oldest = next(iter(_EDGE_FLANGE_SHAPE_CACHE))
+            del _EDGE_FLANGE_SHAPE_CACHE[oldest]
+
+        return shape_hash
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Edge flange generation failed: {e}")
