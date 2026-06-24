@@ -40,6 +40,7 @@ import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
 import { EquationsModal } from '@/ui/Modals/EquationsModal';
 import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
 import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
+import { SheetMetalPanel } from '@/ui/SheetMetal';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -98,6 +99,7 @@ export default function Home() {
     handleBuildSweepLoft,
     handleConvertEntities,
     handleOffsetEntities,
+    handleCreateEdgeFlange,
   } = useFeatureBuilders(handleRebuild);
 
   const handlePrintToPDF = useCallback(async () => {
@@ -224,8 +226,9 @@ export default function Home() {
         solidSketchPointCount={solidSketchPointCount}
         handleExitAndExtrude={handleExitAndExtrude}
         handleRevolveFromSketch={handleRevolveFromSketch}
-        handleImportStep={handleImportStep}
-        onShowMassProps={() => setShowMassPropsModal(true)}
+          handleImportStep={handleImportStep}
+          handleCreateEdgeFlange={handleCreateEdgeFlange}
+          onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
       />
 
@@ -277,6 +280,8 @@ export default function Home() {
               <MeasurementPanel />
             ) : interferenceActive ? (
               <InterferencePanel />
+            ) : activeTab === 'SHEET_METALS' ? (
+              <SheetMetalPanel active={true} />
             ) : (
               <FeatureManagerPanel
                 features={features}

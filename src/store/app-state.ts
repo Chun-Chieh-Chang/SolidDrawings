@@ -13,8 +13,8 @@ export type AppStateSlice = {
   setApprovedBy: (name: string) => void;
   mode: CadMode;
   setMode: (mode: CadMode) => void;
-  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING';
-  setActiveTab: (tab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING') => void;
+  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS';
+  setActiveTab: (tab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS') => void;
   isSketchMode: boolean;
   setSketchMode: (active: boolean) => void;
   smartDimensionActive: boolean;
@@ -76,8 +76,8 @@ export const createAppState = (set: any, get: any) => ({
       mode,
       activeTab: mode === 'ASSEMBLY' ? 'ASSEMBLY' : mode === 'DRAWING' ? 'DRAWING' : 'FEATURES',
     }),
-  activeTab: 'FEATURES' as 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING',
-  setActiveTab: (activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING') => set({ activeTab }),
+  activeTab: 'FEATURES' as 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS',
+  setActiveTab: (activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS') => set({ activeTab }),
 
   isSketchMode: false,
   setSketchMode: (isSketchMode: boolean) =>

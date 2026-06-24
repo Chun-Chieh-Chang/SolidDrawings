@@ -103,8 +103,8 @@ export type CombinedState = {
   refreshEvaluatedVariables: () => void;
   mode: import('./types').CadMode;
   setMode: (mode: import('./types').CadMode) => void;
-  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING';
-  setActiveTab: (tab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING') => void;
+  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS';
+  setActiveTab: (tab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS') => void;
   activeComponentId: string | null;
   setActiveComponentId: (id: string | null) => void;
   isSketchMode: boolean;
