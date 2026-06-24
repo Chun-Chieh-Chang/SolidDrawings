@@ -7,6 +7,7 @@ export {
   useRevolveBuilders,
   useEntityBuilders,
   useSweepLoftBuilders,
+  useSheetMetalBuilders,
 } from './features';
 
 export type {
@@ -17,4 +18,5 @@ export type {
   SweepParams,
   LoftParams,
   HelicalSweepParams,
+  EdgeFlangeParams,
 } from './features';

@@ -9,18 +9,21 @@ import { useExtrudeBuilders } from './extrude-builders';
 import { useRevolveBuilders } from './revolve-builders';
 import { useEntityBuilders } from './entity-builders';
 import { useSweepLoftBuilders } from './sweep-loft-builders';
+import { useSheetMetalBuilders } from './sheet-metal-builders';
 
 // Re-export sub-modules for direct usage
 export { useExtrudeBuilders } from './extrude-builders';
 export { useRevolveBuilders } from './revolve-builders';
 export { useEntityBuilders } from './entity-builders';
 export { useSweepLoftBuilders } from './sweep-loft-builders';
+export { useSheetMetalBuilders } from './sheet-metal-builders';
 
 // Re-export param types
 export type { ExtrudeParams } from './extrude-builders';
 export type { RevolveParams } from './revolve-builders';
 export type { ConvertEntitiesParams, OffsetEntitiesParams } from './entity-builders';
 export type { SweepParams, LoftParams, HelicalSweepParams } from './sweep-loft-builders';
+export type { EdgeFlangeParams } from './sheet-metal-builders';
 
 export const useFeatureBuilders = (handleRebuild: () => void) => {
   const {
@@ -259,6 +262,7 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     sketchFeatureTo3DPoints,
     handleRebuild,
   });
+  const sheetMetalModule = useSheetMetalBuilders(handleRebuild);
 
   // ── Save Sketch Only ───────────────────────────────────────────
 
@@ -325,5 +329,6 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     sketchFeatureTo3DPoints,
     handleConvertEntities: entityModule.handleConvertEntities,
     handleOffsetEntities: entityModule.handleOffsetEntities,
+    handleCreateEdgeFlange: sheetMetalModule.handleCreateEdgeFlange,
   };
 };

@@ -300,4 +300,33 @@ export class HeavyEngineClient {
       throw error;
     }
   }
+
+  public async createEdgeFlange(params: {
+    base_feature_id: string;
+    edge_ref: string;
+    flange_height: number;
+    bend_radius: number;
+    bend_angle: number;
+    thickness: number;
+    k_factor?: number;
+    direction: 'INSIDE' | 'OUTSIDE';
+    relief_type?: string;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/edge_flange`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Edge flange error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
 }
