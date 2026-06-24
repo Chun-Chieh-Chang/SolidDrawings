@@ -6,13 +6,14 @@ import { v4 as uuidv4 } from 'uuid';
 import { extractAllClosedLoops } from '../../utils/geometry/GraphAdapter';
 
 interface RibbonControllerProps {
-  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING';
+  activeTab: 'FEATURES' | 'SKETCH' | 'EVALUATE' | 'ASSEMBLY' | 'DRAWING' | 'RENDER' | 'SURFACING' | 'SHEET_METALS';
   setActiveTab: (tab: any) => void;
   engineStatus: 'CONNECTED' | 'DISCONNECTED';
   solidSketchPointCount: number;
   handleExitAndExtrude: (op?: any) => void;
   handleRevolveFromSketch: (op?: 'ADD' | 'CUT') => void;
   handleImportStep: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleCreateEdgeFlange?: (params: any) => void;
   onShowMassProps?: () => void;
   onShowEquations?: () => void;
 }
@@ -25,6 +26,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   handleExitAndExtrude,
   handleRevolveFromSketch,
   handleImportStep,
+  handleCreateEdgeFlange,
   onShowMassProps,
   onShowEquations,
 }) => {
@@ -82,8 +84,12 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
       {/* Ribbon Tabs */}
       <div className="flex px-2 border-b border-[#A0A0A0] bg-[#D6DADC]">
         <button
+          onClick={() => { setActiveTab('SHEET_METALS'); setMeasurementMode('NONE'); setMeasurementPoints([]); setMeasurementResults(null); } }
+          className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "SHEET_METALS" ? "border-emerald-600 text-emerald-700 bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}`}
+        >SHEET METAL</button>
+        <button
           onClick={() => { setActiveTab('FEATURES'); setMeasurementMode('NONE'); setMeasurementPoints([]); setMeasurementResults(null); } }
-          className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "FEATURES" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}` }
+          className={`px-6 py-1.5 text-[11px] font-black transition-all border-b-[3px] uppercase ${activeTab === "FEATURES" ? "border-[#005B9A] text-[#005B9A] bg-white shadow-sm" : "border-transparent text-slate-600 hover:bg-white/50"}`}
         >FEATURES</button>
         <button
           onClick={() => { setActiveTab('SURFACING'); setMeasurementMode('NONE'); } }
@@ -825,6 +831,75 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M2 12c4-4 8-4 12 0s8 4 12 0"/><path d="M12 2c-4 4-4 8 0 12s4 8 0 12"/></svg>
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Boundary<br/>Surface</span>
+            </button>
+          </div>
+        ) : activeTab === 'SHEET_METALS' ? (
+          <div className="flex items-center gap-2 h-full animate-in fade-in slide-in-from-left-2 duration-300">
+            <button onClick={() => {
+              if (!selectedTopology || selectedTopology.type !== 'EDGE') {
+                setHint('Edge Flange: Click on a solid body edge first, then press this button.');
+                pushToast('Select an edge on the model, then apply Edge Flange.', 'warning');
+                return;
+              }
+              if (handleCreateEdgeFlange) {
+                handleCreateEdgeFlange({
+                  edgeId: selectedTopology.id,
+                  flangeHeight: 10,
+                  bendRadius: 0.5,
+                  bendAngle: 90,
+                  thickness: 1.0,
+                  kFactor: 0.5,
+                  direction: 'OUTSIDE' as const,
+                  reliefType: 'RECTANGULAR' as const,
+                });
+              } else {
+                setHint('Edge Flange: Select an edge on the solid body, then set parameters.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Edge Flange">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21V3h18v18H3z"/><path d="M3 21l9-9 9 9"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Edge<br/>Flange</span>
+            </button>
+            <button onClick={() => { pushToast('Miter Flange coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Miter Flange">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21V3h18v18H3z"/><path d="M12 3l9 9H3z"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Miter</span>
+            </button>
+            <button onClick={() => { pushToast('Hem coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Hem">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 21V3h18v18H3z"/><path d="M3 21c4-2 8-2 12 0 4 2 6 0 6 0"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Hem</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => { pushToast('Flat Pattern coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Flat Pattern">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 12h18"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Flat<br/>Pattern</span>
+            </button>
+            <button onClick={() => { pushToast('Bend Allowance coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bend Allowance">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20c4-8 8-8 12-4"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Bend<br/>Allow</span>
+            </button>
+            <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            <button onClick={() => {
+              const thickness = 1.0;
+              const bendRadius = 0.5;
+              const bendAngle = 90;
+              const kFactor = 0.5;
+              const ba = Math.PI * (bendAngle / 180) * (bendRadius + kFactor * thickness);
+              pushToast(`BA = ${ba.toFixed(4)} mm (t=${thickness}, R=${bendRadius}, θ=${bendAngle}°, K=${kFactor})`, 'info');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bend Allowance Calculator">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M6 16v4"/><path d="M18 16v4"/><path d="M6 16l6-8 6 8"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">BA<br/>Calc</span>
             </button>
           </div>
         ) : activeTab === 'SKETCH' ? (
