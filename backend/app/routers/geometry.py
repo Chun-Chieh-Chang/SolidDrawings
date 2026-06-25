@@ -84,7 +84,7 @@ async def create_sphere(params: SphereParams):
 @router.post("/rebuild")
 async def rebuild_assembly(request: AssemblyRequest):
     try:
-        print("[DEBUG] Rebuild Request Features:", [f.dict() for f in request.features])
+        print("[DEBUG] Rebuild Request Features:", [f.model_dump() for f in request.features])
         # We now process the entire feature tree as a single B-Rep solid (SolidWorks Part style)
         result = geometry_service.process_features_cached(
             request.features,
@@ -330,7 +330,7 @@ async def convert_entities(request: ConvertEntitiesRequest):
     try:
         return geometry_service.convert_entities(
             request.features,
-            request.selectedTopology.dict(),
+            request.selectedTopology.model_dump(),
             request.activePlane,
             request.activeFaceOrigin,
             request.activeFaceNormal
@@ -480,11 +480,53 @@ class FlatPatternRequest(BaseModel):
     k_factor: Optional[float] = 0.44
     thickness: Optional[float] = 1.0
 
+class UnfoldRequest(BaseModel):
+    features: List[FeatureSummary]
+    bend_ids: Optional[List[str]] = None
+    k_factor: Optional[float] = 0.44
+    thickness: Optional[float] = 1.0
+
+class FoldRequest(BaseModel):
+    features: List[FeatureSummary]
+    bend_ids: List[str]
+    k_factor: Optional[float] = 0.44
+    thickness: Optional[float] = 1.0
+
+@router.post("/unfold")
+async def create_unfold(request: UnfoldRequest):
+    try:
+        shape_hash = geometry_service.generate_unfold(
+            features=[f.model_dump() for f in request.features],
+            bend_ids=request.bend_ids,
+            k_factor=request.k_factor,
+            thickness=request.thickness,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/fold")
+async def create_fold(request: FoldRequest):
+    try:
+        shape_hash = geometry_service.generate_fold(
+            features=[f.model_dump() for f in request.features],
+            bend_ids=request.bend_ids,
+            k_factor=request.k_factor,
+            thickness=request.thickness,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/flat_pattern")
 async def create_flat_pattern(request: FlatPatternRequest):
     try:
         shape_hash = geometry_service.generate_flat_pattern(
-            features=[f.dict() for f in request.features],
+            features=[f.model_dump() for f in request.features],
             k_factor=request.k_factor,
             thickness=request.thickness,
         )
@@ -601,6 +643,69 @@ async def create_ref_coordinate_system(request: RefCoordinateSystemRequest):
 
 from app.services import solver_service
 
+
+class BoundarySurfaceRequest(BaseModel):
+    features: list
+    boundary_curves: List[dict]
+    continuity: Optional[str] = "G1"
+
+
+class TrimSurfaceRequest(BaseModel):
+    features: list
+    trim_curve: dict
+    keep_side: Optional[str] = "INSIDE"
+
+
+class RibRequest(BaseModel):
+    features: list
+    thickness: Optional[float] = 2.0
+    direction: Optional[str] = "BOTH"
+
+
+@router.post("/boundary_surface")
+async def create_boundary_surface(request: BoundarySurfaceRequest):
+    try:
+        shape_hash = geometry_service.generate_boundary_surface(
+            features=request.features,
+            boundary_curves=request.boundary_curves,
+            continuity=request.continuity,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/trim_surface")
+async def create_trim_surface(request: TrimSurfaceRequest):
+    try:
+        shape_hash = geometry_service.generate_trim_surface(
+            features=request.features,
+            trim_curve=request.trim_curve,
+            keep_side=request.keep_side,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/rib")
+async def create_rib(request: RibRequest):
+    try:
+        shape_hash = geometry_service.generate_rib(
+            features=request.features,
+            thickness=request.thickness,
+            direction=request.direction,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 class SolverRequest(BaseModel):
     nodes: dict
     edges: dict
@@ -668,10 +773,50 @@ async def register_component(request: RegisterComponentRequest):
         from app.services.component_registry import registry
         
         # Build shape on backend if possible
-        shape = geometry_service.build_shape_only([f.dict() for f in request.features])
-        registry.register(request.id, [f.dict() for f in request.features], shape=shape)
+        shape = geometry_service.build_shape_only([f.model_dump() for f in request.features])
+        registry.register(request.id, [f.model_dump() for f in request.features], shape=shape)
         
         return {"status": "SUCCESS", "message": f"Component {request.id} registered successfully."}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class SplitRequest(BaseModel):
+    features: List[FeatureDefinition]
+    split_plane: dict  # {point: [x,y,z], normal: [x,y,z]}
+
+
+class CombineRequest(BaseModel):
+    features: List[FeatureDefinition]
+    operation: str = "ADD"  # ADD, SUBTRACT, INTERSECT
+    tool_feature_id: str
+
+
+@router.post("/split")
+async def create_split(request: SplitRequest):
+    try:
+        shape_hash = geometry_service.generate_split(
+            features=[f.model_dump() for f in request.features],
+            split_plane=request.split_plane,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/combine")
+async def create_combine(request: CombineRequest):
+    try:
+        shape_hash = geometry_service.generate_combine(
+            features=[f.model_dump() for f in request.features],
+            operation=request.operation,
+            tool_feature_id=request.tool_feature_id,
+        )
+        return {"success": True, "shape_hash": shape_hash}
     except Exception as e:
         import traceback
         traceback.print_exc()

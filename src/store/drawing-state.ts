@@ -10,7 +10,7 @@ export type DrawingSlice = {
   setActiveSheet: (id: string) => void;
   updateViewPosition: (sheetId: string, viewId: string, position: { x: number; y: number; w: number; h: number }) => void;
   updateViewScale: (sheetId: string, viewId: string, scale: string) => void;
-  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION', sheetId?: string, parentViewId?: string) => void;
+  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL', sheetId?: string, parentViewId?: string) => void;
   removeViewFromSheet: (sheetId: string, viewId: string) => void;
   updateViewTitle: (sheetId: string, viewId: string, title: string) => void;
   toggleViewDimensions: (sheetId: string, viewId: string) => void;
@@ -76,12 +76,12 @@ export const createDrawingState = (set: any, get: any) => ({
       ),
     })),
 
-  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION', sheetId?: string, parentViewId?: string) =>
+  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL', sheetId?: string, parentViewId?: string) =>
     set((state: any) => {
       const id = `view-${Date.now()}`;
       const scales = ['1:1', '1:2', '1:5', '2:1', '5:1'];
       const scale = scales[Math.floor(Math.random() * scales.length)];
-      const titleMap: Record<string, string> = { FRONT: 'Front View', TOP: 'Top View', RIGHT: 'Right View', ISO: 'Isometric View', SECTION: 'Section View' };
+      const titleMap: Record<string, string> = { FRONT: 'Front View', TOP: 'Top View', RIGHT: 'Right View', ISO: 'Isometric View', SECTION: 'Section View', DETAIL: 'Detail View' };
       const colWidth = 500;
       const rowHeight = 350;
       const gap = 20;

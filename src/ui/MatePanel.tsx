@@ -126,7 +126,7 @@ export const MatePanel = () => {
 
     const newMate: CADMate = {
       id: `mate_${uuidv4()}`,
-      name: `${(mateType === 'GEAR' || mateType === 'SCREW' || mateType === 'LOCK' || mateType === 'WIDTH' || mateType === 'SNAP') ? 'Special Mate' : mateType === 'SYMMETRY' ? 'Symmetry Mate' : 'Mate'} ${mates.length + 1}`,
+      name: `${(mateType === 'GEAR' || mateType === 'SCREW' || mateType === 'LOCK' || mateType === 'WIDTH' || mateType === 'SNAP') ? 'Special Mate' : mateType === 'SYMMETRY' ? 'Symmetry Mate' : mateType === 'PROFILE_CENTER' ? 'Profile Center' : 'Mate'} ${mates.length + 1}`,
       type: mateType,
       entity1: toMateEntity(mateSelection[0]),
       entity2: toMateEntity(mateSelection[1]),
@@ -205,9 +205,9 @@ export const MatePanel = () => {
         </div>
 
         <div>
-          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">Special Mate (Special)</div>
+          <div className="text-[10px] font-black text-slate-400 uppercase mb-1.5 tracking-widest">Advanced Mates</div>
           <div className="grid grid-cols-4 gap-1">
-            {(['WIDTH', 'SYMMETRY', 'LOCK', 'SNAP'] as MateType[]).map((type) => (
+            {(['WIDTH', 'SYMMETRY', 'PROFILE_CENTER', 'LOCK', 'SNAP'] as MateType[]).map((type) => (
               <button
                 key={type}
                 onClick={() => setMateType(type)}
@@ -217,7 +217,7 @@ export const MatePanel = () => {
                     : 'bg-[#F8FAFC] border-slate-200 text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                {type === 'WIDTH' ? '↔ Width' : type === 'SYMMETRY' ? '⇄ Symmetry' : type === 'LOCK' ? '🔒 Lock' : '🧲 Snap'}
+                {type === 'WIDTH' ? '↔ Width' : type === 'SYMMETRY' ? '⇄ Symmetry' : type === 'PROFILE_CENTER' ? '◎ Profile' : type === 'LOCK' ? '🔒 Lock' : '🧲 Snap'}
               </button>
             ))}
           </div>

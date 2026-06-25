@@ -159,6 +159,36 @@ export class HeavyEngineClient {
     }
   }
 
+  public async sectionView(features: CADFeature[], cutPlane: any, planeType?: string): Promise<any> {
+    try {
+      const response = await fetch(`${this.baseUrl}/section_view`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features, cutPlane, planeType: planeType || 'FRONT' }),
+      });
+      if (!response.ok) throw new Error('Section view failed');
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] Section view error:', error);
+      return { visible_lines: [], hidden_lines: [], section_fill: [], section_line: null };
+    }
+  }
+
+  public async projectViews(features: CADFeature[]): Promise<Record<string, any[]>> {
+    try {
+      const response = await fetch(`${this.baseUrl}/project_views`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features }),
+      });
+      if (!response.ok) throw new Error('Project views failed');
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] Project views error:', error);
+      return { FRONT: [], TOP: [], RIGHT: [] };
+    }
+  }
+
   public async exportCadFile(features: CADFeature[], format: string, filepath: string): Promise<boolean> {
     try {
       const response = await fetch(`${this.baseUrl}/export`, {
@@ -381,6 +411,52 @@ export class HeavyEngineClient {
       return { success: true, shapeHash: data.shape_hash };
     } catch (error: any) {
       console.error('[HeavyEngineClient] Hem error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  public async createBoundarySurface(params: {
+    features: Array<{ id: string; type: string; parameters: Record<string, any> }>;
+    boundary_curves: Array<{ points: number[][] }>;
+    continuity?: string;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/boundary_surface`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Boundary surface error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  public async createTrimSurface(params: {
+    features: Array<{ id: string; type: string; parameters: Record<string, any> }>;
+    trim_curve: { points: number[][] };
+    keep_side?: string;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/trim_surface`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Trim surface error:', error);
       return { success: false, error: error.message || 'Unknown error' };
     }
   }

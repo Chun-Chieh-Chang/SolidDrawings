@@ -51,8 +51,8 @@ export type AppStateSlice = {
   setReferencePoints: (points: any[]) => void;
   referenceCoordinateSystems: any[];
   setReferenceCoordinateSystems: (systems: any[]) => void;
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   commitPreciseSketchSolve: () => void;
@@ -137,8 +137,8 @@ export const createAppState = (set: any, get: any) => ({
   referenceCoordinateSystems: [] as any[],
   setReferenceCoordinateSystems: (referenceCoordinateSystems: any[]) => set({ referenceCoordinateSystems }),
 
-  pendingFeatureCommand: null as ('FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | null),
-  setPendingFeatureCommand: (pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | null) => set({ pendingFeatureCommand }),
+  pendingFeatureCommand: null as ('FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null),
+  setPendingFeatureCommand: (pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => set({ pendingFeatureCommand }),
   defaultFilletRadius: 2 as number,
   defaultChamferDistance: 1.5 as number,
 

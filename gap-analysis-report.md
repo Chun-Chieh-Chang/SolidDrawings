@@ -13,16 +13,16 @@
 | UI/UX 相容性 (SCS) | 100% | 🟢 完全對齊 |
 | 草圖工具 | 85% | 🟡 小幅差距 |
 | 特特徵引擎 (3D Part) | 80% | 🟡 中等差距 |
-| 鈑金 (Sheet Metal) | 70% | 🟡 核心功能就緒 |
-| 曲面 (Surfacing) | 30% | 🔴 大量缺乏 |
-| 組件 (Assembly) | 25% | 🔴 基礎架構 |
-| 工程圖 (Drawing) | 15% | 🔴 雛形階段 |
+| 鈑金 (Sheet Metal) | 85% | 🟡 核心功能就緒 |
+| 曲面 (Surfacing) | 50% | 🟡 部分完成 |
+| 組件 (Assembly) | 35% | 🟡 基礎架構 |
+| 工程圖 (Drawing) | 35% | 🔴 雛形階段 |
 | 公差 (Tolerancing) | 0% | ⚪ 未開始 |
 | 焊接 (Weldments) | 0% | ⚪ 未開始 |
-| 測試覆蓋率 | 5% | 🔴 嚴重不足 |
+| 測試覆蓋率 | 20% | 🔴 基礎測試架構就緒 |
 | 檔案互通性 | 60% | 🟡 基礎 STEP/STL |
 
-**總體成熟度**: ~45% — 功能性雛形完成，進階模組需大量補齊
+**總體成熟度**: ~60% — 功能性雛形完成，進階模組需大量補齊
 
 ---
 
@@ -313,15 +313,15 @@
 ## 11. 優先級行動建議
 
 ### P0 — 立即 (Critical)
-1. **Unfold/Fold** (鈑金展開/摺疊) — 手動展開必要功能
-2. **Standard 3 Views + Model View** (工程圖) — 工程圖核心
-3. **Advanced Mates** (組件結合) — 組裝功能瓶頸
+~~1. **Unfold/Fold** (鈑金展開/摺疊) — 手動展開必要功能~~ ✅ 已完成 2026-06-25
+~~2. **Standard 3 Views + Model View** (工程圖) — 工程圖核心~~ ✅ 已完成 2026-06-25
+~~3. **Advanced Mates** (組件結合) — 組裝功能瓶頸~~ ✅ 已完成 2026-06-25
 
 ### P1 — 本週 (High)
-4. **Rib 特徵** — 按鈕已存在但未實作
-5. **Boundary Surface / Trim Surface** — 曲面核心
-6. **Split / Combine** (布林運算) — 基本體操作
-7. **Base Flange Tab** — 鈑金專用 UI
+~~4. **Rib 特徵** — 按鈕已存在但未實作~~ ✅ 已完成 2026-06-25
+~~5. **Boundary Surface / Trim Surface** — 曲面核心~~ ✅ 已完成 2026-06-25
+~~6. **Split / Combine** (布林運算) — 基本體操作~~ ✅ 已完成 2026-06-25
+~~7. **Base Flange Tab** — 鈑金專用 UI~~ ✅ 已完成 2026-06-25
 
 ### P2 — 本月 (Medium)
 8. **3D Sketch** — 進階草圖需求
@@ -342,7 +342,7 @@
 
 | 風險 | 嚴重度 | 緩解 |
 |:---|---:|:---|
-| `geometry_service.py` 5700+ 行單一檔案 | 🔴 | 拆分為 sheet_metal.py, features.py, references.py |
+| `geometry_service.py` 6000 行單一檔案 (已拆分 surfacing.py 110 行 + sheet_metal.py 180 行) | 🟡 | 持續拆分 features.py |
 | `RibbonController.tsx` 1245 行 | 🟡 | 拆分為各 Tab 子組件 |
 | 缺少統一錯誤處理層 | 🟡 | 新增 ErrorBoundary 全域 |
 | 無 Python 測試 | 🔴 | pytest 基礎建設 |
@@ -354,9 +354,9 @@
 
 **UI/UX 相容性 (SCS)** 達 100%，基礎互動已完全對齊 SOLIDWORKS 2010。
 
-**功能成熟度**約 45% — 核心 Part 建模與 Sheet Metal 已具備生產力，但 Assembly、Drawing、Surfacing 三大模組仍處於早期階段。
+**功能成熟度**約 60% — 核心 Part 建模與 Sheet Metal 已具備生產力，P0/P1 全數關閉，但 Assembly、Drawing、Surfacing 三大模組仍需補齊。
 
-**最立即的價值缺口**在工程圖 (Drawing) — 這是從「3D 模型工具」進化為「完整 CAD 系統」的關鍵路障。其次是 Assembly 的進階結合與鈑金的 Unfold/Fold。
+**最立即的價值缺口**在工程圖 (Drawing) — 這是從「3D 模型工具」進化為「完整 CAD 系統」的關鍵路障。其次是 Assembly 的進階結合功能。
 
 ---
 

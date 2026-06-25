@@ -231,8 +231,8 @@ export type CombinedState = {
   toasts: import('./types').CadToastItem[];
   pushToast: (message: string, type?: import('./types').CadToastType) => void;
   dismissToast: (id: string) => void;
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   referencePlanes: import('./types').CADReferencePlane[];
@@ -299,7 +299,7 @@ export type CombinedState = {
   setActiveSheet: (id: string) => void;
   updateViewPosition: (sheetId: string, viewId: string, position: { x: number; y: number; w: number; h: number }) => void;
   updateViewScale: (sheetId: string, viewId: string, scale: string) => void;
-  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION', sheetId?: string, parentViewId?: string) => void;
+  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL', sheetId?: string, parentViewId?: string) => void;
   removeViewFromSheet: (sheetId: string, viewId: string) => void;
   updateViewTitle: (sheetId: string, viewId: string, title: string) => void;
   toggleViewDimensions: (sheetId: string, viewId: string) => void;

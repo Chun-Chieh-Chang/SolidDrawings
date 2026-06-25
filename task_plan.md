@@ -1,67 +1,69 @@
-# Task Plan: STABLE-3 Closure + Sheet Metal Phase 6
+# Task Plan: Sprint 2026-06-25 — Close Remaining P1 + Tech Debt
 
-## Status: In Progress (2026-06-23)
+## Status: Planned
 
 ## Goal
-1. Close out STABLE-3 (all phases superseded by STABLE-4 cleanup)
-2. Implement Sheet Metal Phase 6 from PLAN.md — Edge Flange end-to-end
+Close the last 2 P1 gaps (Split/Combine boolean ops, Base Flange Tab) and refactor the overgrown geometry_service.py. This clears all P0/P1 items and brings overall maturity from ~50% to ~60%.
 
 ---
 
-## Phase 1: STABLE-3 Closure (SUPERSEDED BY STABLE-4)
-- [x] Phase 1: Suppress Manual Wizards → **SUPERSEDED** — RobotHUD/RobotOperationService deleted in STABLE-4 (commit 6b7e908). `skipWizardIfRobotWorking` is a no-op stub in RibbonController.tsx line 76-78.
-- [x] Phase 2: Kernel Error Synchronization → **SUPERSEDED** — RobotOperationService.tsx deleted. No robot architecture exists anymore.
-- [x] Phase 3: Robot Script Intelligence → **SUPERSEDED** — e2e_stress_test_sim.py deleted. No stress test infrastructure remains.
-- [x] Phase 4: Final Validation → **SUPERSEDED** — No robot system to validate.
-- [x] Resolution: Mark all STABLE-3 phases as superseded. Document in DEV_LOG.
+## Sprint Tasks
 
-## Phase 2: Sheet Metal — Wire SheetMetalPanel into PropertyManager
-- [x] Connect SheetMetalPanel to useCadStore setActivePropertyManager
-- [x] Wire onFeatureCreate callback through PropertyManager flow
-- [x] Ensure SheetMetalPanel renders alongside other property managers (via activeTab === 'SHEET_METALS' in page.tsx)
+### Task 1: Split / Combine Boolean Operations — P1
 
-## Phase 3: Sheet Metal — Add Sheet Metal Tab to RibbonController
-- [x] Add 'SHEET_METALS' tab to RibbonController activeTab union
-- [x] Create Sheet Metal toolbar group with Edge Flange button
-- [x] Wire button to trigger sheet metal property manager
+**Acceptance Criteria:**
+- [ ] `POST /split` endpoint accepts a `{features, split_plane}` payload and returns 200 with `shape_hash`
+- [ ] `POST /combine` endpoint accepts a `{features, operation: "ADD"|"SUBTRACT"|"INTERSECT", tool_feature_id}` payload and returns 200 with `shape_hash`
+- [ ] `Split` and `Combine` buttons appear in the FEATURES ribbon tab (Boolean group)
+- [ ] `tsc --noEmit` shows zero new errors
 
-## Phase 4: Sheet Metal — Implement Edge Flange Feature Builder
-- [x] Create `src/hooks/features/sheet-metal-builders.ts` with Edge Flange handler
-- [x] Edge Flange: select base edge + sketch plane → create flange profile → extrude
-- [x] Register in useFeatureBuilders index
+- [ ] Backend: Add `POST /split` and `POST /combine` endpoints to geometry.py router
+- [ ] Backend: Add `generate_split()` and `generate_combine()` to geometry_service.py (leveraging OCC BRepAlgoAPI_Split/BRepAlgoAPI_Fuse/Cut/Common)
+- [ ] Frontend: Add Split/Combine buttons to RibbonController FEATURES tab
+- [ ] Verification: `tsc --noEmit` passes clean
 
-## Phase 5: Sheet Metal — Implement Backend Edge Flange Geometry
-- [x] Add `generate_edge_flange()` to backend geometry_service.py
-- [x] Use OpenCASCADE BRepOffsetAPI_MakeSimpleWire + BRepOffsetAPI_Sewing
-- [x] Expose via geometry.py router
-- [x] Real L-profile swept geometry in generate_edge_flange() (was: mock hash)
-- [x] Shape cache (_EDGE_FLANGE_SHAPE_CACHE) for rebuild pipeline lookup
+### Task 2: Base Flange Tab — P1
 
-## Phase 6: Sheet Metal — Bend Allowance K-factor Utility
-- [x] Calculate bend allowance: BA = π × (bendAngle/180) × (radius + kFactor × thickness)
-- [x] Add as standalone utility function
-- [x] Wire into SheetMetalPanel K-Factor rollout
+**Acceptance Criteria:**
+- [ ] `POST /base_flange_tab` returns 200 with `shape_hash` when given a closed sketch profile + thickness
+- [ ] Base Flange/Tab button is the first button in the SHEET_METALS ribbon tab
+- [ ] Clicking the button with a closed sketch creates a `BASE_FLANGE_TAB` feature
+- [ ] `tsc --noEmit` shows zero new errors
 
-## Phase 7: Verify Build + Lint Clean
-- [ ] TypeScript compilation passes
-- [ ] ESLint clean on changed files
-- [ ] No regressions in existing features
+- [ ] Backend: Add `POST /base_flange_tab` endpoint to geometry.py router
+- [ ] Backend: Add `generate_base_flange_tab()` to geometry_service.py (extrudes sketch with thickness, stores seed for flat pattern)
+- [ ] Backend: Add `BASE_FLANGE_TAB` type handling in rebuild pipeline
+- [ ] Frontend: Add Base Flange/Tab button (first position) to SHEET_METALS tab via `addFeature()`
+- [ ] TypeScript: Add `BASE_FLANGE_TAB` to `pendingFeatureCommand` type union
+- [ ] Verification: `tsc --noEmit` passes clean
+
+### Task 3: Refactor geometry_service.py — Tech Debt
+
+**Acceptance Criteria:**
+- [ ] `geometry_service.py` is split into at least 3 files: `features.py`, `sheet_metal.py`, `surfacing.py`
+- [ ] Original file imports from the split files — zero import breakage
+- [ ] All existing endpoints continue to work (API contract unchanged)
+- [ ] `python -c "from app.services.geometry_service import generate_box"` works without error
+
+- [ ] Analyze: Identify natural split boundaries
+- [ ] Create `backend/app/services/sheet_metal.py` — move unfold/fold, flat_pattern, edge_flange, miter_flange, hem, forming_tool, base_flange_tab
+- [ ] Create `backend/app/services/surfacing.py` — move boundary_surface, trim_surface, shape cache
+- [ ] Create `backend/app/services/features.py` — move extrude, revolve, sweep, loft, fillet, chamfer, shell, draft, pattern, mirror, thicken, dome, rib, split, combine
+- [ ] Convert `geometry_service.py` to thin re-export layer
+- [ ] Verification: Python import syntax check + `tsc --noEmit`
 
 ---
+
+## Gap Scoring After This Sprint (Projected)
+
+| Domain | Current | Target |
+|:---|---:|---:|
+| Surfacing | 45% | 50% |
+| Sheet Metal | 75% | 90% |
+| Assembly | 35% | 40% |
+| **Overall** | **~50%** | **~60%** |
 
 ## Errors Encountered
 | Error | Attempt | Resolution |
-|-------|---------|------------|
+|---|---|---|
 | (none yet) | | |
-
-## Files to Create/Modify
-### Create:
-- `src/hooks/features/sheet-metal-builders.ts`
-- `backend/app/services/sheet_metal_service.py` (or add to geometry_service.py)
-
-### Modify:
-- `src/ui/SheetMetal/SheetMetalPanel.tsx` — fix template literals, connect to store
-- `src/ui/RibbonBar/RibbonController.tsx` — add Sheet Metal tab + Edge Flange button
-- `src/hooks/features/index.ts` — register sheet metal builders
-- `src/store/useCadStore.ts` — add sheetMetal state if needed
-- `backend/app/routers/geometry.py` — add edge_flange endpoint

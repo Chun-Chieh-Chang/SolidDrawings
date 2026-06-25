@@ -3,7 +3,7 @@ import type { SelectionFilterType } from '@/utils/selection-filters';
 // ── Primitive types ──────────────────────────────────────────────
 export type CadMode = 'PART' | 'ASSEMBLY' | 'DRAWING' | 'RENDER';
 export type MeasurementMode = 'NONE' | 'DISTANCE' | 'ANGLE' | 'AREA' | 'VOLUME';
-export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT' | 'ANGLE' | 'GEAR' | 'SCREW' | 'WIDTH' | 'SYMMETRY' | 'LOCK' | 'SNAP';
+export type MateType = 'COINCIDENT' | 'PARALLEL' | 'CONCENTRIC' | 'DISTANCE' | 'PERPENDICULAR' | 'TANGENT' | 'ANGLE' | 'GEAR' | 'SCREW' | 'WIDTH' | 'SYMMETRY' | 'LOCK' | 'SNAP' | 'PROFILE_CENTER';
 export type CadToastType = 'error' | 'warning' | 'info';
 
 // ── Mate types ───────────────────────────────────────────────────
@@ -172,7 +172,7 @@ export interface SectionViewState {
 // ── Drawing types ────────────────────────────────────────────────
 export interface DrawingSheetViewData {
   id: string;
-  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION';
+  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL';
   title: string;
   position: { x: number; y: number; w: number; h: number };
   scale: string;

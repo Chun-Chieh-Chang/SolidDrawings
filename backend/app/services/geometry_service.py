@@ -108,6 +108,28 @@ try:
 except ImportError:
     HAS_THREADING = False
 
+# Import domain modules for surfacing, sheet metal, and features
+from .surfacing import (
+    generate_boundary_surface,
+    generate_trim_surface,
+    _SURFACE_SHAPE_CACHE,
+    _SURFACE_CACHE_MAX,
+)
+from .sheet_metal import (
+    generate_forming_tool,
+    _FORMING_TOOL_SHAPE_CACHE,
+    _FORMING_TOOL_CACHE_MAX,
+)
+from .features import (
+    generate_box,
+    generate_cylinder,
+    generate_sphere,
+    generate_rib,
+    generate_split,
+    generate_combine,
+    generate_section_view,
+)
+
 def get_shape_hash(shape, upper=10000000):
     """Robust hashing for OCC shapes across different versions."""
     if not HAS_OCC or shape is None:
@@ -2249,6 +2271,90 @@ def process_features(features, deflection=0.01):
                             print(f"[ERROR] SURFACE_CUT logic failed: {sc_err}")
             continue
 
+        elif f_type == 'SURFACE_BOUNDARY':
+            try:
+                boundary_curves = params.get('boundary_curves', [])
+                continuity = params.get('continuity', 'G1')
+                result_hash = generate_boundary_surface(
+                    features, boundary_curves, continuity
+                )
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as bnd_err:
+                print(f"[ERROR] SURFACE_BOUNDARY failed: {bnd_err}")
+            continue
+
+        elif f_type == 'SURFACE_TRIM':
+            try:
+                trim_curve = params.get('trim_curve', {})
+                keep_side = params.get('keep_side', 'INSIDE')
+                result_hash = generate_trim_surface(
+                    features, trim_curve, keep_side
+                )
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as trim_err:
+                print(f"[ERROR] SURFACE_TRIM failed: {trim_err}")
+            continue
+
+        elif f_type == 'SPLIT':
+            if final_shape is not None:
+                try:
+                    split_plane = params.get('split_plane', {})
+                    result_hash = generate_split(features, split_plane)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+                except Exception as split_err:
+                    print(f"[ERROR] SPLIT failed: {split_err}")
+            continue
+
+        elif f_type == 'COMBINE':
+            if final_shape is not None:
+                try:
+                    operation = params.get('operation', 'ADD')
+                    tool_feature_id = params.get('tool_feature_id')
+                    result_hash = generate_combine(features, operation, tool_feature_id)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+                except Exception as combine_err:
+                    print(f"[ERROR] COMBINE failed: {combine_err}")
+            continue
+
+        elif f_type == 'BASE_FLANGE_TAB':
+            # Map to a thin extrude with sheet metal defaults
+            try:
+                thickness = float(params.get('thickness', 1.0))
+                bend_radius = float(params.get('bendRadius', 0.5))
+                # Use a box-like default if no prior shape exists
+                if final_shape is None:
+                    sketch_id = params.get('sketchId')
+                    if sketch_id:
+                        # Find referenced sketch and hand off to EXTRUDE
+                        tf_params = dict(params)
+                        tf_params['operation'] = 'ADD'
+                        tf_params['endCondition'] = 'BLIND'
+                        tf_params['depth'] = thickness * 20  # Scale for visual thickness
+                        tf_params['isThin'] = True
+                        tf_params['thinThickness'] = thickness
+                        tf_params['thinDirection'] = 'MID_PLANE'
+                        feat_shape = build_feature_shape_in_isolation('EXTRUDE', tf_params, final_shape, features)
+                        if feat_shape and not feat_shape.IsNull():
+                            final_shape = feat_shape
+                else:
+                    # Add thin material to existing body
+                    builder = BRepPrimAPI_MakeBox(gp_Pnt(-10, -10, 0), gp_Pnt(10, 10, thickness))
+                    builder.Build()
+                    if builder.IsDone():
+                        thin_shape = builder.Shape()
+                        if final_shape is not None and not final_shape.IsNull():
+                            fuse = BRepAlgoAPI_Fuse(final_shape, thin_shape)
+                            fuse.Build()
+                            if fuse.IsDone():
+                                final_shape = fuse.Shape()
+            except Exception as bft_err:
+                print(f"[ERROR] BASE_FLANGE_TAB failed: {bft_err}")
+            continue
+
         if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
@@ -2636,6 +2742,79 @@ def build_shape_only(
                                         final_shape = cut_tool.Shape()
                         except Exception as sc_err:
                             print(f"[ERROR] SURFACE_CUT logic failed: {sc_err}")
+            continue
+
+        elif f_type == 'SURFACE_BOUNDARY':
+            try:
+                boundary_curves = params.get('boundary_curves', [])
+                continuity = params.get('continuity', 'G1')
+                result_hash = generate_boundary_surface(
+                    features, boundary_curves, continuity
+                )
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as bnd_err:
+                print(f"[ERROR] SURFACE_BOUNDARY failed: {bnd_err}")
+            continue
+
+        elif f_type == 'SURFACE_TRIM':
+            try:
+                trim_curve = params.get('trim_curve', {})
+                keep_side = params.get('keep_side', 'INSIDE')
+                result_hash = generate_trim_surface(
+                    features, trim_curve, keep_side
+                )
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as trim_err:
+                print(f"[ERROR] SURFACE_TRIM failed: {trim_err}")
+            continue
+
+        elif f_type == 'SPLIT':
+            if final_shape is not None:
+                try:
+                    split_plane = params.get('split_plane', {})
+                    result_hash = generate_split(features, split_plane)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+                except Exception as split_err:
+                    print(f"[ERROR] SPLIT failed: {split_err}")
+            continue
+
+        elif f_type == 'COMBINE':
+            if final_shape is not None:
+                try:
+                    operation = params.get('operation', 'ADD')
+                    tool_feature_id = params.get('tool_feature_id')
+                    result_hash = generate_combine(features, operation, tool_feature_id)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+                except Exception as combine_err:
+                    print(f"[ERROR] COMBINE failed: {combine_err}")
+            continue
+
+        elif f_type == 'BASE_FLANGE_TAB':
+            try:
+                thickness = float(params.get('thickness', 1.0))
+                if final_shape is None:
+                    # Create box-like base
+                    builder = BRepPrimAPI_MakeBox(gp_Pnt(-10, -10, 0), gp_Pnt(10, 10, thickness * 20))
+                    builder.Build()
+                    if builder.IsDone():
+                        final_shape = builder.Shape()
+                else:
+                    # Add thin material to existing body
+                    builder = BRepPrimAPI_MakeBox(gp_Pnt(-10, -10, 0), gp_Pnt(10, 10, thickness))
+                    builder.Build()
+                    if builder.IsDone():
+                        thin_shape = builder.Shape()
+                        if not thin_shape.IsNull():
+                            fuse = BRepAlgoAPI_Fuse(final_shape, thin_shape)
+                            fuse.Build()
+                            if fuse.IsDone():
+                                final_shape = fuse.Shape()
+            except Exception as bft_err:
+                print(f"[ERROR] BASE_FLANGE_TAB failed: {bft_err}")
             continue
 
         elif f_type == 'EDGE_FLANGE':
@@ -3264,25 +3443,6 @@ def build_shape_only(
             _store_shape_prefix(prefix_key, final_shape)
 
     return final_shape
-
-def generate_box(width, height, depth):
-    if not HAS_OCC:
-        return {"type": "mesh", "data": make_mock_box_mesh(width, height, depth)}
-    box = BRepPrimAPI_MakeBox(width, height, depth).Shape()
-    return {"type": "mesh", "data": _shape_to_mesh(box)}
-
-def generate_cylinder(radius, height):
-    if not HAS_OCC:
-        return {"type": "mesh", "data": make_mock_cylinder_mesh(radius, height)}
-    cylinder = BRepPrimAPI_MakeCylinder(radius, height).Shape()
-    return {"type": "mesh", "data": _shape_to_mesh(cylinder)}
-
-def generate_sphere(radius):
-    if not HAS_OCC:
-        return {"type": "mesh", "data": make_mock_sphere_mesh(radius)}
-    sphere = BRepPrimAPI_MakeSphere(radius).Shape()
-    return {"type": "mesh", "data": _shape_to_mesh(sphere)}
-
 
 # ==========================================
 # Pure-Python High-Fidelity Parametric Mesh Engine
@@ -5435,8 +5595,7 @@ _HEM_CACHE_MAX = 64
 _FLAT_PATTERN_SHAPE_CACHE: dict[str, object] = {}
 _FLAT_PATTERN_CACHE_MAX = 16
 
-_FORMING_TOOL_SHAPE_CACHE: dict[str, object] = {}
-_FORMING_TOOL_CACHE_MAX = 64
+# (imported from sheet_metal module)
 
 
 def generate_hem(
@@ -5601,6 +5760,10 @@ def generate_flat_pattern(
             ba = float(fp.get('bend_angle', 90.0))
             kf = float(fp.get('k_factor', k_factor))
 
+            # Skip bends marked as folded (selective unfold/fold support)
+            if fp.get('_unfold') is False:
+                continue
+
             if f_type == 'EDGE_FLANGE':
                 fh = float(fp.get('flange_height', 10.0))
                 unfold_len = fh - br - t + _bend_allowance(ba, br, t, kf)
@@ -5681,197 +5844,44 @@ def generate_flat_pattern(
         raise RuntimeError(f"Flat pattern generation failed: {e}")
 
 
-# ──────────────────────────────────────────────
-# Forming Tool Geometry Generation
-# ──────────────────────────────────────────────
-
-def _make_louver(width: float, height: float, depth: float, radius: float,
-                 angle: float, thickness: float) -> 'TopoDS_Shape':
+def generate_unfold(features, bend_ids=None, k_factor=0.44, thickness=1.0):
     """
-    Louver: a raised slot with angled ends.
-    - width: longitudinal length of the louver
-    - height: width of the louver opening
-    - depth: how far it protrudes from the face
-    - angle: opening angle in degrees
+    Unfold (selectively flatten) sheet metal bends.
+
+    If bend_ids is None, unfolds all bends (full flat pattern).
+    If bend_ids is provided, only unfolds the specified bends.
+    Delegates to generate_flat_pattern for the actual computation.
     """
-    # Base of the louver: a rectangular emboss
-    base = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), width, height, depth).Shape()
+    # Full unfold = super-set of flat pattern. For selective unfold,
+    # we store the bend selection in a special feature parameter
+    # that generate_flat_pattern can consume.
+    modified_features = list(features)
+    for f in modified_features:
+        if isinstance(f, dict) and f.get('type') in ('EDGE_FLANGE', 'MITER_FLANGE', 'HEM'):
+            params = f.get('parameters', {})
+            if bend_ids is None or f.get('id') in bend_ids:
+                params['_unfold'] = True
+            else:
+                params['_unfold'] = False
 
-    # Angled ramp: cut a wedge from the front
-    cutter = BRepPrimAPI_MakeBox(
-        gp_Pnt(-0.1, -0.1, depth * 0.3),
-        width + 0.2, height * 0.6, depth * 1.2
-    ).Shape()
-
-    cut = BRepAlgoAPI_Cut(base, cutter)
-    cut.Build()
-    if cut.IsDone():
-        return cut.Shape()
-    return base
+    return generate_flat_pattern(modified_features, k_factor, thickness)
 
 
-def _make_lance(width: float, height: float, depth: float, angle: float,
-                thickness: float) -> 'TopoDS_Shape':
+def generate_fold(features, bend_ids, k_factor=0.44, thickness=1.0):
     """
-    Lance: a tab cut on 3 sides and bent upward.
-    Creates a raised tab with a triangular opening.
+    Re-fold previously unfolded bends.
+
+    Sets _unfold=False on the specified bends, which causes
+    generate_flat_pattern to skip them (keeping them folded).
     """
-    base = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), width, height, depth).Shape()
+    modified_features = list(features)
+    for f in modified_features:
+        if isinstance(f, dict) and f.get('type') in ('EDGE_FLANGE', 'MITER_FLANGE', 'HEM'):
+            params = f.get('parameters', {})
+            if f.get('id') in bend_ids:
+                params['_unfold'] = False
 
-    # Triangular cut on the front face to simulate the opened tab
-    cut_wedge = BRepPrimAPI_MakeBox(
-        gp_Pnt(width * 0.15, -0.1, depth * 0.2),
-        width * 0.7, height * 0.5, depth
-    ).Shape()
-
-    cut = BRepAlgoAPI_Cut(base, cut_wedge)
-    cut.Build()
-    if cut.IsDone():
-        return cut.Shape()
-    return base
+    return generate_flat_pattern(modified_features, k_factor, thickness)
 
 
-def _make_bridge(width: float, height: float, depth: float, radius: float,
-                 thickness: float) -> 'TopoDS_Shape':
-    """
-    Bridge: a raised tab with both ends attached.
-    Arched top with open sides.
-    """
-    # Main bridge body
-    body = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), width, height, depth).Shape()
-
-    # Cut out the sides to create the bridge arch opening
-    side_cut_left = BRepPrimAPI_MakeBox(
-        gp_Pnt(-0.1, -0.1, -0.1),
-        width * 0.25 + 0.2, height + 0.2, depth + 0.2
-    ).Shape()
-
-    side_cut_right = BRepPrimAPI_MakeBox(
-        gp_Pnt(width * 0.75, -0.1, -0.1),
-        width * 0.25 + 0.2, height + 0.2, depth + 0.2
-    ).Shape()
-
-    body = BRepAlgoAPI_Cut(body, side_cut_left)
-    body.Build()
-    if body.IsDone():
-        body = BRepAlgoAPI_Cut(body.Shape(), side_cut_right)
-        body.Build()
-        if body.IsDone():
-            return body.Shape()
-    return BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), width, height, depth).Shape()
-
-
-def _make_dimple(width: float, height: float, depth: float, radius: float,
-                 thickness: float) -> 'TopoDS_Shape':
-    """
-    Dimple: an embossed spherical indentation on the face.
-    Creates a shallow dome-like protrusion.
-    """
-    # Base plate
-    base = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), width, height, thickness).Shape()
-
-    # Spherical emboss on the top
-    sphere_radius = min(width, height, depth * 2) * 0.4
-    sphere = BRepPrimAPI_MakeSphere(gp_Pnt(width / 2, height / 2, thickness),
-                                    sphere_radius).Shape()
-
-    fuse = BRepAlgoAPI_Fuse(base, sphere)
-    fuse.Build()
-    if fuse.IsDone():
-        return fuse.Shape()
-    return base
-
-
-def _make_drawn_cutout(width: float, height: float, depth: float, radius: float,
-                        thickness: float) -> 'TopoDS_Shape':
-    """
-    Drawn Cutout: a cutout with a flanged edge.
-    Creates a box with a smaller box subtracted and a surrounding flange.
-    """
-    # Outer box
-    outer = BRepPrimAPI_MakeBox(gp_Pnt(0, 0, 0), width, height, depth).Shape()
-
-    # Inner cutout
-    inset = thickness * 2
-    inner = BRepPrimAPI_MakeBox(
-        gp_Pnt(inset, inset, -0.1),
-        width - 2 * inset, height - 2 * inset, depth + 0.2
-    ).Shape()
-
-    cut = BRepAlgoAPI_Cut(outer, inner)
-    cut.Build()
-    if cut.IsDone():
-        return cut.Shape()
-    return outer
-
-
-def generate_forming_tool(
-    tool_type: str,
-    width: float = 10.0,
-    height: float = 10.0,
-    depth: float = 5.0,
-    radius: float = 1.0,
-    angle: float = 45.0,
-    thickness: float = 1.0,
-    direction: str = 'OUTSIDE',
-) -> str:
-    """
-    Generate a forming tool shape (Louver, Lance, Bridge, Dimple, Drawn Cutout).
-
-    tool_type:
-      LOUVER       — raised slot with angled ends
-      LANCE        — tab cut on 3 sides and bent upward
-      BRIDGE       — raised tab with both ends attached
-      DIMPLE       — embossed spherical indentation
-      DRAWN_CUTOUT — cutout with a flanged edge
-
-    Returns a hash key for cache lookup during rebuild.
-    """
-    if not HAS_OCC:
-        raise RuntimeError("OpenCASCADE is not available")
-
-    try:
-        # Clamp to sane ranges
-        width = max(width, 1.0)
-        height = max(height, 1.0)
-        depth = max(0.5, depth)
-        radius = max(0.1, radius)
-        thickness = max(0.1, thickness)
-
-        # Dispatch to tool builder
-        tool_map = {
-            'LOUVER': _make_louver,
-            'LANCE': _make_lance,
-            'BRIDGE': _make_bridge,
-            'DIMPLE': _make_dimple,
-            'DRAWN_CUTOUT': _make_drawn_cutout,
-        }
-
-        builder = tool_map.get(tool_type, _make_louver)
-        tool_shape = builder(width, height, depth, radius, angle, thickness)
-
-        if not tool_shape or tool_shape.IsNull():
-            # Fallback: simple box
-            tool_shape = BRepPrimAPI_MakeBox(
-                gp_Pnt(0, 0, 0), width, height, depth
-            ).Shape()
-
-        # Apply direction transform
-        if direction == 'OUTSIDE':
-            trsf = gp_Trsf()
-            trsf.SetTranslation(gp_Vec(0.0, 0.0, 0.0))
-            tool_shape = BRepBuilderAPI_Transform(tool_shape, trsf).Shape()
-
-        # Cache and return
-        shape_hash = str(uuid.uuid4())
-        _FORMING_TOOL_SHAPE_CACHE[shape_hash] = tool_shape
-        if len(_FORMING_TOOL_SHAPE_CACHE) > _FORMING_TOOL_CACHE_MAX:
-            oldest = next(iter(_FORMING_TOOL_SHAPE_CACHE))
-            del _FORMING_TOOL_SHAPE_CACHE[oldest]
-
-        return shape_hash
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise RuntimeError(f"Forming tool generation ({tool_type}) failed: {e}")
+# generate_rib, generate_split, generate_combine moved to features.py

@@ -28,7 +28,7 @@ interface ViewPosition {
 
 interface DrawingViewData {
   id: string;
-  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION';
+  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL';
   title: string;
   position: ViewPosition;
   scale: string;
@@ -55,7 +55,7 @@ const SCALE_TO_FACTOR: Record<string, number> = {
 
 interface DrawingViewProps {
   title: string;
-  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION';
+  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL';
   lines: any[];
   showDimensions: boolean;
   components?: any[];
@@ -64,10 +64,14 @@ interface DrawingViewProps {
   viewId: string;
   parentViewId?: string;
   sectionLine?: { u1: number; v1: number; u2: number; v2: number };
+  sectionFill?: { points: number[][] }[];
+  detailBounds?: { cx: number; cy: number; radius: number } | null;
   isDragging?: boolean;
+  onSectionCreated?: (parentViewId: string, data: any) => void;
+  onDetailCreated?: (parentViewId: string, bounds: { cx: number; cy: number; radius: number }) => void;
 }
 
-const DrawingView = ({ title, type, lines, showDimensions, components, scale, sheetId, viewId, sectionLine, isDragging }: DrawingViewProps) => {
+const DrawingView = ({ title, type, lines, showDimensions, components, scale, sheetId, viewId, sectionLine, sectionFill, detailBounds, isDragging, onSectionCreated, onDetailCreated }: DrawingViewProps) => {
   const [editingDim, setEditingDim] = useState<{id: string, type: string, param: string} | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [showScaleDropdown, setShowScaleDropdown] = useState(false);
@@ -75,6 +79,10 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
   const [sectionStart, setSectionStart] = useState<{u: number, v: number} | null>(null);
   const [sectionEnd, setSectionEnd] = useState<{u: number, v: number} | null>(null);
   const [isDrawingSection, setIsDrawingSection] = useState(false);
+  const [showDetailTool, setShowDetailTool] = useState(false);
+  const [detailCenter, setDetailCenter] = useState<{u: number, v: number} | null>(null);
+  const [detailRadius, setDetailRadius] = useState(50);
+  const [isDrawingDetail, setIsDrawingDetail] = useState(false);
 
   const features = useCadStore(state => state.features);
   const updateFeatureParams = useCadStore(state => state.updateFeatureParams);
@@ -110,11 +118,21 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
   const midV = hasBounds ? (minV + maxV) / 2 : 0;
 
   const size = Math.max(widthVal, heightVal);
-  const halfSize = hasBounds ? size / 2 + Math.max(size * 0.4, 20) : 50;
+  let halfSize = hasBounds ? size / 2 + Math.max(size * 0.4, 20) : 50;
   const scaleFactor = SCALE_TO_FACTOR[scale] || 1;
+  
+  // For DETAIL views, zoom into the detail bounds area
+  let viewCenterU = midU;
+  let viewCenterV = midV;
+  if (type === 'DETAIL' && detailBounds) {
+    viewCenterU = detailBounds.cx;
+    viewCenterV = detailBounds.cy;
+    halfSize = detailBounds.radius * 1.5;
+  }
+  
   const scaledHalfSize = halfSize / scaleFactor;
   const viewBox = hasBounds 
-    ? `${midU - scaledHalfSize} ${midV - scaledHalfSize} ${scaledHalfSize * 2} ${scaledHalfSize * 2}`
+    ? `${viewCenterU - scaledHalfSize} ${viewCenterV - scaledHalfSize} ${scaledHalfSize * 2} ${scaledHalfSize * 2}`
     : `-50 -50 100 100`;
 
   const viewBoxSize = halfSize * 2;
@@ -132,10 +150,10 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
 
   const getProjPos = useCallback((pos: [number, number, number]): [number, number] => {
     const [x, y, z] = pos;
-    if (type === 'FRONT') return [x, y];
+    if (type === 'FRONT' || type === 'SECTION') return [x, y];
     if (type === 'TOP') return [x, -z];
     if (type === 'RIGHT') return [z, y];
-    if (type === 'SECTION') return [x, y];
+    if (type === 'DETAIL') return [x, y];
     return [iso_u(x, y, z), iso_v(x, y, z)];
   }, [type]);
 
@@ -208,7 +226,6 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
 
   // Handle section line drawing on click
   const handleSvgClick = (e: React.MouseEvent<SVGElement>) => {
-    if (!showSectionTool) return;
     const svgEl = e.currentTarget as SVGElement & SVGGraphicsElement;
     const svg = svgEl as unknown as SVGSVGElement;
     const pt = svg.createSVGPoint();
@@ -217,12 +234,22 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
     const ctM = svg.getScreenCTM();
     const svgP = pt.matrixTransform(ctM?.inverse());
     
-    if (!isDrawingSection) {
-      setSectionStart({ u: svgP.x, v: svgP.y });
-      setIsDrawingSection(true);
-    } else {
-      setSectionEnd({ u: svgP.x, v: svgP.y });
-      setIsDrawingSection(false);
+    if (showSectionTool) {
+      if (!isDrawingSection) {
+        setSectionStart({ u: svgP.x, v: svgP.y });
+        setIsDrawingSection(true);
+      } else {
+        setSectionEnd({ u: svgP.x, v: svgP.y });
+        setIsDrawingSection(false);
+      }
+    } else if (showDetailTool) {
+      if (!isDrawingDetail) {
+        setDetailCenter({ u: svgP.x, v: svgP.y });
+        setIsDrawingDetail(true);
+      } else {
+        setDetailRadius(Math.sqrt((svgP.x - (detailCenter?.u ?? 0)) ** 2 + (svgP.y - (detailCenter?.v ?? 0)) ** 2));
+        setIsDrawingDetail(false);
+      }
     }
   };
 
@@ -232,14 +259,37 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
     setShowScaleDropdown(false);
   };
 
-  // Add section view from this cutting plane
-  const handleCreateSectionView = () => {
+  // Add section view from this cutting plane — calls backend API
+  const handleCreateSectionView = async () => {
     if (sectionStart && sectionEnd) {
+      const client = HeavyEngineClient.getInstance();
+      const cutOrigin = [0, 0, 0];
+      const cutNormal = [0, 0, 1];
+      if (type === 'FRONT') { cutOrigin[1] = 0; cutNormal[1] = 1; }
+      else if (type === 'TOP') { cutOrigin[2] = 0; cutNormal[2] = -1; }
+      else if (type === 'RIGHT') { cutOrigin[0] = 0; cutNormal[0] = 1; }
+
+      const result = await client.sectionView(features, { origin: cutOrigin, normal: cutNormal }, 'FRONT');
+      if (result && result.visible_lines) {
+        onSectionCreated?.(viewId, result);
+      }
       addViewToSheet('SECTION', sheetId, viewId);
       setShowSectionTool(false);
       setSectionStart(null);
       setSectionEnd(null);
       setIsDrawingSection(false);
+    }
+  };
+
+  // Add detail view from this circle selection
+  const handleCreateDetailView = () => {
+    if (detailCenter && detailRadius > 5) {
+      onDetailCreated?.(viewId, { cx: detailCenter.u, cy: detailCenter.v, radius: detailRadius });
+      addViewToSheet('DETAIL', sheetId, viewId);
+      setShowDetailTool(false);
+      setDetailCenter(null);
+      setDetailRadius(50);
+      setIsDrawingDetail(false);
     }
   };
 
@@ -291,7 +341,7 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
             </svg>
           </button>
           {/* Section View Tool */}
-          {type !== 'SECTION' && (
+          {type !== 'SECTION' && type !== 'DETAIL' && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowSectionTool(!showSectionTool); }}
               className={`p-0.5 rounded transition-all ${showSectionTool ? 'text-amber-500' : 'text-slate-500 hover:text-amber-500'}`}
@@ -300,6 +350,19 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                 <line x1="4" y1="4" x2="20" y2="20"/>
                 <line x1="20" y1="4" x2="4" y2="20"/>
+              </svg>
+            </button>
+          )}
+          {/* Detail View Tool */}
+          {type !== 'DETAIL' && type !== 'SECTION' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetailTool(!showDetailTool); }}
+              className={`p-0.5 rounded transition-all ${showDetailTool ? 'text-emerald-500' : 'text-slate-500 hover:text-emerald-500'}`}
+              title="Create detail view"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <circle cx="12" cy="12" r="8"/>
+                <circle cx="12" cy="12" r="4"/>
               </svg>
             </button>
           )}
@@ -322,6 +385,29 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
           )}
           <button
             onClick={(e) => { e.stopPropagation(); setShowSectionTool(false); setSectionStart(null); setSectionEnd(null); setIsDrawingSection(false); }}
+            className="ml-1 px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-bold hover:bg-slate-300"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Detail tool overlay */}
+      {showDetailTool && (
+        <div className="absolute top-8 right-2 bg-white border border-emerald-300 rounded-lg shadow-lg z-20 p-2 text-[9px]">
+          <div className="text-emerald-700 font-bold mb-1">Detail View Tool</div>
+          <div className="text-slate-500 mb-1">Click center, then edge</div>
+          {isDrawingDetail && <div className="text-emerald-600 font-bold">Set radius...</div>}
+          {detailCenter && !isDrawingDetail && detailRadius > 5 && (
+            <button
+              onClick={(e) => { e.stopPropagation(); handleCreateDetailView(); }}
+              className="mt-1 px-2 py-0.5 bg-emerald-500 text-white rounded text-[8px] font-bold hover:bg-emerald-600"
+            >
+              Create Detail
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setShowDetailTool(false); setDetailCenter(null); setDetailRadius(50); setIsDrawingDetail(false); }}
             className="ml-1 px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-bold hover:bg-slate-300"
           >
             Cancel
@@ -361,7 +447,25 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
             <pattern id={`centermark-${sheetId}-${viewId}`} width="2" height="2" patternUnits="userSpaceOnUse">
               <circle cx="1" cy="1" r="0.3" fill="#64748B"/>
             </pattern>
+            {/* Section hatch pattern for cut faces */}
+            {type === 'SECTION' && sectionFill && sectionFill.length > 0 && (
+              <pattern id={`hatch-${sheetId}-${viewId}`} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="6" stroke="#64748B" strokeWidth="0.5" strokeOpacity="0.6"/>
+              </pattern>
+            )}
           </defs>
+
+          {/* Section fill (hatched cut faces) */}
+          {type === 'SECTION' && sectionFill && sectionFill.map((fillPoly: any, fi: number) => (
+            <polygon
+              key={`sf-${fi}`}
+              points={fillPoly.points.map((p: number[]) => `${p[0]},${p[1]}`).join(' ')}
+              fill={`url(#hatch-${sheetId}-${viewId})`}
+              stroke="#64748B"
+              strokeWidth={lineStrokeWidth * 0.5}
+              strokeOpacity={0.8}
+            />
+          ))}
 
           {/* Model lines */}
           {normalizedLines.map((line: any, i: number) => (
@@ -560,6 +664,44 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
             />
           )}
 
+          {/* Detail bounds circle on parent view */}
+          {detailBounds && (
+            <g>
+              <circle
+                cx={detailBounds.cx}
+                cy={detailBounds.cy}
+                r={detailBounds.radius}
+                fill="none"
+                stroke="#10B981"
+                strokeWidth="2"
+                strokeDasharray="6,3"
+              />
+              <text
+                x={detailBounds.cx}
+                y={detailBounds.cy - detailBounds.radius - 6}
+                textAnchor="middle"
+                fontSize={textSize * 0.8}
+                fill="#10B981"
+                fontWeight="bold"
+              >
+                DETAIL
+              </text>
+            </g>
+          )}
+
+          {/* Detail circle preview while drawing */}
+          {showDetailTool && isDrawingDetail && detailCenter && (
+            <circle
+              cx={detailCenter.u}
+              cy={detailCenter.v}
+              r={Math.max(detailRadius, 5)}
+              fill="none"
+              stroke="#10B981"
+              strokeWidth="2"
+              strokeDasharray="6,3"
+            />
+          )}
+
           {/* Dimension overlay for auto-generated linear dimensions */}
           <DimensionOverlay 
             lines={normalizedLines}
@@ -668,6 +810,8 @@ export const DrawingSheet = () => {
   const [isRebuilding, setIsRebuilding] = useState<boolean>(false);
   const [renamingSheetId, setRenamingSheetId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [sectionData, setSectionData] = useState<Record<string, any>>({});
+  const [detailBounds, setDetailBounds] = useState<Record<string, { cx: number; cy: number; radius: number }>>({});
   const containerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -760,6 +904,14 @@ export const DrawingSheet = () => {
     dragOffsets.current = null;
   };
 
+  const handleSectionCreated = useCallback((parentViewId: string, data: any) => {
+    setSectionData(prev => ({ ...prev, [parentViewId]: data }));
+  }, []);
+
+  const handleDetailCreated = useCallback((parentViewId: string, bounds: { cx: number; cy: number; radius: number }) => {
+    setDetailBounds(prev => ({ ...prev, [parentViewId]: bounds }));
+  }, []);
+
   const handleRenameSheet = (sheetId: string) => {
     const sheet = drawingSheets.find(s => s.id === sheetId);
     setRenamingSheetId(sheetId);
@@ -851,12 +1003,28 @@ export const DrawingSheet = () => {
               gridTemplateColumns: `repeat(${activeSheetData?.views.length && activeSheetData.views.length % 2 !== 0 ? activeSheetData.views.length : Math.ceil((activeSheetData?.views.length || 0) / 1) / 2 || 2}, 1fr)`,
               gridTemplateRows: `repeat(${activeSheetData && activeSheetData.views.length > 0 ? Math.ceil(activeSheetData.views.length / 2) : 2}, 1fr)` ,
             }}>
-              {activeSheetData?.views.map((viewData: DrawingViewData) => (
+              {activeSheetData?.views.map((viewData: DrawingViewData) => {
+                // For DETAIL views, inherit lines from the parent view
+                let viewLines: any[] = [];
+                if (viewData.type === 'DETAIL' && viewData.parentViewId) {
+                  const detailParentView = activeSheetData?.views.find(v => v.id === viewData.parentViewId);
+                  if (detailParentView) {
+                    // If parent is a SECTION view, use its section data lines
+                    if (detailParentView.type === 'SECTION' && sectionData[viewData.parentViewId]) {
+                      viewLines = sectionData[viewData.parentViewId]?.visible_lines || [];
+                    } else {
+                      viewLines = projections[detailParentView.type] || [];
+                    }
+                  }
+                } else {
+                  viewLines = projections[viewData.type] || [];
+                }
+                return (
                 <DrawingView
                   key={viewData.id}
                   title={viewData.title}
                   type={viewData.type}
-                  lines={projections[viewData.type] || []}
+                  lines={viewLines}
                   showDimensions={viewData.showDimensions}
                   components={components}
                   scale={viewData.scale}
@@ -864,9 +1032,14 @@ export const DrawingSheet = () => {
                   viewId={viewData.id}
                   parentViewId={viewData.parentViewId}
                   sectionLine={viewData.sectionLine}
+                  sectionFill={viewData.type === 'SECTION' && viewData.parentViewId ? (sectionData[viewData.parentViewId]?.section_fill || []) : undefined}
+                  detailBounds={viewData.parentViewId ? (detailBounds[viewData.parentViewId] || null) : null}
                   isDragging={draggingViewId === viewData.id}
+                  onSectionCreated={handleSectionCreated}
+                  onDetailCreated={handleDetailCreated}
                 />
-              ))}
+              );
+            })}
             </div>
           </DndContext>
         </div>

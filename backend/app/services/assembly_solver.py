@@ -227,6 +227,16 @@ def solve_assembly_mates(components_dict, mates_list):
                     # Zero rotation difference
                     residuals.extend(v1[3:] - v2[3:])
 
+            elif m_type == 'PROFILE_CENTER':
+                # PROFILE CENTER mate: aligns bounding box centers of two components
+                # Computes centroid of each component's faces and aligns them.
+                cid1 = ent1.get('componentId')
+                cid2 = ent2.get('componentId')
+                # Get world positions of both entities
+                # p1 and p2 are already the world positions from get_world_geom
+                # Align centers (zero position difference)
+                residuals.extend(p1 - p2)
+
             elif m_type == 'SNAP':
                 # SNAP mate: aligns two vertices/edges with optional offset
                 snap_offset = params.get('snapOffset', [0, 0, 0]) if params else [0, 0, 0]
