@@ -931,3 +931,40 @@ MECE cleanup sweep: identify and remove outdated, redundant, or invalid code/fil
 - Branch: `main`
 - Remote: `origin` → `https://github.com/Chun-Chieh-Chang/SolidDrawings.git`
 - Clean working tree: no uncommitted changes except `gap-analysis-report.md` (generated report) and cleanup commits
+
+---
+
+## 2026-06-25 MECE Cleanup — Remove Stale/Redundant Files
+
+### Scope
+Systematic MECE cleanup: identify and quarantine outdated, duplicate, or irrelevant files into `.trash/`.
+
+### Files Moved to `.trash/`
+**Root-level stale files (6):**
+- `sync.ffs_lock` — FreeFileSync artifact
+- `check_occ.py` — 2-line OCC debug script
+- `# SOLIDWORKS UXUI Compatibility Aud.md` — broken filename, untracked stale audit
+- `goal 啟動 SkillsBuilder 閉環機制.md` — stale goal document
+- `findings.md` — old findings superseded by `docs/08_LEARNINGS/`
+- `walkthrough.md` — old walkthrough superseded by `docs/`
+
+**Stale docs/ root files (8):**
+- `antigravity_skills_manual.md`, `constraint_solver_spec.md`, `karpathy_coding_standards.md`, `master_workflow_hook.md` (duplicate of `05_GOVERNANCE/`), `pdca-system.html`, `skill_usage_guide.md`, `verification_exercise_10.md`, `verification_exercise_3.md`
+
+**Stale SW2010 alignment files (11):**
+- `solidworks-2010-*.md` (8 files), `solidworks-2010-feature-matrix.csv`, `ui-parity-spec.md`, `SW2010_ALIGNMENT_PLAN.md`
+
+**Old flat directories (5):**
+- `docs/architecture/`, `docs/governance/`, `docs/spec/` (all superseded by MECE numbered dirs)
+- `docs/benchmarks/` (exercise SOPs — not in MECE index, quarantined)
+- `docs/productization/` (old gap reports — superseded by `gap-analysis-report.md`)
+
+**Stale test file (1):**
+- `backend/tests/test_geometry.py` — untracked old test superseded by `test_api_geometry.py`
+
+### .gitignore Updates
+- Added `.trash/`, `sync.ffs_lock`
+
+### Git Baseline
+- Cleanup commit: `[to be created]`
+- All quarantined files recoverable from `.trash/`

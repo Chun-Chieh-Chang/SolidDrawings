@@ -57,6 +57,12 @@ nul
 # Vendor placeholder (empty directory)
 vendor/
 
+# Trash / cleanup staging directory
+.trash/
+
+# FreeFileSync artifact
+sync.ffs_lock
+
 # OpenCode session state
 .omo/
 
