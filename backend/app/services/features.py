@@ -45,7 +45,7 @@ def generate_section_view(features, cut_plane, plane_type="FRONT"):
     if not HAS_OCC:
         return {"visible_lines": [], "hidden_lines": [], "section_fill": [], "section_line": None}
 
-    from geometry_service import build_shape_only
+    from .geometry_service import build_shape_only
 
     # Lazy-import HLR and explorer classes
     from OCC.Core.HLRBRep import HLRBRep_Algo, HLRBRep_HLRToShape
@@ -193,27 +193,27 @@ def _map_point_to_2d(x, y, z, plane_type):
 
 def generate_box(width, height, depth):
     if not HAS_OCC:
-        from geometry_service import make_mock_box_mesh
+        from .geometry_service import make_mock_box_mesh
         return {"type": "mesh", "data": make_mock_box_mesh(width, height, depth)}
-    from geometry_service import _shape_to_mesh
+    from .geometry_service import _shape_to_mesh
     box = BRepPrimAPI_MakeBox(width, height, depth).Shape()
     return {"type": "mesh", "data": _shape_to_mesh(box)}
 
 
 def generate_cylinder(radius, height):
     if not HAS_OCC:
-        from geometry_service import make_mock_cylinder_mesh
+        from .geometry_service import make_mock_cylinder_mesh
         return {"type": "mesh", "data": make_mock_cylinder_mesh(radius, height)}
-    from geometry_service import _shape_to_mesh
+    from .geometry_service import _shape_to_mesh
     cylinder = BRepPrimAPI_MakeCylinder(radius, height).Shape()
     return {"type": "mesh", "data": _shape_to_mesh(cylinder)}
 
 
 def generate_sphere(radius):
     if not HAS_OCC:
-        from geometry_service import make_mock_sphere_mesh
+        from .geometry_service import make_mock_sphere_mesh
         return {"type": "mesh", "data": make_mock_sphere_mesh(radius)}
-    from geometry_service import _shape_to_mesh
+    from .geometry_service import _shape_to_mesh
     sphere = BRepPrimAPI_MakeSphere(radius).Shape()
     return {"type": "mesh", "data": _shape_to_mesh(sphere)}
 
@@ -230,7 +230,7 @@ def generate_rib(features, thickness=2.0, direction="BOTH"):
         return str(uuid.uuid4())
 
     try:
-        from geometry_service import build_shape_only
+        from .geometry_service import build_shape_only
 
         shape = build_shape_only(features)
         if not shape or shape.IsNull():
@@ -275,7 +275,7 @@ def generate_split(features, split_plane):
         return str(uuid.uuid4())
 
     try:
-        from geometry_service import build_shape_only
+        from .geometry_service import build_shape_only
 
         shape = build_shape_only(features)
         if not shape or shape.IsNull():
@@ -312,7 +312,7 @@ def generate_combine(features, operation="ADD", tool_feature_id=None):
         return str(uuid.uuid4())
 
     try:
-        from geometry_service import build_shape_only, build_feature_shape_in_isolation
+        from .geometry_service import build_shape_only, build_feature_shape_in_isolation
 
         shape = build_shape_only(features)
         if not shape or shape.IsNull():

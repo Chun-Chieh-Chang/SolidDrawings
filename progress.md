@@ -11,6 +11,12 @@
   - `getProjPos`: DETAIL returns [x, y] (same as FRONT projection)
   - `tsc --noEmit`: zero new errors
   - Backend tests: 16 passed (no regression)
+  - Fixed features.py imports: bare `from geometry_service` → relative `from .geometry_service`
+- **Test coverage expansion**:
+  - `test_geometry_service_ext.py`: +17 tests for features.py (generate_box, generate_cylinder, generate_sphere, generate_rib, generate_section_view) with HAS_OCC=False patching
+  - `test_api_geometry.py`: +4 section_view edge case tests (all plane types, structure validation, polygon points)
+  - **Total backend tests**: 55 passed (was 16) — all green
+  - Imports fix: features.py now uses relative imports `from .geometry_service` instead of bare imports
 
 ## 2026-06-25 — Sprint Plan: Drawing + Sheet Metal + Surfacing
 

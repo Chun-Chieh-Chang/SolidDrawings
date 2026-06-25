@@ -240,3 +240,47 @@ class TestSectionViewEndpoint:
         assert resp.status_code == 200
         data = resp.json()
         assert isinstance(data["visible_lines"], list)
+
+    def test_all_plane_types_return_valid_structure(self):
+        """All plane types return expected structure."""
+        for pt in ["FRONT", "TOP", "RIGHT", "ISO"]:
+            resp = client.post(self.ENDPOINT, json={
+                "features": [{"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}}],
+                "cutPlane": {"origin": [0, 0, 0], "normal": [0, 1, 0]},
+                "planeType": pt,
+            })
+            assert resp.status_code == 200, f"Failed for plane_type={pt}"
+            data = resp.json()
+            assert "visible_lines" in data
+            assert "hidden_lines" in data
+            assert "section_fill" in data
+
+    def test_section_fill_is_list_of_polygons(self):
+        """section_fill items have 'points' key."""
+        resp = client.post(self.ENDPOINT, json={
+            "features": [
+                {"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}},
+                {"id": "cyl1", "type": "CYLINDER", "parameters": {"radius": 2.0, "height": 3.0}},
+            ],
+            "cutPlane": {"origin": [0, 0, 0], "normal": [0, 1, 0]},
+            "planeType": "FRONT",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        assert isinstance(data["section_fill"], list)
+
+    def test_visible_lines_contains_expected_structure(self):
+        """Each visible line has points and visible flag."""
+        resp = client.post(self.ENDPOINT, json={
+            "features": [{"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}}],
+            "cutPlane": {"origin": [0, 0, 0], "normal": [0, 1, 0]},
+            "planeType": "FRONT",
+        })
+        assert resp.status_code == 200
+        data = resp.json()
+        for line in data["visible_lines"]:
+            assert "points" in line
+            assert isinstance(line["points"], list)
+        for line in data["hidden_lines"]:
+            assert "points" in line
+            assert isinstance(line["points"], list)

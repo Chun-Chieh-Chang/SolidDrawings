@@ -37,6 +37,16 @@ def patch_surfacing_has_occ():
     surfacing.HAS_OCC = saved
 
 
+@pytest.fixture(autouse=True)
+def patch_features_has_occ():
+    """Patch features module's HAS_OCC."""
+    from app.services import features
+    saved = features.HAS_OCC
+    features.HAS_OCC = False
+    yield
+    features.HAS_OCC = saved
+
+
 SAMPLE_FEATURES = [
     {"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}},
     {"id": "cyl1", "type": "CYLINDER", "parameters": {"radius": 2.0, "height": 3.0}},
@@ -200,3 +210,127 @@ class TestProcessFeatures:
         ]
         result = process_features(features)
         assert result is not None
+
+
+# ── features.py primitive shapes ──────────────────────────────────────────────
+
+
+class TestGenerateBox:
+    """generate_box returns a mesh dict when OCC unavailable."""
+
+    def test_returns_mesh_type(self):
+        from app.services.features import generate_box
+        result = generate_box(10.0, 5.0, 3.0)
+        assert isinstance(result, dict)
+        assert result["type"] == "mesh"
+
+    def test_returns_data_with_vertices(self):
+        from app.services.features import generate_box
+        result = generate_box(10.0, 5.0, 3.0)
+        data = result["data"]
+        assert isinstance(data, dict)
+        assert "vertices" in data
+        assert len(data["vertices"]) > 0
+
+    def test_zero_dimensions(self):
+        from app.services.features import generate_box
+        result = generate_box(0, 0, 0)
+        assert result["type"] == "mesh"
+
+
+class TestGenerateCylinder:
+    """generate_cylinder returns a mesh dict when OCC unavailable."""
+
+    def test_returns_mesh_type(self):
+        from app.services.features import generate_cylinder
+        result = generate_cylinder(5.0, 10.0)
+        assert isinstance(result, dict)
+        assert result["type"] == "mesh"
+
+    def test_with_zero_radius(self):
+        from app.services.features import generate_cylinder
+        result = generate_cylinder(0, 10.0)
+        assert result["type"] == "mesh"
+
+    def test_with_zero_height(self):
+        from app.services.features import generate_cylinder
+        result = generate_cylinder(5.0, 0)
+        assert result["type"] == "mesh"
+
+
+class TestGenerateSphere:
+    """generate_sphere returns a mesh dict when OCC unavailable."""
+
+    def test_returns_mesh_type(self):
+        from app.services.features import generate_sphere
+        result = generate_sphere(5.0)
+        assert isinstance(result, dict)
+        assert result["type"] == "mesh"
+
+    def test_zero_radius(self):
+        from app.services.features import generate_sphere
+        result = generate_sphere(0)
+        assert result["type"] == "mesh"
+
+
+class TestGenerateRib:
+    """generate_rib returns a uuid string when OCC unavailable."""
+
+    def test_returns_string(self):
+        from app.services.features import generate_rib
+        result = generate_rib([], thickness=2.0, direction="BOTH")
+        assert isinstance(result, str)
+
+    def test_returns_uuid(self):
+        from app.services.features import generate_rib
+        result = generate_rib([{"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}}], thickness=2.0)
+        # Without OCC, returns a uuid4 hex with dashes (36 chars)
+        assert len(result) == 36
+
+    def test_with_empty_features(self):
+        from app.services.features import generate_rib
+        result = generate_rib([], thickness=2.0)
+        assert len(result) == 36
+
+
+class TestGenerateSectionView:
+    """generate_section_view returns empty structure when OCC unavailable."""
+
+    def test_returns_dict_with_expected_keys(self):
+        from app.services.features import generate_section_view
+        result = generate_section_view([], {"origin": [0, 0, 0], "normal": [0, 1, 0]}, "FRONT")
+        assert isinstance(result, dict)
+        assert "visible_lines" in result
+        assert "hidden_lines" in result
+        assert "section_fill" in result
+
+    def test_visible_lines_is_empty(self):
+        from app.services.features import generate_section_view
+        result = generate_section_view([], {}, "FRONT")
+        assert result["visible_lines"] == []
+
+    def test_hidden_lines_is_empty(self):
+        from app.services.features import generate_section_view
+        result = generate_section_view([], {}, "TOP")
+        assert result["hidden_lines"] == []
+
+    def test_section_fill_is_empty(self):
+        from app.services.features import generate_section_view
+        result = generate_section_view([], {}, "RIGHT")
+        assert result["section_fill"] == []
+
+    def test_with_features_and_no_cut_plane(self):
+        from app.services.features import generate_section_view
+        result = generate_section_view(
+            [{"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}}],
+            {},
+            "FRONT",
+        )
+        assert result["visible_lines"] == []
+
+    def test_different_plane_types_dont_crash(self):
+        from app.services.features import generate_section_view
+        for pt in ["FRONT", "TOP", "RIGHT", "ISO"]:
+            result = generate_section_view([], {}, pt)
+            assert isinstance(result, dict)
+            assert "visible_lines" in result
