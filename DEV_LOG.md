@@ -885,3 +885,49 @@ Four features delivered end-to-end: Edge Flange → Miter Flange → Hem → Fla
 - All follow the same end-to-end pipeline pattern
 - Next per PLAN.md: DimXpert/Tolerancing or Weldments
 - Notable: Weldments and DimXpert postponed per earlier user directive
+
+---
+
+## 2026-06-25 Cleanup — Remove Redundant/Invalid Code & Files
+
+### Scope
+MECE cleanup sweep: identify and remove outdated, redundant, or invalid code/files across the entire repository.
+
+### Actions Taken
+1. **Empty directories removed**:
+   - `src/ui/Weldments/` — Weldments feature not planned; empty stub
+   - `reports/` — single file moved to `docs/`; directory deleted
+2. **Redundant documentation deleted**:
+   - `docs/solidworks_raw.html` (1 MB) — raw scraped HTML from SOLIDWORKS docs; not referenced
+   - `docs/solidworks-2010-phase6-completion-report.md` — historical, mojibake encoding
+   - `docs/solidworks-2010-phase7-completion-report.md` — historical, mojibake encoding
+3. **Consolidated duplicate logs**:
+   - `DEV_LOG_Sweep_Addendum.md` — content already in DEV_LOG.md lines 724–772; file deleted
+4. **Default Next.js boilerplate removed**:
+   - `public/next.svg`, `public/vercel.svg` — starter template assets, unused
+5. **Encoding-damaged artifacts removed**:
+   - `gap-checklist.md` — mojibake (corrupted Chinese characters); superseded by `gap-analysis-report.md`
+6. **Reports moved**:
+   - `reports/coverage-solidworks-2010.md` → `docs/solidworks-2010-coverage-report.md`
+
+### Files Deleted (7)
+| File | Reason |
+|------|--------|
+| `src/ui/Weldments/` | Empty directory, feature not needed |
+| `docs/solidworks_raw.html` | 1 MB raw scraped HTML, not useful |
+| `docs/solidworks-2010-phase6-completion-report.md` | Historical, mojibake |
+| `docs/solidworks-2010-phase7-completion-report.md` | Historical, mojibake |
+| `public/next.svg` | Default Next.js boilerplate |
+| `public/vercel.svg` | Default Vercel boilerplate |
+| `gap-checklist.md` | Mojibake, superseded by gap-analysis-report.md |
+| `DEV_LOG_Sweep_Addendum.md` | Content already in DEV_LOG.md |
+
+### Files Moved (1)
+| File | New Location |
+|------|-------------|
+| `reports/coverage-solidworks-2010.md` | `docs/solidworks-2010-coverage-report.md` |
+
+### Git Baseline
+- Branch: `main`
+- Remote: `origin` → `https://github.com/Chun-Chieh-Chang/SolidDrawings.git`
+- Clean working tree: no uncommitted changes except `gap-analysis-report.md` (generated report) and cleanup commits
