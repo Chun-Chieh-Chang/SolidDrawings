@@ -446,6 +446,35 @@ class FeatureSummary(BaseModel):
     type: str
     parameters: dict = {}
 
+class FormingToolRequest(BaseModel):
+    tool_type: str                                # LOUVER | LANCE | BRIDGE | DIMPLE | DRAWN_CUTOUT
+    width: float = 10.0
+    height: float = 10.0
+    depth: float = 5.0
+    radius: float = 1.0
+    angle: float = 45.0
+    thickness: float = 1.0
+    direction: str = 'OUTSIDE'
+
+@router.post("/forming_tool")
+async def create_forming_tool(request: FormingToolRequest):
+    try:
+        shape_hash = geometry_service.generate_forming_tool(
+            tool_type=request.tool_type,
+            width=request.width,
+            height=request.height,
+            depth=request.depth,
+            radius=request.radius,
+            angle=request.angle,
+            thickness=request.thickness,
+            direction=request.direction,
+        )
+        return {"success": True, "shape_hash": shape_hash}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 class FlatPatternRequest(BaseModel):
     features: List[FeatureSummary]
     k_factor: Optional[float] = 0.44

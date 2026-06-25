@@ -17,6 +17,7 @@ interface RibbonControllerProps {
   handleCreateMiterFlange?: (params: any) => void;
   handleCreateHem?: (params: any) => void;
   handleCreateFlatPattern?: () => void;
+  handleCreateFormingTool?: (params: { toolType: string; width: number; height: number; depth: number; radius: number; angle: number; thickness: number; direction: string }) => void;
   onShowMassProps?: () => void;
   onShowEquations?: () => void;
 }
@@ -33,6 +34,7 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   handleCreateMiterFlange,
   handleCreateHem,
   handleCreateFlatPattern,
+  handleCreateFormingTool,
   onShowMassProps,
   onShowEquations,
 }) => {
@@ -934,25 +936,81 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
               </div>
               <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Flat Pattern</span>
             </button>
-            <button onClick={() => { pushToast('Bend Allowance coming soon.', 'info'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bend Allowance">
-              <div className="w-10 h-10 flex items-center justify-center text-slate-500 transition-transform group-hover:scale-110">
+            <button onClick={() => {
+              setActiveTab('SHEET_METALS');
+              setHint('Set global bend allowance parameters (K-Factor, relief type, bend radius) in the panel.');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bend Allowance">
+              <div className="w-10 h-10 flex items-center justify-center text-slate-600 transition-transform group-hover:scale-110">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20c4-8 8-8 12-4"/></svg>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 leading-none uppercase">Bend<br/>Allow</span>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Bend<br/>Allow</span>
             </button>
             <div className="w-[1px] h-10 bg-border/50 mx-1" />
+            {/* Forming Tools */}
             <button onClick={() => {
-              const thickness = 1.0;
-              const bendRadius = 0.5;
-              const bendAngle = 90;
-              const kFactor = 0.5;
-              const ba = Math.PI * (bendAngle / 180) * (bendRadius + kFactor * thickness);
-              pushToast(`BA = ${ba.toFixed(4)} mm (t=${thickness}, R=${bendRadius}, θ=${bendAngle}°, K=${kFactor})`, 'info');
-            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bend Allowance Calculator">
+              if (handleCreateFormingTool) {
+                handleCreateFormingTool({ toolType: 'LOUVER', width: 10, height: 4, depth: 2, radius: 1, angle: 45, thickness: 1.0, direction: 'OUTSIDE' });
+              } else {
+                setHint('Select a face, then apply Louver forming tool.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Louver">
               <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 20h16"/><path d="M6 16v4"/><path d="M18 16v4"/><path d="M6 16l6-8 6 8"/></svg>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="4" y="6" width="16" height="12" rx="1"/><line x1="6" y1="10" x2="18" y2="10"/><line x1="6" y1="14" x2="18" y2="14"/></svg>
               </div>
-              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">BA<br/>Calc</span>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Louver</span>
+            </button>
+            <button onClick={() => {
+              if (handleCreateFormingTool) {
+                handleCreateFormingTool({ toolType: 'LANCE', width: 8, height: 3, depth: 4, radius: 1, angle: 60, thickness: 1.0, direction: 'OUTSIDE' });
+              } else {
+                setHint('Select a face, then apply Lance forming tool.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Lance">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="6" y="5" width="12" height="14" rx="1"/><line x1="12" y1="5" x2="12" y2="19" strokeDasharray="2 2"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Lance</span>
+            </button>
+            <button onClick={() => {
+              if (handleCreateFormingTool) {
+                handleCreateFormingTool({ toolType: 'BRIDGE', width: 12, height: 5, depth: 3, radius: 2, angle: 0, thickness: 1.0, direction: 'OUTSIDE' });
+              } else {
+                setHint('Select a face, then apply Bridge forming tool.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Bridge">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16c4-8 12-8 16 0"/><line x1="4" y1="16" x2="20" y2="16"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Bridge</span>
+            </button>
+            <button onClick={() => {
+              if (handleCreateFormingTool) {
+                handleCreateFormingTool({ toolType: 'DIMPLE', width: 10, height: 2, depth: 2, radius: 3, angle: 0, thickness: 1.0, direction: 'OUTSIDE' });
+              } else {
+                setHint('Select a face, then apply Dimple forming tool.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Dimple">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="3" fill="currentColor" fillOpacity="0.2"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Dimple</span>
+            </button>
+            <button onClick={() => {
+              if (handleCreateFormingTool) {
+                handleCreateFormingTool({ toolType: 'DRAWN_CUTOUT', width: 8, height: 8, depth: 3, radius: 1, angle: 0, thickness: 1.0, direction: 'OUTSIDE' });
+              } else {
+                setHint('Select a face, then apply Drawn Cutout forming tool.');
+              }
+              setActiveTab('SHEET_METALS');
+            }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Drawn Cutout">
+              <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="5" y="5" width="14" height="14" rx="1"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg>
+              </div>
+              <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Cutout</span>
             </button>
           </div>
         ) : activeTab === 'SKETCH' ? (

@@ -843,5 +843,45 @@ Four features delivered end-to-end: Edge Flange → Miter Flange → Hem → Fla
 
 ### Status
 - Sheet Metal feature set: Edge Flange ✅ Miter Flange ✅ Hem ✅ Flat Pattern ✅
-- All follow same pipeline pattern — easy to add new features.
 - Ready for Bend Allowance UI and Forming Tools next.
+
+---
+
+## 2026-06-25 Sheet Metal Phase 6 — Bend Allowance UI + Forming Tools
+
+### Bend Allowance Panel
+- Created `src/ui/SheetMetal/BendAllowancePanel.tsx` as a dedicated PropertyManager-style panel
+- **Allowance type selector**: K-Factor / Bend Allowance / Bend Deduction — 3-way toggle
+- **K-Factor controls**: slider (0-1, step 0.005) + material presets (Steel thin/medium, Aluminum, Stainless, Copper, Brass)
+- **Bend parameters**: thickness, bend radius, bend angle inputs
+- **Relief settings**: type selector (Rectangular/Tear/Obround/None), Auto Relief checkbox, width/depth dimensions, custom relief ratio
+- **Live calculation preview**: BA, Setback, Total Flat Length displayed with formula breakdown
+- Integrated into `SheetMetalPanel.tsx` — renders when "Bend Allowance" or "K-Factor" tool selected
+- Ribbon "Bend Allow" button now active (switches to SHEET_METALS tab)
+
+### Forming Tools — 5 Types (End-to-End)
+- **Backend geometry** (`geometry_service.py`):
+  - `generate_forming_tool()` dispatches to 5 builder functions
+  - `_make_louver()`: raised slot with angled cut wedge
+  - `_make_lance()`: tab cut on 3 sides with triangular opening
+  - `_make_bridge()`: raised tab with both ends attached, side arches cut out
+  - `_make_dimple()`: spherical emboss on base plate
+  - `_make_drawn_cutout()`: box with inset smaller box subtracted (flanged cutout)
+  - All cached in `_FORMING_TOOL_SHAPE_CACHE` (max 64)
+- **Rebuild pipeline**: `FORMING_TOOL` case — cache lookup → fallback box → fuse with body
+- **API** (`geometry.py`): `FormingToolRequest` model + `POST /forming_tool`
+- **Frontend**:
+  - `createFormingTool()` in HeavyEngineClient
+  - `handleCreateFormingTool()` in sheet-metal-builders — validates face selection, calls API, creates feature record
+  - 5 Ribbon buttons in SHEET_METALS tab (Louver, Lance, Bridge, Dimple, Drawn Cutout)
+- Props wired through `index.ts` → `page.tsx` → `RibbonController.tsx`
+
+### Build Verification
+- `tsc --noEmit`: zero new errors (only pre-existing playwright/jest)
+- Python syntax: geometry_service.py and geometry.py compile clean
+
+### Status
+- Phase 6 complete: Bend Allowance UI ✅ Forming Tools (5 types) ✅
+- All follow the same end-to-end pipeline pattern
+- Next per PLAN.md: DimXpert/Tolerancing or Weldments
+- Notable: Weldments and DimXpert postponed per earlier user directive

@@ -4,6 +4,7 @@ import React from 'react';
 import { useCadStore } from '@/store/useCadStore';
 import { Rollout } from '../PropertyManager/Rollout';
 import { PMHeader } from '../PropertyManager/PMHeader';
+import { BendAllowancePanel } from './BendAllowancePanel';
 
 export interface SheetMetalProps {
   active: boolean;
@@ -48,6 +49,8 @@ export const SheetMetalPanel: React.FC<SheetMetalProps> = ({ active, onFeatureCr
 
   if (!active) return null;
 
+  const isBendAllowanceTool = selectedTool === 'BEND_ALLOWANCE' || selectedTool === 'K-FACEOR';
+
   const handleToolClick = (toolId: string) => {
     setSelectedTool(toolId);
     useCadStore.getState().setHint(`Sheet Metal: — select edges/faces to proceed.`);
@@ -67,6 +70,11 @@ export const SheetMetalPanel: React.FC<SheetMetalProps> = ({ active, onFeatureCr
     });
     useCadStore.getState().pushToast(`${selectedTool} applied`, 'info');
   };
+
+  // Show dedicated BendAllowancePanel when bend allowance tools selected
+  if (isBendAllowanceTool) {
+    return <BendAllowancePanel onClose={() => setSelectedTool(null)} />;
+  }
 
   return (
     <div className="flex flex-col h-full bg-white border-l border-[#A0A0A0]">

@@ -103,6 +103,7 @@ export default function Home() {
     handleCreateMiterFlange,
     handleCreateHem,
     handleCreateFlatPattern,
+    handleCreateFormingTool,
   } = useFeatureBuilders(handleRebuild);
 
   const handlePrintToPDF = useCallback(async () => {
@@ -234,6 +235,7 @@ export default function Home() {
           handleCreateMiterFlange={handleCreateMiterFlange}
           handleCreateHem={handleCreateHem}
           handleCreateFlatPattern={handleCreateFlatPattern}
+          handleCreateFormingTool={handleCreateFormingTool}
           onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
       />

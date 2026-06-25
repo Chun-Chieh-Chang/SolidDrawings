@@ -340,10 +340,97 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
     handleRebuild,
   ]);
 
+  /** Forming Tool: create louver/lance/bridge/dimple/drawn cutout on a face. */
+  const handleCreateFormingTool = useCallback(async (params: {
+    toolType: string;
+    width: number;
+    height: number;
+    depth: number;
+    radius: number;
+    angle: number;
+    thickness: number;
+    direction: string;
+  }) => {
+    const { toolType, width, height, depth, radius, angle, thickness, direction } = params;
+
+    if (!selectedTopology || selectedTopology.type !== 'FACE') {
+      pushToast('Please select a face on the solid body first.', 'warning');
+      return;
+    }
+
+    const baseSolid = features.find(
+      (f: any) => f.type === 'EXTRUDE' && !features.some((f2: any) => f2.parameters?.base_feature_id === f.id)
+    );
+
+    if (!baseSolid) {
+      pushToast('Create a base extruded body first before applying forming tools.', 'error');
+      return;
+    }
+
+    try {
+      const client = HeavyEngineClient.getInstance();
+
+      const result = await client.createFormingTool({
+        tool_type: toolType,
+        width,
+        height,
+        depth,
+        radius,
+        angle,
+        thickness,
+        direction,
+      });
+
+      if (!result.success) {
+        pushToast(`Forming tool (${toolType}) failed: ${result.error || 'Backend error'}`, 'error');
+        return;
+      }
+
+      const featId = `feat_${uuidv4()}`;
+      const toolLabel = toolType.charAt(0) + toolType.slice(1).toLowerCase().replace(/_/g, ' ');
+      addFeature({
+        id: featId,
+        type: 'FORMING_TOOL',
+        name: `${toolLabel} ${features.filter((f: any) => f.type === 'FORMING_TOOL').length + 1}`,
+        parameters: {
+          tool_type: toolType,
+          width,
+          height,
+          depth,
+          radius,
+          angle,
+          thickness,
+          direction,
+          face_ref: selectedTopology.id,
+          base_feature_id: baseSolid.id,
+          occt_shape_hash: result.shapeHash,
+        },
+      });
+
+      setSelectedId(featId);
+      setActiveTab('SHEET_METALS');
+      setHint(`${toolLabel} forming tool applied: ${width}×${height}×${depth}mm`);
+      pushToast(`${toolLabel} forming tool created`, 'info');
+      handleRebuild();
+    } catch (err: any) {
+      pushToast(`Forming tool error: ${err.message || 'Unknown error'}`, 'error');
+    }
+  }, [
+    features,
+    selectedTopology,
+    addFeature,
+    setSelectedId,
+    setHint,
+    pushToast,
+    setActiveTab,
+    handleRebuild,
+  ]);
+
   return {
     handleCreateEdgeFlange,
     handleCreateMiterFlange,
     handleCreateHem,
     handleCreateFlatPattern,
+    handleCreateFormingTool,
   };
 };

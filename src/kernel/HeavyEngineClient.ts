@@ -385,6 +385,34 @@ export class HeavyEngineClient {
     }
   }
 
+  public async createFormingTool(params: {
+    tool_type: string;
+    width: number;
+    height: number;
+    depth: number;
+    radius: number;
+    angle: number;
+    thickness: number;
+    direction: string;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/forming_tool`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Forming tool error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
   public async createFlatPattern(params: {
     features: Array<{ id: string; type: string; parameters: Record<string, any> }>;
     k_factor?: number;
