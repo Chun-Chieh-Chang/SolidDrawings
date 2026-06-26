@@ -333,6 +333,8 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     handleCreateMiterFlange: sheetMetalModule.handleCreateMiterFlange,
     handleCreateHem: sheetMetalModule.handleCreateHem,
     handleCreateFlatPattern: sheetMetalModule.handleCreateFlatPattern,
+    handleUnfold: sheetMetalModule.handleUnfold,
+    handleFold: sheetMetalModule.handleFold,
     handleCreateFormingTool: sheetMetalModule.handleCreateFormingTool,
   };
 };

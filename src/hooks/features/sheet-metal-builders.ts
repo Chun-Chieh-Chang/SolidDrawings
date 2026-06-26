@@ -426,11 +426,142 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
     handleRebuild,
   ]);
 
+  /** Unfold: selectively flatten specified bends. */
+  const handleUnfold = useCallback(async (bendIds?: string[]) => {
+    const sheetMetalFeatures = features.filter(
+      (f: any) => f.type === 'EDGE_FLANGE' || f.type === 'MITER_FLANGE' || f.type === 'HEM'
+    );
+
+    if (sheetMetalFeatures.length === 0) {
+      pushToast('No sheet metal bends to unfold. Create Edge Flange, Miter Flange, or Hem first.', 'warning');
+      return;
+    }
+
+    try {
+      const client = HeavyEngineClient.getInstance();
+      const allFeatures = features.map((f: any) => ({
+        id: f.id,
+        type: f.type,
+        parameters: f.parameters || {},
+      }));
+
+      const result = await client.createUnfold({
+        features: allFeatures,
+        bend_ids: bendIds,
+        k_factor: 0.44,
+        thickness: 1.0,
+      });
+
+      if (!result.success) {
+        pushToast(`Unfold failed: ${result.error || 'Backend error'}`, 'error');
+        return;
+      }
+
+      const featId = `feat_${uuidv4()}`;
+      addFeature({
+        id: featId,
+        type: 'UNFOLD',
+        name: `Unfold ${features.filter((f: any) => f.type === 'UNFOLD').length + 1}`,
+        parameters: {
+          occt_shape_hash: result.shapeHash,
+          bend_ids: bendIds || [],
+          k_factor: 0.44,
+          thickness: 1.0,
+        },
+      });
+
+      setSelectedId(featId);
+      setActiveTab('SHEET_METALS');
+      setHint('Unfold: selectively flattened bends. The unfolded plate appears above the folded body.');
+      pushToast('Unfold: selective flattening applied.', 'info');
+      handleRebuild();
+    } catch (err: any) {
+      pushToast(`Unfold error: ${err.message || 'Unknown error'}`, 'error');
+    }
+  }, [
+    features,
+    addFeature,
+    setSelectedId,
+    setHint,
+    pushToast,
+    setActiveTab,
+    handleRebuild,
+  ]);
+
+  /** Fold: re-fold previously unfolded bends. */
+  const handleFold = useCallback(async (bendIds: string[]) => {
+    const sheetMetalFeatures = features.filter(
+      (f: any) => f.type === 'EDGE_FLANGE' || f.type === 'MITER_FLANGE' || f.type === 'HEM'
+    );
+
+    if (sheetMetalFeatures.length === 0) {
+      pushToast('No sheet metal bends to fold.', 'warning');
+      return;
+    }
+
+    if (bendIds.length === 0) {
+      pushToast('Select bends to re-fold.', 'warning');
+      return;
+    }
+
+    try {
+      const client = HeavyEngineClient.getInstance();
+      const allFeatures = features.map((f: any) => ({
+        id: f.id,
+        type: f.type,
+        parameters: f.parameters || {},
+      }));
+
+      const result = await client.createFold({
+        features: allFeatures,
+        bend_ids: bendIds,
+        k_factor: 0.44,
+        thickness: 1.0,
+      });
+
+      if (!result.success) {
+        pushToast(`Fold failed: ${result.error || 'Backend error'}`, 'error');
+        return;
+      }
+
+      const featId = `feat_${uuidv4()}`;
+      addFeature({
+        id: featId,
+        type: 'FOLD',
+        name: `Fold ${features.filter((f: any) => f.type === 'FOLD').length + 1}`,
+        parameters: {
+          occt_shape_hash: result.shapeHash,
+          bend_ids: bendIds,
+          k_factor: 0.44,
+          thickness: 1.0,
+        },
+      });
+
+      setSelectedId(featId);
+      setActiveTab('SHEET_METALS');
+      setHint('Fold: previously unfolded bends have been re-folded.');
+      pushToast('Fold: re-fold selected bends.', 'info');
+      handleRebuild();
+    } catch (err: any) {
+      pushToast(`Fold error: ${err.message || 'Unknown error'}`, 'error');
+    }
+  }, [
+    features,
+    addFeature,
+    setSelectedId,
+    setHint,
+    pushToast,
+    setActiveTab,
+    handleRebuild,
+  ]);
+
   return {
     handleCreateEdgeFlange,
     handleCreateMiterFlange,
     handleCreateHem,
     handleCreateFlatPattern,
     handleCreateFormingTool,
+    handleUnfold,
+    handleFold,
   };
 };

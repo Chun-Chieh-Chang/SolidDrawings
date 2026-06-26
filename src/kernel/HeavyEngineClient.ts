@@ -511,4 +511,54 @@ export class HeavyEngineClient {
       return { success: false, error: error.message || 'Unknown error' };
     }
   }
+
+  /** Unfold: selectively flatten specific bends. */
+  public async createUnfold(params: {
+    features: Array<{ id: string; type: string; parameters: Record<string, any> }>;
+    bend_ids?: string[];
+    k_factor?: number;
+    thickness?: number;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/unfold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Unfold error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
+
+  /** Fold: re-fold previously unfolded bends. */
+  public async createFold(params: {
+    features: Array<{ id: string; type: string; parameters: Record<string, any> }>;
+    bend_ids: string[];
+    k_factor?: number;
+    thickness?: number;
+  }): Promise<{ success: boolean; shapeHash?: string; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/fold`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const err = await response.text();
+        return { success: false, error: err };
+      }
+      const data = await response.json();
+      return { success: true, shapeHash: data.shape_hash };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Fold error:', error);
+      return { success: false, error: error.message || 'Unknown error' };
+    }
+  }
 }
