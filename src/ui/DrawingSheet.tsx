@@ -16,6 +16,8 @@ import {
 import { DimensionOverlay } from './DrawingSheet/DimensionOverlay';
 import { AnnotationLayer } from './DrawingSheet/AnnotationLayer';
 import { SheetFormatSelector } from './DrawingSheet/SheetFormatSelector';
+import { BendTablePanel } from './BendTablePanel';
+import { BomTable } from './DrawingSheet/BomTable';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -28,13 +30,15 @@ interface ViewPosition {
 
 interface DrawingViewData {
   id: string;
-  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL';
+  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL' | 'CROP' | 'AUXILIARY';
   title: string;
   position: ViewPosition;
   scale: string;
   showDimensions: boolean;
   parentViewId?: string;
   sectionLine?: { u1: number; v1: number; u2: number; v2: number };
+  cropBoundary?: { type: 'RECT' | 'CIRCLE'; x: number; y: number; w: number; h: number; r?: number };
+  auxiliaryEdge?: { x1: number; y1: number; x2: number; y2: number };
 }
 
 // ─── Scale Options ───────────────────────────────────────────────────────────
@@ -55,7 +59,7 @@ const SCALE_TO_FACTOR: Record<string, number> = {
 
 interface DrawingViewProps {
   title: string;
-  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL';
+  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL' | 'CROP' | 'AUXILIARY';
   lines: any[];
   showDimensions: boolean;
   components?: any[];
@@ -67,11 +71,17 @@ interface DrawingViewProps {
   sectionFill?: { points: number[][] }[];
   detailBounds?: { cx: number; cy: number; radius: number } | null;
   isDragging?: boolean;
+  cropBoundary?: { type: 'RECT' | 'CIRCLE'; x: number; y: number; w: number; h: number; r?: number };
+  auxiliaryEdge?: { x1: number; y1: number; x2: number; y2: number };
+  annotations?: import('@/store/types').DrawingAnnotation[];
+  onAnnotationPositionChange?: (annotationId: string, x: number, y: number) => void;
   onSectionCreated?: (parentViewId: string, data: any) => void;
   onDetailCreated?: (parentViewId: string, bounds: { cx: number; cy: number; radius: number }) => void;
+  onCropCreated?: (parentViewId: string, boundary: { type: 'RECT' | 'CIRCLE'; x: number; y: number; w: number; h: number; r?: number }) => void;
+  onAuxiliaryCreated?: (parentViewId: string, edge: { x1: number; y1: number; x2: number; y2: number }) => void;
 }
 
-const DrawingView = ({ title, type, lines, showDimensions, components, scale, sheetId, viewId, sectionLine, sectionFill, detailBounds, isDragging, onSectionCreated, onDetailCreated }: DrawingViewProps) => {
+const DrawingView = ({ title, type, lines, showDimensions, components, scale, sheetId, viewId, sectionLine, sectionFill, detailBounds, isDragging, annotations, onAnnotationPositionChange, onSectionCreated, onDetailCreated, cropBoundary, auxiliaryEdge, onCropCreated, onAuxiliaryCreated }: DrawingViewProps) => {
   const [editingDim, setEditingDim] = useState<{id: string, type: string, param: string} | null>(null);
   const [editValue, setEditValue] = useState<string>('');
   const [showScaleDropdown, setShowScaleDropdown] = useState(false);
@@ -83,12 +93,20 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
   const [detailCenter, setDetailCenter] = useState<{u: number, v: number} | null>(null);
   const [detailRadius, setDetailRadius] = useState(50);
   const [isDrawingDetail, setIsDrawingDetail] = useState(false);
+  const [showCropTool, setShowCropTool] = useState(false);
+  const [cropRect, setCropRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [cropType, setCropType] = useState<'RECT' | 'CIRCLE'>('RECT');
+  const [cropRadius, setCropRadius] = useState(50);
+  const [showAuxTool, setShowAuxTool] = useState(false);
+  const [auxEdge, setAuxEdge] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null);
 
   const features = useCadStore(state => state.features);
   const updateFeatureParams = useCadStore(state => state.updateFeatureParams);
   const updateViewScale = useCadStore(state => state.updateViewScale);
   const addViewToSheet = useCadStore(state => state.addViewToSheet);
   const toggleViewDimensions = useCadStore(state => state.toggleViewDimensions);
+  const cropView = useCadStore(state => state.cropView);
+  const createAuxiliaryView = useCadStore(state => state.createAuxiliaryView);
 
   // Normalize lines
   const normalizedLines = useMemo(() => {
@@ -150,12 +168,25 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
 
   const getProjPos = useCallback((pos: [number, number, number]): [number, number] => {
     const [x, y, z] = pos;
-    if (type === 'FRONT' || type === 'SECTION') return [x, y];
+    if (type === 'FRONT' || type === 'SECTION' || type === 'CROP') return [x, y];
     if (type === 'TOP') return [x, -z];
     if (type === 'RIGHT') return [z, y];
     if (type === 'DETAIL') return [x, y];
+    if (type === 'AUXILIARY' && auxiliaryEdge) {
+      // Project along the edge normal direction
+      const dx = auxiliaryEdge.x2 - auxiliaryEdge.x1;
+      const dy = auxiliaryEdge.y2 - auxiliaryEdge.y1;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 0.001) return [x, y];
+      // Normal: rotate edge direction 90° counter-clockwise
+      const nx = -dy / len;
+      const ny = dx / len;
+      // Project (x,y,z) onto plane perpendicular to edge and aligned with normal
+      // Simplified: use FRONT-like projection but offset by edge normal component
+      return [x + nx * z * 0.3, y + ny * z * 0.3];
+    }
     return [iso_u(x, y, z), iso_v(x, y, z)];
-  }, [type]);
+  }, [type, auxiliaryEdge]);
 
   // Detect circular features for center marks
   const circularCenters = useMemo(() => {
@@ -293,6 +324,26 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
     }
   };
 
+  // ── Crop View ──────────────────────────────────────────────────
+  const handleCreateCropView = () => {
+    if (cropRect && cropRect.w > 5 && cropRect.h > 5) {
+      const boundary = { type: cropType, x: cropRect.x, y: cropRect.y, w: cropRect.w, h: cropRect.h, r: cropType === 'CIRCLE' ? cropRadius : undefined };
+      onCropCreated?.(viewId, boundary);
+      setShowCropTool(false);
+      setCropRect(null);
+    }
+  };
+
+  // ── Auxiliary View ─────────────────────────────────────────────
+  const handleCreateAuxiliaryView = () => {
+    if (auxEdge) {
+      onAuxiliaryCreated?.(viewId, auxEdge);
+      addViewToSheet('AUXILIARY', sheetId, viewId);
+      setShowAuxTool(false);
+      setAuxEdge(null);
+    }
+  };
+
   return (
     <div 
       className={`border border-slate-300 bg-white aspect-video relative flex flex-col group hover:border-primary transition-all shadow-sm rounded overflow-hidden ${isDragging ? 'opacity-50 ring-2 ring-primary' : ''}`}
@@ -366,6 +417,31 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
               </svg>
             </button>
           )}
+          {/* Crop View Tool */}
+          {type !== 'CROP' && type !== 'AUXILIARY' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowCropTool(!showCropTool); }}
+              className={`p-0.5 rounded transition-all ${showCropTool ? 'text-blue-500' : 'text-slate-500 hover:text-blue-500'}`}
+              title="Crop view"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <rect x="3" y="3" width="9" height="9" rx="1"/>
+                <line x1="14" y1="3" x2="21" y2="3"/><line x1="3" y1="14" x2="3" y2="21"/>
+              </svg>
+            </button>
+          )}
+          {/* Auxiliary View Tool */}
+          {type !== 'AUXILIARY' && type !== 'DETAIL' && type !== 'SECTION' && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowAuxTool(!showAuxTool); }}
+              className={`p-0.5 rounded transition-all ${showAuxTool ? 'text-purple-500' : 'text-slate-500 hover:text-purple-500'}`}
+              title="Create auxiliary view"
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M3 3 L21 3 L21 15 L3 15 Z" /><path d="M7 15 L7 21 L17 21 L17 15" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -415,6 +491,66 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
         </div>
       )}
 
+      {/* Crop Tool Overlay */}
+      {showCropTool && (
+        <div className="absolute top-8 right-2 bg-white border border-blue-300 rounded-lg shadow-lg z-20 p-2 text-[9px]" onClick={e => e.stopPropagation()}>
+          <div className="text-blue-700 font-bold mb-1">Crop Tool</div>
+          <div className="flex gap-1 mb-1">
+            <button onClick={() => setCropType('RECT')} className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${cropType === 'RECT' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>Rect</button>
+            <button onClick={() => setCropType('CIRCLE')} className={`px-1.5 py-0.5 rounded text-[8px] font-bold ${cropType === 'CIRCLE' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-600'}`}>Circle</button>
+          </div>
+          {cropType === 'RECT' ? (
+            <div className="text-slate-500 mb-1">Set X,Y,W,H in view coords</div>
+          ) : (
+            <div><label className="text-slate-500">Radius: </label>
+              <input type="range" min="10" max="200" value={cropRadius} onChange={e => setCropRadius(Number(e.target.value))}
+                className="w-20 align-middle" />
+              <span className="ml-1 text-slate-700 font-bold">{cropRadius}</span>
+            </div>
+          )}
+          <div className="flex gap-1 mt-1 flex-wrap">
+            <input type="number" placeholder="X" className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setCropRect(prev => ({ ...prev || { y: 0, w: 100, h: 100 }, x: Number(e.target.value) }))} />
+            <input type="number" placeholder="Y" className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setCropRect(prev => ({ ...prev || { x: 0, w: 100, h: 100 }, y: Number(e.target.value) }))} />
+            <input type="number" placeholder="W" defaultValue={100} className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setCropRect(prev => ({ ...prev || { x: 0, y: 0, h: 100 }, w: Number(e.target.value) }))} />
+            <input type="number" placeholder="H" defaultValue={100} className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setCropRect(prev => ({ ...prev || { x: 0, y: 0, w: 100 }, h: Number(e.target.value) }))} />
+          </div>
+          {cropRect && cropRect.w > 5 && cropRect.h > 5 && (
+            <button onClick={handleCreateCropView}
+              className="mt-1 px-2 py-0.5 bg-blue-500 text-white rounded text-[8px] font-bold hover:bg-blue-600">
+              Apply Crop
+            </button>
+          )}
+          <button onClick={() => { setShowCropTool(false); setCropRect(null); }}
+            className="ml-1 px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-bold hover:bg-slate-300">
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Auxiliary Tool Overlay */}
+      {showAuxTool && (
+        <div className="absolute top-8 right-2 bg-white border border-purple-300 rounded-lg shadow-lg z-20 p-2 text-[9px]" onClick={e => e.stopPropagation()}>
+          <div className="text-purple-700 font-bold mb-1">Auxiliary View Tool</div>
+          <div className="text-slate-500 mb-1">Enter edge endpoints to project from:</div>
+          <div className="flex gap-1 flex-wrap">
+            <input type="number" placeholder="X1" className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setAuxEdge(prev => ({ ...prev || { y1: 0, x2: 0, y2: 0 }, x1: Number(e.target.value) }))} />
+            <input type="number" placeholder="Y1" className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setAuxEdge(prev => ({ ...prev || { x1: 0, x2: 0, y2: 0 }, y1: Number(e.target.value) }))} />
+            <input type="number" placeholder="X2" className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setAuxEdge(prev => ({ ...prev || { x1: 0, y1: 0, y2: 0 }, x2: Number(e.target.value) }))} />
+            <input type="number" placeholder="Y2" className="w-14 px-1 py-0.5 border rounded text-[8px]" onChange={e => setAuxEdge(prev => ({ ...prev || { x1: 0, y1: 0, x2: 0 }, y2: Number(e.target.value) }))} />
+          </div>
+          {auxEdge && (
+            <button onClick={handleCreateAuxiliaryView}
+              className="mt-1 px-2 py-0.5 bg-purple-500 text-white rounded text-[8px] font-bold hover:bg-purple-600">
+              Create Auxiliary View
+            </button>
+          )}
+          <button onClick={() => { setShowAuxTool(false); setAuxEdge(null); }}
+            className="ml-1 px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[8px] font-bold hover:bg-slate-300">
+            Cancel
+          </button>
+        </div>
+      )}
+
       {/* View Label Badge */}
       <div className="absolute top-7 left-2 text-[8px] font-black text-slate-400 uppercase tracking-widest bg-slate-50/80 backdrop-blur px-1.5 py-0.5 rounded border border-slate-200 z-10 group-hover:text-primary group-hover:border-primary/30 transition-all">
         {hasBounds && type !== 'ISO' && `${widthVal.toFixed(1)} x ${heightVal.toFixed(1)} mm`}
@@ -453,6 +589,16 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
                 <line x1="0" y1="0" x2="0" y2="6" stroke="#64748B" strokeWidth="0.5" strokeOpacity="0.6"/>
               </pattern>
             )}
+            {/* Crop clipPath */}
+            {type === 'CROP' && cropBoundary && (
+              <clipPath id={`crop-clip-${sheetId}-${viewId}`}>
+                {cropBoundary.type === 'RECT' ? (
+                  <rect x={cropBoundary.x} y={cropBoundary.y} width={cropBoundary.w} height={cropBoundary.h} />
+                ) : (
+                  <circle cx={cropBoundary.x} cy={cropBoundary.y} r={cropBoundary.r || 50} />
+                )}
+              </clipPath>
+            )}
           </defs>
 
           {/* Section fill (hatched cut faces) */}
@@ -467,19 +613,46 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
             />
           ))}
 
-          {/* Model lines */}
-          {normalizedLines.map((line: any, i: number) => (
-            <polyline
-              key={i}
-              points={line.points.map((p: any) => `${p[0]},${p[1]}`).join(' ')}
-              fill="none"
-              stroke={line.visible ? "currentColor" : "#94A3B8"}
-              strokeWidth={lineStrokeWidth}
-              strokeDasharray={line.visible ? "none" : `${lineStrokeWidth*3},${lineStrokeWidth*2}`}
-              strokeOpacity={line.visible ? 1 : 0.4}
-              className="group-hover:stroke-primary transition-colors"
+          {/* Model lines (with optional crop clip) */}
+          {type === 'CROP' && cropBoundary ? (
+            <g clipPath={`url(#crop-clip-${sheetId}-${viewId})`}>
+              {normalizedLines.map((line: any, i: number) => (
+                <polyline key={i}
+                  points={line.points.map((p: any) => `${p[0]},${p[1]}`).join(' ')}
+                  fill="none"
+                  stroke={line.visible ? "currentColor" : "#94A3B8"}
+                  strokeWidth={lineStrokeWidth}
+                  strokeDasharray={line.visible ? "none" : `${lineStrokeWidth*3},${lineStrokeWidth*2}`}
+                  strokeOpacity={line.visible ? 1 : 0.4}
+                  className="group-hover:stroke-primary transition-colors"
+                />
+              ))}
+            </g>
+          ) : (
+            normalizedLines.map((line: any, i: number) => (
+              <polyline key={i}
+                points={line.points.map((p: any) => `${p[0]},${p[1]}`).join(' ')}
+                fill="none"
+                stroke={line.visible ? "currentColor" : "#94A3B8"}
+                strokeWidth={lineStrokeWidth}
+                strokeDasharray={line.visible ? "none" : `${lineStrokeWidth*3},${lineStrokeWidth*2}`}
+                strokeOpacity={line.visible ? 1 : 0.4}
+                className="group-hover:stroke-primary transition-colors"
+              />
+            ))
+          )}
+
+          {/* Crop boundary overlay (dashed box/circle) */}
+          {type === 'CROP' && cropBoundary && cropBoundary.type === 'RECT' && (
+            <rect x={cropBoundary.x} y={cropBoundary.y} width={cropBoundary.w} height={cropBoundary.h}
+              fill="none" stroke="#3B82F6" strokeWidth={lineStrokeWidth * 1.5} strokeDasharray={`${lineStrokeWidth*3},${lineStrokeWidth*2}`}
             />
-          ))}
+          )}
+          {type === 'CROP' && cropBoundary && cropBoundary.type === 'CIRCLE' && (
+            <circle cx={cropBoundary.x} cy={cropBoundary.y} r={cropBoundary.r || 50}
+              fill="none" stroke="#3B82F6" strokeWidth={lineStrokeWidth * 1.5} strokeDasharray={`${lineStrokeWidth*3},${lineStrokeWidth*2}`}
+            />
+          )}
 
           {/* Center marks for circular features */}
           {circularCenters.map((center, i) => (
@@ -689,6 +862,30 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
             </g>
           )}
 
+          {/* Auxiliary edge line on parent view */}
+          {auxiliaryEdge && (
+            <g>
+              <line
+                x1={auxiliaryEdge.x1} y1={auxiliaryEdge.y1}
+                x2={auxiliaryEdge.x2} y2={auxiliaryEdge.y2}
+                stroke="#8B5CF6"
+                strokeWidth="2"
+                strokeDasharray="6,3"
+              />
+              {/* Arrow indicating projection direction */}
+              <text
+                x={(auxiliaryEdge.x1 + auxiliaryEdge.x2) / 2}
+                y={(auxiliaryEdge.y1 + auxiliaryEdge.y2) / 2 - 8}
+                textAnchor="middle"
+                fontSize={textSize * 0.8}
+                fill="#8B5CF6"
+                fontWeight="bold"
+              >
+                AUX
+              </text>
+            </g>
+          )}
+
           {/* Detail circle preview while drawing */}
           {showDetailTool && isDrawingDetail && detailCenter && (
             <circle
@@ -710,11 +907,11 @@ const DrawingView = ({ title, type, lines, showDimensions, components, scale, sh
             showDimensions={showDimensions}
           />
 
-          {/* Centerlines and annotation overlay */}
+          {/* Centerlines and GD&T annotation overlay */}
           <AnnotationLayer
-            lines={normalizedLines}
-            showCenterlines={showDimensions}
-            annotations={[]}
+            annotations={annotations ?? []}
+            draggable={true}
+            onPositionChange={onAnnotationPositionChange}
           />
         </svg>
       </div>
@@ -796,7 +993,9 @@ export const DrawingSheet = () => {
     partMaterial, massProperties,
     drawingSheets, activeSheetId, setDrawingSheets, setActiveSheet,
     addDrawingSheet, deleteDrawingSheet, renameDrawingSheet,
-    updateViewPosition, addViewToSheet,
+    updateViewPosition, addViewToSheet, addAnnotation,
+    cropView, createAuxiliaryView,
+    bomEntries, setBomEntries, removeBomEntry, updateBomEntry, rebuildBomFromComponents,
   } = useCadStore();
 
   const [projections, setProjections] = useState<Record<string, any[]>>({
@@ -812,6 +1011,7 @@ export const DrawingSheet = () => {
   const [renameValue, setRenameValue] = useState('');
   const [sectionData, setSectionData] = useState<Record<string, any>>({});
   const [detailBounds, setDetailBounds] = useState<Record<string, { cx: number; cy: number; radius: number }>>({});
+  const [annotationTool, setAnnotationTool] = useState<'DATUM' | 'GD&T' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const sensors = useSensors(
@@ -912,6 +1112,56 @@ export const DrawingSheet = () => {
     setDetailBounds(prev => ({ ...prev, [parentViewId]: bounds }));
   }, []);
 
+  const handleCropCreated = useCallback((parentViewId: string, boundary: { type: 'RECT' | 'CIRCLE'; x: number; y: number; w: number; h: number; r?: number }) => {
+    if (activeSheetId) {
+      cropView(activeSheetId, parentViewId, boundary);
+    }
+  }, [activeSheetId, cropView]);
+
+  const handleAuxiliaryCreated = useCallback((parentViewId: string, edge: { x1: number; y1: number; x2: number; y2: number }) => {
+    if (activeSheetId) {
+      createAuxiliaryView(activeSheetId, parentViewId, edge);
+    }
+  }, [activeSheetId, createAuxiliaryView]);
+
+  const handleAddDatum = useCallback(() => {
+    if (!activeSheetId) return;
+    const existing = activeSheet?.annotations ?? [];
+    const label = String.fromCharCode(65 + existing.filter(a => a.type === 'DATUM').length); // A, B, C, ...
+    addAnnotation(activeSheetId, {
+      id: `datum-${Date.now()}`,
+      type: 'DATUM',
+      label: label || 'A',
+      x: 200 + existing.length * 40,
+      y: 200 + existing.length * 30,
+    });
+  }, [activeSheetId, activeSheet, addAnnotation]);
+
+  const handleAddGdt = useCallback(() => {
+    if (!activeSheetId) return;
+    addAnnotation(activeSheetId, {
+      id: `gdt-${Date.now()}`,
+      type: 'GEOMETRIC_TOLERANCE',
+      symbol: 'POSITION',
+      tolerance: 0.05,
+      diameterPrefix: true,
+      datums: ['A', 'B'],
+      x: 300,
+      y: 300,
+    });
+  }, [activeSheetId, addAnnotation]);
+
+  const handleAnnotationPositionChange = useCallback((annotationId: string, x: number, y: number) => {
+    if (activeSheetId) {
+      // We'll use the store action; for now dispatch through updateAnnotationPosition
+      const sheet = drawingSheets.find(s => s.id === activeSheetId);
+      if (sheet) {
+        // Direct state mutation through the store
+        useCadStore.getState().updateAnnotationPosition(activeSheetId, annotationId, x, y);
+      }
+    }
+  }, [activeSheetId, drawingSheets]);
+
   const handleRenameSheet = (sheetId: string) => {
     const sheet = drawingSheets.find(s => s.id === sheetId);
     setRenamingSheetId(sheetId);
@@ -987,6 +1237,26 @@ export const DrawingSheet = () => {
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               Add View
             </button>
+            <button
+              onClick={handleAddDatum}
+              className={`px-3 py-1 text-[9px] font-black uppercase rounded shadow-sm border transition-all flex items-center gap-1 ${
+                annotationTool === 'DATUM' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+              title="Add Datum Feature"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polygon points="12,2 15,9 22,9 16,14 18,22 12,17 6,22 8,14 2,9 9,9"/></svg>
+              Datum
+            </button>
+            <button
+              onClick={handleAddGdt}
+              className={`px-3 py-1 text-[9px] font-black uppercase rounded shadow-sm border transition-all flex items-center gap-1 ${
+                annotationTool === 'GD&T' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+              title="Add Geometric Tolerance"
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="6" width="18" height="12" rx="1"/><line x1="9" y1="6" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="18"/></svg>
+              GD&amp;T
+            </button>
           </div>
         </div>
 
@@ -1034,9 +1304,15 @@ export const DrawingSheet = () => {
                   sectionLine={viewData.sectionLine}
                   sectionFill={viewData.type === 'SECTION' && viewData.parentViewId ? (sectionData[viewData.parentViewId]?.section_fill || []) : undefined}
                   detailBounds={viewData.parentViewId ? (detailBounds[viewData.parentViewId] || null) : null}
+                  cropBoundary={viewData.cropBoundary}
+                  auxiliaryEdge={viewData.auxiliaryEdge}
                   isDragging={draggingViewId === viewData.id}
+                  annotations={activeSheet?.annotations}
+                  onAnnotationPositionChange={handleAnnotationPositionChange}
                   onSectionCreated={handleSectionCreated}
                   onDetailCreated={handleDetailCreated}
+                  onCropCreated={handleCropCreated}
+                  onAuxiliaryCreated={handleAuxiliaryCreated}
                 />
               );
             })}
@@ -1050,46 +1326,33 @@ export const DrawingSheet = () => {
           <div className="flex-1 border-2 border-slate-900 bg-white overflow-hidden flex flex-col">
             <div className="text-[10px] font-black uppercase bg-slate-900 text-white px-2 py-1 flex justify-between items-center">
                <span>Bill of Materials</span>
-               <span className="text-[8px] opacity-70">AUTO-GENERATED</span>
+               <div className="flex items-center gap-2">
+                 <button
+                   onClick={() => {
+                     if (components.length > 0) {
+                       rebuildBomFromComponents(components);
+                     } else {
+                       // Set default demo entries
+                       setBomEntries([
+                         { id: 'bom-1', itemNo: 1, partNo: 'PART-999-001', description: 'Base Plate', qty: 1, material: partMaterial, note: '', level: 0, componentId: '' },
+                         { id: 'bom-2', itemNo: 2, partNo: 'PART-999-002', description: 'Bracket', qty: 2, material: partMaterial, note: '', level: 0, componentId: '' },
+                       ]);
+                     }
+                   }}
+                   className="text-[8px] bg-white/20 hover:bg-white/30 text-white px-1.5 py-0.5 rounded transition-colors"
+                   title="Rebuild BOM from assembly components"
+                 >
+                   REBUILD
+                 </button>
+                 <span className="text-[8px] opacity-70">AUTO-GENERATED</span>
+               </div>
             </div>
             <div className="flex-1 overflow-auto">
-              <table className="w-full text-left text-[10px]">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b-2 border-slate-900 text-slate-900 uppercase font-black text-[8px]">
-                    <th className="px-2 py-0.5 w-10">Item</th>
-                    <th>Part Number</th>
-                    <th>Material</th>
-                    <th className="text-right px-2">QTY</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {components.length > 0 ? (
-                    components.reduce((acc: any[], comp) => {
-                      const existing = acc.find((item: any) => item.partId === comp.partId);
-                      if (existing) {
-                        existing.qty += 1;
-                      } else {
-                        acc.push({ partId: comp.partId, name: comp.instanceName, qty: 1, material: partMaterial });
-                      }
-                      return acc;
-                    }, []).map((item: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-slate-50">
-                        <td className="px-2 py-1 font-black text-slate-400">{idx + 1}</td>
-                        <td className="font-bold text-slate-900">{item.partId}</td>
-                        <td className="italic text-slate-500">{item.material}</td>
-                        <td className="text-right px-2 font-mono font-black">{item.qty}</td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr className="hover:bg-slate-50">
-                      <td className="px-2 py-1 font-black text-slate-400">1</td>
-                      <td className="font-bold text-slate-900">PART-999-001</td>
-                      <td className="italic text-slate-500">{partMaterial}</td>
-                      <td className="text-right px-2 font-mono font-black">1</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <BomTable
+                entries={bomEntries}
+                onUpdate={updateBomEntry}
+                onRemove={removeBomEntry}
+              />
             </div>
           </div>
 
@@ -1147,6 +1410,7 @@ export const DrawingSheet = () => {
       {/* Sheet Tabs Bar */}
       <div className="mt-2 mx-auto w-[1120px]">
         <div className="flex items-center gap-2 mb-1">
+          <BendTablePanel />
           <SheetFormatSelector
             currentSize={activeSheetData?.sheetSize || 'A4'}
             onChange={(size: string) => {
