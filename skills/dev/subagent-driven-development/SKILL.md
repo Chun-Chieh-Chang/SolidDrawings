@@ -101,6 +101,29 @@ Use the least powerful model that can handle each role to conserve cost and incr
 - Touches multiple files with integration concerns → standard model
 - Requires design judgment or broad codebase understanding → most capable model
 
+## Operational Constraints (Lessons Learned)
+
+**Background tasks (`run_in_background=true`) have a 30-minute inactivity timeout.** If the subagent spends too long exploring before making tool calls, it gets killed. This applies primarily to the `deep` category (goal-oriented autonomous problem-solving).
+
+**Symptoms:** Subagent dispatches successfully, does file exploration, then times out silently before producing output. You get a timeout notification with no deliverables.
+
+**Root cause:** `deep` agents start by exploring the codebase extensively (reading files, grepping patterns) before writing any code. If this exploration phase exceeds ~20 minutes without tool call activity, the 30-minute inactivity window expires.
+
+**Solutions (in priority order):**
+
+1. **Sync `task(run_in_background=false)` — preferred for complex multi-step work.** Synchronous tasks do not have the 30-minute inactivity limit. They run until complete. Use this for tasks involving multiple files, design decisions, or open-ended exploration.
+
+2. **Inline execution — for tightly coupled or time-sensitive work.** Execute the task directly in your own session instead of delegating. Best when you already have the relevant files in context.
+
+3. **Pre-load context before background dispatch.** If you must use `run_in_background=true`, provide extensive file contents and code snippets in the prompt itself so the subagent doesn't need to discover them independently.
+
+**When to use which:**
+- Task requires reading 3+ files to understand patterns → sync task
+- Task is 1-2 files with clear spec → background task is fine (fast model)
+- Task involves integration across multiple modules → sync task
+- Task is research-heavy with implementation → sync task
+- Task is a simple, self-contained edit → background task is fine
+
 ## Handling Implementer Status
 
 Implementer subagents report one of four statuses. Handle each appropriately:
