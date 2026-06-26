@@ -288,5 +288,138 @@ export const sketchActions = {
         }
       });
     }
-  }
+  },
+
+  /**
+   * Apply a 2D fillet between two sketch edges.
+   * @param edgeId1 - First edge ID
+   * @param edgeId2 - Second edge ID
+   * @param radius - Fillet radius
+   * @returns true if successful
+   */
+  applyFillet: (edgeId1: string, edgeId2: string, radius: number): boolean => {
+    const state = useCadStore.getState();
+    const e1 = state.sketchEdges[edgeId1];
+    const e2 = state.sketchEdges[edgeId2];
+    if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return false;
+
+    const n1a = state.sketchNodes[e1.nodeIds[0]];
+    const n1b = state.sketchNodes[e1.nodeIds[1]];
+    const n2a = state.sketchNodes[e2.nodeIds[0]];
+    const n2b = state.sketchNodes[e2.nodeIds[1]];
+    if (!n1a || !n1b || !n2a || !n2b) return false;
+
+    // Dynamic import to avoid circular dependency
+    const { computeFillet } = require('../utils/sketch-fillet-chamfer');
+    const result = computeFillet(
+      { id: e1.id, start: { x: n1a.x, y: n1a.y }, end: { x: n1b.x, y: n1b.y } },
+      { id: e2.id, start: { x: n2a.x, y: n2a.y }, end: { x: n2b.x, y: n2b.y } },
+      radius
+    );
+    if (!result) return false;
+
+    useCadStore.getState().saveSnapshot();
+
+    // Create arc center node
+    const centerNodeId = `fillet_center_${Date.now()}`;
+    const arcStartNodeId = `fillet_start_${Date.now()}`;
+    const arcEndNodeId = `fillet_end_${Date.now()}`;
+
+    const newNodes: Record<string, SketchNode> = {
+      ...state.sketchNodes,
+      [centerNodeId]: { id: centerNodeId, x: result.arc.center.x, y: result.arc.center.y, isFixed: true },
+      [arcStartNodeId]: { id: arcStartNodeId, x: result.arc.start.x, y: result.arc.start.y },
+      [arcEndNodeId]: { id: arcEndNodeId, x: result.arc.end.x, y: result.arc.end.y },
+    };
+
+    // Update existing edges (trimmed)
+    const newEdges: Record<string, SketchEdge> = { ...state.sketchEdges };
+    newEdges[edgeId1] = {
+      ...e1,
+      nodeIds: [e1.nodeIds[0], arcStartNodeId],
+    };
+    newEdges[edgeId2] = {
+      ...e2,
+      nodeIds: [e2.nodeIds[0], arcEndNodeId],
+    };
+
+    // Add fillet arc edge
+    const arcId = `fillet_arc_${Date.now()}`;
+    newEdges[arcId] = {
+      id: arcId,
+      type: 'ARC',
+      nodeIds: [arcStartNodeId, arcEndNodeId],
+      parameters: {
+        center: result.arc.center,
+        radius: result.arc.radius,
+        startAngle: result.arc.startAngle,
+        endAngle: result.arc.endAngle,
+      },
+    };
+
+    useCadStore.setState({ sketchNodes: newNodes, sketchEdges: newEdges });
+    return true;
+  },
+
+  /**
+   * Apply a 2D chamfer between two sketch edges.
+   * @param edgeId1 - First edge ID
+   * @param edgeId2 - Second edge ID
+   * @param distance - Chamfer distance from intersection
+   * @returns true if successful
+   */
+  applyChamfer: (edgeId1: string, edgeId2: string, distance: number): boolean => {
+    const state = useCadStore.getState();
+    const e1 = state.sketchEdges[edgeId1];
+    const e2 = state.sketchEdges[edgeId2];
+    if (!e1 || !e2 || e1.nodeIds.length < 2 || e2.nodeIds.length < 2) return false;
+
+    const n1a = state.sketchNodes[e1.nodeIds[0]];
+    const n1b = state.sketchNodes[e1.nodeIds[1]];
+    const n2a = state.sketchNodes[e2.nodeIds[0]];
+    const n2b = state.sketchNodes[e2.nodeIds[1]];
+    if (!n1a || !n1b || !n2a || !n2b) return false;
+
+    const { computeChamfer } = require('../utils/sketch-fillet-chamfer');
+    const result = computeChamfer(
+      { id: e1.id, start: { x: n1a.x, y: n1a.y }, end: { x: n1b.x, y: n1b.y } },
+      { id: e2.id, start: { x: n2a.x, y: n2a.y }, end: { x: n2b.x, y: n2b.y } },
+      distance
+    );
+    if (!result) return false;
+
+    useCadStore.getState().saveSnapshot();
+
+    // Create chamfer endpoint nodes
+    const cp1Id = `chamfer_p1_${Date.now()}`;
+    const cp2Id = `chamfer_p2_${Date.now()}`;
+
+    const newNodes: Record<string, SketchNode> = {
+      ...state.sketchNodes,
+      [cp1Id]: { id: cp1Id, x: result.line.start.x, y: result.line.start.y },
+      [cp2Id]: { id: cp2Id, x: result.line.end.x, y: result.line.end.y },
+    };
+
+    // Update existing edges (trimmed)
+    const newEdges: Record<string, SketchEdge> = { ...state.sketchEdges };
+    newEdges[edgeId1] = {
+      ...e1,
+      nodeIds: [e1.nodeIds[0], cp1Id],
+    };
+    newEdges[edgeId2] = {
+      ...e2,
+      nodeIds: [e2.nodeIds[0], cp2Id],
+    };
+
+    // Add chamfer line edge
+    const chamferId = `chamfer_line_${Date.now()}`;
+    newEdges[chamferId] = {
+      id: chamferId,
+      type: 'LINE',
+      nodeIds: [cp1Id, cp2Id],
+    };
+
+    useCadStore.setState({ sketchNodes: newNodes, sketchEdges: newEdges });
+    return true;
+  },
 };

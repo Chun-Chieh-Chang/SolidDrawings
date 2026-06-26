@@ -95,6 +95,9 @@ export interface SketchNode {
   id: string;
   x: number;
   y: number;
+  z?: number;
+  is3D?: boolean;
+  plane?: 'FRONT' | 'TOP' | 'RIGHT';
   isFixed?: boolean;
 }
 
@@ -103,6 +106,7 @@ export interface SketchEdge {
   type: 'LINE' | 'ARC' | 'CIRCLE' | 'CENTER_LINE' | 'SPLINE' | 'TEXT';
   nodeIds: string[];
   isConstruction?: boolean;
+  is3D?: boolean;
   parameters?: any;
 }
 
@@ -115,6 +119,8 @@ export interface SketchConstraint {
   offset?: number;
   arcCondition?: 'CENTER' | 'MIN' | 'MAX';
   label?: string;
+  is3D?: boolean;
+  plane?: 'FRONT' | 'TOP' | 'RIGHT';
 }
 
 // ── Assembly types ───────────────────────────────────────────────
@@ -122,6 +128,8 @@ export interface CADComponent {
   id: string;
   partId: string;
   instanceName: string;
+  isSubAssembly?: boolean;
+  children?: CADComponent[];
   transform: {
     position: [number, number, number];
     rotation: [number, number, number];
@@ -169,22 +177,121 @@ export interface SectionViewState {
   flip: boolean;
 }
 
+// ── Sheet Metal Bend Table types ────────────────────────────────
+export interface BendData {
+  id: string;
+  type: string;
+  bend_radius: number;
+  bend_angle: number;
+  k_factor: number;
+  direction: string;
+  thickness: number;
+}
+
+export interface BendTableState {
+  bends: BendData[];
+  showBendTable: boolean;
+  setShowBendTable: (show: boolean) => void;
+  setBends: (bends: BendData[]) => void;
+  updateBendKFactor: (id: string, k_factor: number) => void;
+}
+
 // ── Drawing types ────────────────────────────────────────────────
+export interface CropBoundary {
+  type: 'RECT' | 'CIRCLE';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  r?: number; // radius for CIRCLE
+}
+
+export interface AuxiliaryEdge {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
+
+export type ViewType = 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL' | 'CROP' | 'AUXILIARY';
+
 export interface DrawingSheetViewData {
   id: string;
-  type: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL';
+  type: ViewType;
   title: string;
   position: { x: number; y: number; w: number; h: number };
   scale: string;
   showDimensions: boolean;
   parentViewId?: string;
   sectionLine?: { u1: number; v1: number; u2: number; v2: number };
+  cropBoundary?: CropBoundary;
+  auxiliaryEdge?: AuxiliaryEdge;
 }
+
+// ── BOM types ─────────────────────────────────────────────────────
+export interface BomEntry {
+  id: string;
+  itemNo: number;
+  partNo: string;
+  description: string;
+  qty: number;
+  material: string;
+  note: string;
+  level: number;
+  parentId?: string;
+  componentId: string;
+  isSubAssembly?: boolean;
+  children?: BomEntry[];
+}
+
+// ── Drawing annotation types ──────────────────────────────────────
+export type GeometricToleranceSymbol =
+  | 'STRAIGHTNESS'
+  | 'FLATNESS'
+  | 'CIRCULARITY'
+  | 'CYLINDRICITY'
+  | 'PROFILE_LINE'
+  | 'PROFILE_SURFACE'
+  | 'ANGULARITY'
+  | 'PERPENDICULARITY'
+  | 'PARALLELISM'
+  | 'POSITION'
+  | 'CONCENTRICITY'
+  | 'SYMMETRY'
+  | 'CIRCULAR_RUNOUT'
+  | 'TOTAL_RUNOUT';
+
+export interface DatumFeature {
+  id: string;
+  type: 'DATUM';
+  label: string;
+  x: number;
+  y: number;
+  angle?: number;
+  attachedViewId?: string;
+}
+
+export interface GeometricTolerance {
+  id: string;
+  type: 'GEOMETRIC_TOLERANCE';
+  symbol: GeometricToleranceSymbol;
+  tolerance: number;
+  diameterPrefix?: boolean;
+  materialCondition?: 'M' | 'L' | 'S';
+  datums: string[];
+  x: number;
+  y: number;
+  width?: number;
+  attachedViewId?: string;
+}
+
+export type DrawingAnnotation = DatumFeature | GeometricTolerance;
 
 export interface DrawingSheetData {
   id: string;
   name: string;
   views: DrawingSheetViewData[];
+  annotations?: DrawingAnnotation[];
   sheetSize?: 'A4' | 'A3' | 'A2' | 'A1' | 'A0';
 }
 
@@ -257,6 +364,6 @@ export const MATERIAL_PRESETS: Record<string, {
 
 export const DEFAULT_RIBBON_LAYOUT: RibbonLayout = {
   FEATURES: ['EXTRUDE', 'REVOLVE', 'EXTRUDE_CUT', 'REVOLVED_CUT', 'SWEEP', 'LOFT', 'FILLET', 'CHAMFER', 'MIRROR', 'PATTERN', 'SHELL', 'DOME', 'DRAFT', 'REFERENCE_PLANE', 'REFERENCE_AXIS', 'REFERENCE_POINT', 'REFERENCE_COORDINATE_SYSTEM', 'HOLE_WIZARD'],
-  SKETCH: ['LINE', 'CIRCLE', 'ARC', 'RECTANGLE', 'POLYGON', 'SMART_DIMENSION', 'TRIM', 'EXTEND', 'OFFSET', 'MIRROR', 'PATTERN', 'TEXT', 'SPLINE'],
+  SKETCH: ['LINE', 'CIRCLE', 'ARC', 'RECTANGLE', 'POLYGON', 'SMART_DIMENSION', 'TRIM', 'EXTEND', 'OFFSET', 'MIRROR', 'PATTERN', 'TEXT', 'SPLINE', 'FILLET', 'CHAMFER'],
   EVALUATE: ['MEASURE', 'MASS_PROPS', 'INTERFERENCE', 'SECTION_VIEW', 'EQUATIONS']
 };

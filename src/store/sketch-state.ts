@@ -17,6 +17,11 @@ export type SketchSlice = {
   setSketchEdges: (edges: Record<string, SketchEdge> | ((prev: Record<string, SketchEdge>) => Record<string, SketchEdge>)) => void;
   setSketchConstraints: (constraints: Record<string, SketchConstraint> | ((prev: Record<string, SketchConstraint>) => Record<string, SketchConstraint>)) => void;
   convertEntities: (selectedEdgeIds: string[]) => void;
+  // ── 3D Sketch mode ───────────────────────────────────────────
+  is3DMode: boolean;
+  set3DMode: (active: boolean) => void;
+  active3DPlane: 'FRONT' | 'TOP' | 'RIGHT' | null;
+  setActive3DPlane: (plane: 'FRONT' | 'TOP' | 'RIGHT' | null) => void;
 };
 
 export const createSketchState = (set: any, get: any) => ({
@@ -71,4 +76,14 @@ export const createSketchState = (set: any, get: any) => ({
       return { sketchNodes: nextNodes, sketchEdges: nextEdges };
     });
   },
+
+  // ── 3D Sketch mode ───────────────────────────────────────────
+  is3DMode: false,
+  set3DMode: (is3DMode: boolean) => {
+    get().saveSnapshot();
+    get().markRebuildDirty(0);
+    set({ is3DMode });
+  },
+  active3DPlane: null as 'FRONT' | 'TOP' | 'RIGHT' | null,
+  setActive3DPlane: (active3DPlane: 'FRONT' | 'TOP' | 'RIGHT' | null) => set({ active3DPlane }),
 });

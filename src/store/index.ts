@@ -22,6 +22,10 @@ import type {
   CadToastType,
   DrawingSheetData,
   DrawingSheetViewData,
+  DrawingAnnotation,
+  DatumFeature,
+  GeometricTolerance,
+  GeometricToleranceSymbol,
   CadToastItem,
   CADContextMenu,
   MeasurementResult,
@@ -61,6 +65,10 @@ export type {
   CadToastType,
   DrawingSheetData,
   DrawingSheetViewData,
+  DrawingAnnotation,
+  DatumFeature,
+  GeometricTolerance,
+  GeometricToleranceSymbol,
   CadToastItem,
   CADContextMenu,
   MeasurementResult,
@@ -85,6 +93,12 @@ export type CombinedState = {
   setProjectName: (name: string) => void;
   drawingScale: string;
   setDrawingScale: (scale: string) => void;
+  // ── Bend Table ─────────────────────────────────────────────────
+  showBendTable: boolean;
+  setShowBendTable: (show: boolean) => void;
+  bendTableData: import('./types').BendData[];
+  setBendTableData: (bends: import('./types').BendData[]) => void;
+  updateBendTableKFactor: (id: string, k_factor: number) => void;
   drawnBy: string;
   setDrawnBy: (name: string) => void;
   approvedBy: string;
@@ -111,6 +125,10 @@ export type CombinedState = {
   setSketchMode: (active: boolean) => void;
   smartDimensionActive: boolean;
   setSmartDimensionActive: (active: boolean) => void;
+  is3DMode: boolean;
+  set3DMode: (active: boolean) => void;
+  active3DPlane: 'FRONT' | 'TOP' | 'RIGHT' | null;
+  setActive3DPlane: (plane: 'FRONT' | 'TOP' | 'RIGHT' | null) => void;
   activePlane: string | null;
   setActivePlane: (plane: string | null) => void;
   activeFaceOrigin: [number, number, number] | null;
@@ -196,6 +214,10 @@ export type CombinedState = {
   setLargeAssemblyMode: (active: boolean) => void;
   mates: import('./types').CADMate[];
   setMates: (mates: import('./types').CADMate[]) => void;
+  addSubAssembly: (parentId: string, name: string) => void;
+  addToSubAssembly: (subAssemblyId: string, component: import('./types').CADComponent) => void;
+  removeFromSubAssembly: (subAssemblyId: string, componentId: string) => void;
+  updateSubComponentTransform: (subAssemblyId: string, componentId: string, position: [number, number, number], rotation: [number, number, number]) => void;
   addMate: (mate: import('./types').CADMate) => void;
   removeMate: (id: string) => void;
   mateSelection: any[];
@@ -299,10 +321,21 @@ export type CombinedState = {
   setActiveSheet: (id: string) => void;
   updateViewPosition: (sheetId: string, viewId: string, position: { x: number; y: number; w: number; h: number }) => void;
   updateViewScale: (sheetId: string, viewId: string, scale: string) => void;
-  addViewToSheet: (viewType: 'FRONT' | 'TOP' | 'RIGHT' | 'ISO' | 'SECTION' | 'DETAIL', sheetId?: string, parentViewId?: string) => void;
+  addViewToSheet: (viewType: import('./types').ViewType, sheetId?: string, parentViewId?: string) => void;
   removeViewFromSheet: (sheetId: string, viewId: string) => void;
   updateViewTitle: (sheetId: string, viewId: string, title: string) => void;
   toggleViewDimensions: (sheetId: string, viewId: string) => void;
+  cropView: (sheetId: string, viewId: string, boundary: import('./types').CropBoundary) => void;
+  createAuxiliaryView: (sheetId: string, parentViewId: string, edge: import('./types').AuxiliaryEdge) => void;
+  addAnnotation: (sheetId: string, annotation: import('./types').DrawingAnnotation) => void;
+  updateAnnotationPosition: (sheetId: string, annotationId: string, x: number, y: number) => void;
+  removeAnnotation: (sheetId: string, annotationId: string) => void;
+  bomEntries: import('./types').BomEntry[];
+  setBomEntries: (entries: import('./types').BomEntry[]) => void;
+  addBomEntry: (entry: import('./types').BomEntry) => void;
+  removeBomEntry: (id: string) => void;
+  updateBomEntry: (id: string, updates: Partial<import('./types').BomEntry>) => void;
+  rebuildBomFromComponents: (components: import('./types').CADComponent[]) => void;
 };
 
 export type CadState = CombinedState;
@@ -319,6 +352,17 @@ export const useCadStore = create<CombinedState>()(
       ...createConfigState(set, get),
       ...createUiState(set, get),
       ...createAppState(set, get),
+      // ── Bend Table ─────────────────────────────────────────────
+      showBendTable: false,
+      setShowBendTable: (show: boolean) => set({ showBendTable: show }),
+      bendTableData: [],
+      setBendTableData: (bends: import('./types').BendData[]) => set({ bendTableData: bends }),
+      updateBendTableKFactor: (id: string, k_factor: number) =>
+        set((state: any) => ({
+          bendTableData: state.bendTableData.map((b: import('./types').BendData) =>
+            b.id === id ? { ...b, k_factor } : b
+          ),
+        })),
     }),
     {
       name: 'cad-storage',

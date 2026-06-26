@@ -1,4 +1,33 @@
+import { v4 as uuidv4 } from 'uuid';
 import type { CADComponent, CADMate, MateEntity, ExplodedViewState, MotionStudyState, MotionDriver, SectionViewState } from './types';
+
+// ── Recursive tree helpers ──────────────────────────────────────────────
+function findComponentDeep(list: CADComponent[], id: string): CADComponent | undefined {
+  for (const c of list) {
+    if (c.id === id) return c;
+    if (c.children) {
+      const found = findComponentDeep(c.children, id);
+      if (found) return found;
+    }
+  }
+  return undefined;
+}
+
+function updateComponentDeep(list: CADComponent[], id: string, updater: (c: CADComponent) => CADComponent): CADComponent[] {
+  return list.map(c => {
+    if (c.id === id) return updater(c);
+    if (c.children) return { ...c, children: updateComponentDeep(c.children, id, updater) };
+    return c;
+  });
+}
+
+function removeComponentDeep(list: CADComponent[], id: string): CADComponent[] {
+  return list.filter(c => {
+    if (c.id === id) return false;
+    if (c.children) c.children = removeComponentDeep(c.children, id);
+    return true;
+  }).map(c => c.children ? { ...c, children: removeComponentDeep(c.children, id) } : c);
+}
 
 export type AssemblySlice = {
   components: CADComponent[];
@@ -52,6 +81,11 @@ export type AssemblySlice = {
   removeMotionDriver: (id: string) => void;
   sectionView: SectionViewState;
   setSectionView: (view: Partial<SectionViewState>) => void;
+  // ── Sub-assembly CRUD ────────────────────────────────────────
+  addSubAssembly: (parentId: string, name: string) => void;
+  addToSubAssembly: (subAssemblyId: string, component: CADComponent) => void;
+  removeFromSubAssembly: (subAssemblyId: string, componentId: string) => void;
+  updateSubComponentTransform: (subAssemblyId: string, componentId: string, position: [number, number, number], rotation: [number, number, number]) => void;
 };
 
 export const createAssemblyState = (set: any, get: any) => ({
@@ -140,6 +174,55 @@ export const createAssemblyState = (set: any, get: any) => ({
   sectionView: { isActive: false, plane: 'FRONT', offset: 0, flip: false } as SectionViewState,
   setSectionView: (view: Partial<SectionViewState>) =>
     set((state: any) => ({ sectionView: { ...state.sectionView, ...view } })),
+
+  // ── Sub-assembly CRUD ────────────────────────────────────────
+  addSubAssembly: (parentId: string, name: string) => {
+    get().saveSnapshot();
+    const newSub: CADComponent = {
+      id: uuidv4(),
+      partId: '',
+      instanceName: name,
+      isSubAssembly: true,
+      children: [],
+      visible: true,
+      transform: { position: [0, 0, 0], rotation: [0, 0, 0] },
+    };
+    set((state: any) => ({
+      components: updateComponentDeep(state.components, parentId, (c) => ({
+        ...c,
+        children: [...(c.children || []), newSub],
+      })),
+    }));
+  },
+  addToSubAssembly: (subAssemblyId: string, component: CADComponent) => {
+    get().saveSnapshot();
+    set((state: any) => ({
+      components: updateComponentDeep(state.components, subAssemblyId, (c) => ({
+        ...c,
+        children: [...(c.children || []), component],
+      })),
+    }));
+  },
+  removeFromSubAssembly: (subAssemblyId: string, componentId: string) => {
+    get().saveSnapshot();
+    set((state: any) => ({
+      components: updateComponentDeep(state.components, subAssemblyId, (c) => ({
+        ...c,
+        children: (c.children || []).filter((child: CADComponent) => child.id !== componentId),
+      })),
+    }));
+  },
+  updateSubComponentTransform: (subAssemblyId: string, componentId: string, position: [number, number, number], rotation: [number, number, number]) => {
+    get().saveSnapshot();
+    set((state: any) => ({
+      components: updateComponentDeep(state.components, subAssemblyId, (c) => ({
+        ...c,
+        children: (c.children || []).map((child: CADComponent) =>
+          child.id === componentId ? { ...child, transform: { position, rotation } } : child
+        ),
+      })),
+    }));
+  },
 
   explodedView: { isActive: false, factor: 0, directions: {}, steps: [], currentStepIndex: -1 } as ExplodedViewState,
   setExplodedView: (view: Partial<ExplodedViewState>) =>
