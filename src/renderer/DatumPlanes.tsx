@@ -12,6 +12,8 @@ import { CircleToolHandler } from '../utils/sketch/ToolHandlers/CircleTool';
 import { RectangleToolHandler, CenterRectangleToolHandler } from '../utils/sketch/ToolHandlers/RectangleTool';
 import { PolygonToolHandler } from '../utils/sketch/ToolHandlers/PolygonTool';
 import { ExtendToolHandler } from '../utils/sketch/ToolHandlers/ExtendTool';
+import { FilletToolHandler } from '../utils/sketch/ToolHandlers/FilletTool';
+import { ChamferToolHandler } from '../utils/sketch/ToolHandlers/ChamferTool';
 import { sketchActions } from '../store/sketchActions';
 import { previewSolve, commitPreciseSketchSolve } from '@/kernel/SketchSolverService';
 
@@ -493,6 +495,30 @@ export const DatumPlanes = () => {
      if (sketchTool === 'EXTEND') {
         const extendTool = new ExtendToolHandler();
         extendTool.onPointerDown({
+          rawU, rawV,
+          snappedU: rawU, snappedV: rawV,
+          snappedNodeId: null,
+          shiftKey: event.shiftKey || false,
+          activeSnapType: undefined
+        });
+        return;
+     }
+
+     if (sketchTool === 'FILLET') {
+        const filletTool = new FilletToolHandler();
+        filletTool.onPointerDown({
+          rawU, rawV,
+          snappedU: rawU, snappedV: rawV,
+          snappedNodeId: null,
+          shiftKey: event.shiftKey || false,
+          activeSnapType: undefined
+        });
+        return;
+     }
+
+     if (sketchTool === 'CHAMFER') {
+        const chamferTool = new ChamferToolHandler();
+        chamferTool.onPointerDown({
           rawU, rawV,
           snappedU: rawU, snappedV: rawV,
           snappedNodeId: null,

@@ -103,6 +103,8 @@ export default function Home() {
     handleCreateMiterFlange,
     handleCreateHem,
     handleCreateFlatPattern,
+    handleUnfold,
+    handleFold,
     handleCreateFormingTool,
   } = useFeatureBuilders(handleRebuild);
 
@@ -235,6 +237,8 @@ export default function Home() {
           handleCreateMiterFlange={handleCreateMiterFlange}
           handleCreateHem={handleCreateHem}
           handleCreateFlatPattern={handleCreateFlatPattern}
+          handleUnfold={handleUnfold}
+          handleFold={handleFold}
           handleCreateFormingTool={handleCreateFormingTool}
           onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
