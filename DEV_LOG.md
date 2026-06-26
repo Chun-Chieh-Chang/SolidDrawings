@@ -968,3 +968,27 @@ Systematic MECE cleanup: identify and quarantine outdated, duplicate, or irrelev
 ### Git Baseline
 - Cleanup commit: `[to be created]`
 - All quarantined files recoverable from `.trash/`
+
+---
+
+## 2026-06-25 RCA/CAPA: Sub-agent dispatch failure (401/NOP)
+
+### Investigation
+All 5 sub-agent dispatch methods failed:
+1. `ultrabrain` → `Token refresh failed: 401`
+2. `deep` (background) → Sisyphus-Junior returned empty message, 0 tool calls in 6 min
+3. `unspecified-high` → `No payment method`
+4. `quick` → `Token refresh failed: 401`
+5. Session retry (ses_...) → `Token refresh failed: 401`
+
+**Root Cause**: API token expiry in long session + no fallback routing.
+**Impact**: All sub-agent delegation blocked mid-sprint.
+
+### Corrective Action
+- Unfold/Fold Task 1 implemented **manually** (no sub-agent): HeavyEngineClient API methods, store types, sheet-metal-builders handlers, RibbonController wiring
+- `tsc --noEmit`: ✅ zero errors
+- `pytest`: 100 passed, 2 skipped ✅
+
+### Preventive Actions (documented for next session)
+- Sub-agent fallback protocol needed
+- Token pre-flight check before autodev loop
