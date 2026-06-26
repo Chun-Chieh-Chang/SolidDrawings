@@ -522,6 +522,44 @@ async def create_fold(request: FoldRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+class BendTableRequest(BaseModel):
+    features: List[FeatureSummary]
+
+class BendTableItem(BaseModel):
+    id: str
+    type: str
+    bend_radius: float = 0.5
+    bend_angle: float = 90.0
+    k_factor: float = 0.44
+    direction: str = "UP"
+    thickness: float = 1.0
+
+@router.post("/bend_table")
+async def get_bend_table(request: BendTableRequest):
+    """Derive bend table data from sheet metal features."""
+    try:
+        bends: list[dict] = []
+        for feat in request.features:
+            p = feat.parameters or {}
+            ftype = feat.type
+            # Sheet metal feature types that involve bending
+            if ftype in ('BASE_FLANGE_TAB', 'EDGE_FLANGE', 'MITER_FLANGE', 'HEM', 'JOG'):
+                bend = {
+                    "id": feat.id,
+                    "type": ftype,
+                    "bend_radius": float(p.get("bendRadius", p.get("bend_radius", 0.5))),
+                    "bend_angle": float(p.get("bendAngle", p.get("bend_angle", 90.0))),
+                    "k_factor": float(p.get("kFactor", p.get("k_factor", 0.44))),
+                    "direction": str(p.get("direction", "UP")),
+                    "thickness": float(p.get("thickness", 1.0)),
+                }
+                bends.append(bend)
+        return {"success": True, "bends": bends}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/flat_pattern")
 async def create_flat_pattern(request: FlatPatternRequest):
     try:

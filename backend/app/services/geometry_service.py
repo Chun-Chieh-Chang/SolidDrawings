@@ -5198,6 +5198,58 @@ def build_feature_chain(features: list) -> tuple:
         if f_type in ('REFERENCE_PLANE', 'REFERENCE_AXIS', 'REFERENCE_POINT'):
             continue
         
+        # Handle SURFACE_CUT directly — it modifies cumulative_shape, not a standalone shape
+        if f_type == 'SURFACE_CUT' and cumulative_shape is not None:
+            try:
+                from OCC.Core.TopExp import TopExp_Explorer
+                from OCC.Core.TopAbs import TopAbs_FACE
+                from OCC.Core.TopoDS import topods
+                from OCC.Core.BRepAdaptor import BRepAdaptor_Surface
+                from OCC.Core.BRepLProp import BRepLProp_SLProps
+                from OCC.Core.gp import gp_Pnt, gp_Dir
+                from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox
+                from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Common
+                tool_id = params.get('tool_feature_id')
+                flip = params.get('flip', False)
+                tool_feat = next((f for f in features if (f.get('id') if isinstance(f, dict) else getattr(f, 'id', None)) == tool_id), None)
+                if tool_feat:
+                    tf_type = tool_feat.get('type') if isinstance(tool_feat, dict) else getattr(tool_feat, 'type', '')
+                    tf_params = tool_feat.get('parameters', {}) if isinstance(tool_feat, dict) else getattr(tool_feat, 'parameters', {})
+                    tool_shape = build_feature_shape_in_isolation(tf_type, tf_params, None, features)
+                    if tool_shape and not tool_shape.IsNull():
+                        exp = TopExp_Explorer(tool_shape, TopAbs_FACE)
+                        if exp.More():
+                            face = topods.Face(exp.Current())
+                            adaptor = BRepAdaptor_Surface(face)
+                            u_mid = (adaptor.FirstUParameter() + adaptor.LastUParameter()) / 2.0
+                            v_mid = (adaptor.FirstVParameter() + adaptor.LastVParameter()) / 2.0
+                            props = BRepLProp_SLProps(adaptor, u_mid, v_mid, 1, 1e-6)
+                            if props.IsNormalDefined():
+                                normal = props.Normal()
+                                if flip: normal.Reverse()
+                                # Use a large fixed-size box on the keep side of the cut plane
+                                p_ref = props.Value()
+                                keep_dir = gp_Dir(-normal.X(), -normal.Y(), -normal.Z())
+                                big_size = 100000.0
+                                bx = p_ref.X() + keep_dir.X() * big_size * 0.5
+                                by = p_ref.Y() + keep_dir.Y() * big_size * 0.5
+                                bz = p_ref.Z() + keep_dir.Z() * big_size * 0.5
+                                keep_box = BRepPrimAPI_MakeBox(
+                                    gp_Pnt(bx - big_size*0.5, by - big_size*0.5, bz - big_size*0.5),
+                                    gp_Pnt(bx + big_size*0.5, by + big_size*0.5, bz + big_size*0.5)
+                                ).Shape()
+                                # Intersect the cumulative shape with the keep-box
+                                common = BRepAlgoAPI_Common(cumulative_shape, keep_box)
+                                common.Build()
+                                if common.IsDone():
+                                    result = common.Shape()
+                                    if result is not None and not result.IsNull():
+                                        cumulative_shape = result
+            except Exception as sc_err:
+                print(f"[ERROR] SURFACE_CUT in build_feature_chain failed: {sc_err}")
+            shapes.append(cumulative_shape)
+            continue
+        
         # Build this feature in isolation
         feature_shape = build_feature_shape_in_isolation(f_type, params, cumulative_shape, features)
         
