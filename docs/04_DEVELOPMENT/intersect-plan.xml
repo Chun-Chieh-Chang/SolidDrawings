@@ -1,0 +1,30 @@
+<strategy>
+## Task: Add Intersect (交集) feature button + Combine PropertyManager rollout
+## Scope:
+- INCLUDED: 
+  - Create CombineRollout (operation selector: ADD/SUBTRACT/INTERSECT + tool body picker)
+  - Register it in PartFeaturePropertyManager/index.tsx for COMBINE type
+  - Add Intersect button to FeaturesTab.tsx (creates COMBINE with operation:INTERSECT)
+  - Add INTERSECT to DEFAULT_RIBBON_LAYOUT
+  - Add backend test for INTERSECT operation
+- EXCLUDED:
+  - Changes to geometry_service.py, features.py, or any backend logic (already supports INTERSECT)
+  - Changes to the Combine API endpoint (already works)
+## Strategy:
+1. Create combine-rollout.tsx → operation radio buttons + tool_feature_id dropdown
+2. Index.tsx → register { combine-rollout } for COMBINE type
+3. FeaturesTab.tsx → add Intersect button (creates COMBINE + operation:INTERSECT)
+4. types.ts → add INTERSECT to DEFAULT_RIBBON_LAYOUT.FEATURES
+5. Run frontend tests ✅
+6. Commit + push
+## Verification Conditions:
+- [ ] Intersect button visible in Features tab
+- [ ] Clicking Intersect → creates COMBINE feature with operation:INTERSECT
+- [ ] CombineRollout shows operation radio (ADD/SUBTRACT/INTERSECT)
+- [ ] Tool body dropdown shows available features
+- [ ] 89 frontend + 83 backend tests pass
+## Constraints:
+- Follow existing PropertyManager rollout pattern exactly
+- No backend changes needed
+- tool_feature_id type matches existing CADFeature.parameters pattern
+</strategy>
