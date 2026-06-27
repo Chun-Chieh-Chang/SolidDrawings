@@ -152,10 +152,9 @@ class TestProcessFeatures:
             {"id": "split1", "type": "SPLIT",
              "parameters": {"split_plane": {"point": [0, 0, 0], "normal": [0, 0, 1]}}},
         ]
-        # process_features catches internal errors gracefully; SPLIT uses OCC API
         result = process_features(features)
-        # Should either return a dict or None — but not crash
-        assert result is None or isinstance(result, dict)
+        assert isinstance(result, dict)
+        assert "type" in result
 
     def test_process_with_combine_feature(self):
         from app.services.geometry_service import process_features

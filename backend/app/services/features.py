@@ -14,6 +14,7 @@ try:
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
     from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism
     from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Splitter, BRepAlgoAPI_Section
+    from OCC.Core.TopTools import TopTools_ListOfShape
     HAS_OCC = True
 except ImportError:
     HAS_OCC = False
@@ -286,8 +287,14 @@ def generate_split(features, split_plane):
         plane = gp_Pln(pnt, nrm)
         face = BRepBuilderAPI_MakeFace(plane, -1000, 1000, -1000, 1000).Face()
 
-        # Perform split
-        splitter = BRepAlgoAPI_Splitter(shape, face)
+        # Perform split (BRepAlgoAPI_Splitter: SetArguments/SetTools for older OCC)
+        args = TopTools_ListOfShape()
+        args.Append(shape)
+        tools = TopTools_ListOfShape()
+        tools.Append(face)
+        splitter = BRepAlgoAPI_Splitter()
+        splitter.SetArguments(args)
+        splitter.SetTools(tools)
         splitter.Build()
         if splitter.IsDone():
             shape_hash = str(uuid.uuid4())
