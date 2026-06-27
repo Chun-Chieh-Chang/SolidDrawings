@@ -193,8 +193,7 @@ def _map_point_to_2d(x, y, z, plane_type):
 
 def generate_box(width, height, depth):
     if not HAS_OCC:
-        from .geometry_service import make_mock_box_mesh
-        return {"type": "mesh", "data": make_mock_box_mesh(width, height, depth)}
+        raise RuntimeError("OpenCASCADE kernel not available. Cannot generate box geometry.")
     from .geometry_service import _shape_to_mesh
     box = BRepPrimAPI_MakeBox(width, height, depth).Shape()
     return {"type": "mesh", "data": _shape_to_mesh(box)}
@@ -202,8 +201,7 @@ def generate_box(width, height, depth):
 
 def generate_cylinder(radius, height):
     if not HAS_OCC:
-        from .geometry_service import make_mock_cylinder_mesh
-        return {"type": "mesh", "data": make_mock_cylinder_mesh(radius, height)}
+        raise RuntimeError("OpenCASCADE kernel not available. Cannot generate cylinder geometry.")
     from .geometry_service import _shape_to_mesh
     cylinder = BRepPrimAPI_MakeCylinder(radius, height).Shape()
     return {"type": "mesh", "data": _shape_to_mesh(cylinder)}
@@ -211,8 +209,7 @@ def generate_cylinder(radius, height):
 
 def generate_sphere(radius):
     if not HAS_OCC:
-        from .geometry_service import make_mock_sphere_mesh
-        return {"type": "mesh", "data": make_mock_sphere_mesh(radius)}
+        raise RuntimeError("OpenCASCADE kernel not available. Cannot generate sphere geometry.")
     from .geometry_service import _shape_to_mesh
     sphere = BRepPrimAPI_MakeSphere(radius).Shape()
     return {"type": "mesh", "data": _shape_to_mesh(sphere)}

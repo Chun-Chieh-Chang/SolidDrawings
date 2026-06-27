@@ -116,10 +116,6 @@ from .surfacing import (
     _SURFACE_CACHE_MAX,
 )
 # Import from extracted sub-modules
-from .mock_geometry import (
-    make_mock_box_mesh, make_mock_cylinder_mesh, make_mock_sphere_mesh,
-    make_mock_revolve_mesh, make_mock_aviv_mesh, generate_mock_mesh,
-)
 from .reference_geometry import (
     generate_reference_plane, generate_reference_axis,
     generate_reference_point, generate_reference_coordinate_system,
@@ -1895,23 +1891,7 @@ def process_features(features, deflection=0.01):
     Supports BOX, CYLINDER, SPHERE, and EXTRUDE features.
     """
     if not HAS_OCC:
-        ref_geometry = []
-        for feat in features:
-            if hasattr(feat, 'type'):
-                f_id = feat.id
-                f_type = feat.type
-                params = feat.parameters
-            else:
-                f_id = feat.get('id')
-                f_type = feat.get('type')
-                params = feat.get('parameters', {})
-            if f_type == 'REFERENCE_PLANE':
-                res = generate_reference_plane(params.get('planeType', 'OFFSET'), params.get('refs', []), params.get('offset', 0.0), features, angle=params.get('angle', 0.0))
-                ref_geometry.append({"id": f_id, "type": "PLANE", "data": res})
-            elif f_type == 'REFERENCE_AXIS':
-                res = generate_reference_axis(params.get('axisType', 'TWO_POINTS'), params.get('refs', []), features)
-                ref_geometry.append({"id": f_id, "type": "AXIS", "data": res})
-        return {"type": "mesh", "data": generate_mock_mesh(features), "ref_geometry": ref_geometry}
+        raise RuntimeError("OpenCASCADE kernel not available. Cannot process features.")
 
     final_shape = None
     ref_geometry = [] # [{id, type, origin, normal/direction, xDir, yDir}]
