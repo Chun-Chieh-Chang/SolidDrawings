@@ -65,8 +65,9 @@ def build_surface_cut_features():
     ]
 
 
+@pytest.mark.skipif(not _has_occ(), reason="OpenCASCADE not available")
 class TestSurfaceCutContract:
-    """SURFACE_CUT contract tests — runnable with or without OCC."""
+    """SURFACE_CUT contract tests — require OCC for geometry generation."""
 
     def test_surface_cut_returns_dict_with_data(self):
         """process_features_cached returns a dict with a 'data' key."""

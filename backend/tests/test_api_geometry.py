@@ -12,6 +12,11 @@ import pytest
 BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND_ROOT)
 
+from app.services import geometry_service
+
+pytestmark = pytest.mark.skipif(not geometry_service.HAS_OCC, reason="OpenCASCADE not available")
+sys.path.insert(0, BACKEND_ROOT)
+
 from fastapi.testclient import TestClient
 from app.main import app
 

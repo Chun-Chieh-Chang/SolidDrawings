@@ -2,9 +2,13 @@ import sys
 import os
 import math
 
+import pytest
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../backend')))
 
 from app.services import geometry_service
+
+pytestmark = pytest.mark.skipif(not geometry_service.HAS_OCC, reason="OpenCASCADE not available")
 
 def test_sweep_twist_degrees():
     print("--- Testing Sweep with Twist - Degrees ---")

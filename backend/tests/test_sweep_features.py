@@ -2,10 +2,14 @@ import sys
 import os
 import math
 
+import pytest
+
 # Add backend to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../backend')))
 
 from app.services import geometry_service
+
+pytestmark = pytest.mark.skipif(not geometry_service.HAS_OCC, reason="OpenCASCADE not available")
 
 def test_circular_profile_sweep():
     print("--- Testing Circular Profile Sweep ---")

@@ -2,9 +2,13 @@ import math
 import sys
 import os
 
+import pytest
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from app.services.geometry_service import process_features, HAS_OCC
+
+pytestmark = pytest.mark.skipif(not HAS_OCC, reason="OpenCASCADE not available")
 
 def test_loft_solid_and_thin():
     # Define two square profiles at different heights

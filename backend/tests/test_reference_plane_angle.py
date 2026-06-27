@@ -2,9 +2,13 @@ import math
 import sys
 import os
 
+import pytest
+
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from app.services.geometry_service import generate_reference_plane, process_features
+from app.services.geometry_service import generate_reference_plane, process_features, HAS_OCC
+
+pytestmark = pytest.mark.skipif(not HAS_OCC, reason="OpenCASCADE not available")
 
 def test_angle_reference_plane():
     # Define an axis edge (Z-axis) and a reference plane (pointing along +X)

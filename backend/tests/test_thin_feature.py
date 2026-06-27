@@ -5,9 +5,18 @@ import math
 # Add backend to path
 sys.path.append(os.path.join(os.getcwd(), 'backend'))
 
+import pytest
+
 from app.services.geometry_service import build_feature_shape_in_isolation, get_shape_hash
-from OCC.Core.GProp import GProp_GProps
-from OCC.Core.BRepGProp import brepgprop
+
+try:
+    from OCC.Core.GProp import GProp_GProps
+    from OCC.Core.BRepGProp import brepgprop
+    _HAS_OCC = True
+except ImportError:
+    _HAS_OCC = False
+
+pytestmark = pytest.mark.skipif(not _HAS_OCC, reason="OpenCASCADE (pythonocc-core) not installed")
 
 def test_thin_extrude_closed():
     print("--- Testing Thin Extrude (Closed Loop) ---")
