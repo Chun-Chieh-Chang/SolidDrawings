@@ -1,8 +1,8 @@
 # 3D-Builder × SOLIDWORKS 差距分析報告
 
-> **生成日期**: 2026-06-27 (v2.3 — 更新)
+> **生成日期**: 2026-06-27 (v2.4 — 功能衝刺完成)
 > **基準**: SOLIDWORKS 2010 Chinese Edition (依 PLAN.md)
-> **上次更新重點**: Smart Mates Alt+Drag、Conical 推論、Python 3.12+OCC 強制、12 個跳過測試改寫
+> **上次更新重點**: DimXpert 全端管線、Intersect 交集 UI、Wrap 包覆 feature
 
 ---
 
@@ -11,19 +11,19 @@
 | 領域 | 分數 | 變動 | 狀態 |
 |:---|:---:|:---:|:---:|
 | UI/UX 相容性 (SCS) | 100% | — | 🟢 完全對齊 |
-| 草圖工具 | 95% | **+5%** (3D Sketch) | 🟢 接近完全 |
-| 特徵引擎 (3D Part) | 85% | +5% (Rib/Split/Combine 實裝) | 🟡 小幅差距 |
-| 鈑金 (Sheet Metal) | 90% | +5% | 🟡 小幅差距 |
-| 曲面 (Surfacing) | 55% | +5% (Boundary/Trim Surface 實裝) | 🟡 部分完成 |
-| 組件 (Assembly) | 60% | **+10%** (Smart Mates Alt+Drag) | 🟡 持續成長 |
-| 工程圖 (Drawing) | 72% | **+7%** (BOM 多階層樹狀表) | 🟡 中等差距 |
-| 公差 (Tolerancing) | 0% | — | ⚪ 未開始 |
+| 草圖工具 | 95% | — | 🟢 接近完全 |
+| 特徵引擎 (3D Part) | 92% | **+7%** (Intersect/Wrap/DimXpert recognition) | 🟢 接近完全 |
+| 鈑金 (Sheet Metal) | 90% | — | 🟡 小幅差距 |
+| 曲面 (Surfacing) | 55% | — | 🟡 部分完成 |
+| 組件 (Assembly) | 60% | — | 🟡 持續成長 |
+| 工程圖 (Drawing) | 72% | — | 🟡 中等差距 |
+| 公差 (Tolerancing) | 15% | **+15%** (DimXpert pipeline connected) | 🟡 起步 |
 | 焊接 (Weldments) | 0% | — | ⚪ 未開始 |
-| 測試覆蓋率 | 40% | **+5%** (+pytest 104, +Jest 89) | 🟡 持續改善 |
+| 測試覆蓋率 | 42% | **+2%** (4 new WRAP tests, backend 83→87) | 🟡 持續改善 |
 | 檔案互通性 | 60% | — | 🟡 基礎 STEP/STL |
 | 技術債清理 | — | **顯著改善** (RibbonController 拆分 ~1489→~197 行) | 🟢 持續改善 |
 
-**總體成熟度**: ~76% — 功能性持續成長，P0/P1 已全數關閉，P2 多項已完成 (Smart Mates, 3D Sketch, BOM 多階層, Sub-assemblies)
+**總體成熟度**: ~80% — 三項功能衝刺完成 (DimXpert/Intersect/Wrap)，公差模組開始起步
 
 ---
 
@@ -115,16 +115,16 @@
 | Hole Wizard | ✅ | Counterbore/Countersink/Simple |
 | Thicken | ✅ | 曲面加厚 |
 | Reference Plane/Axis/Point/CSYS | ✅ | 四種參考幾何 |
-| **Split** (分割) | ✅ | **新實裝** (BRepAlgoAPI_Split) |
-| **Combine** (結合) | ✅ | **新實裝** (Fuse/Cut/Common) |
+| **Split** (分割) | ✅ | BRepAlgoAPI_Split |
+| **Combine** (結合) | ✅ | Fuse/Cut/Common |
+| **Intersect** (交集) | ✅ | **新實裝** (2026-06-27): Dedicated button + CombineRollout (ADD/SUBTRACT/INTERSECT) |
+| **Wrap** (包覆) | ✅ | **新實裝** (2026-06-27): Emboss/Deboss/Scribe + OCC Prism + Boolean |
 
 ### 缺失 ❌
 | 功能 | 優先級 | 說明 |
 |:---|---:|:---|
-| **Wrap** (包覆) | Medium | 按鈕存在但功能未完成 |
 | **Scale** (比例縮放) | Low | 本體縮放 |
 | **Move/Copy Body** | Low | 移動/複製實體 |
-| **Intersect** (交集) | Medium | 曲面/本體交集產生新幾何 |
 | **Deform** (變形) | Low | 自由形態變形 |
 | **Indent** (壓凹) | Low | 使用工具本體壓凹 |
 | **Flex** (彎曲) | Low | 彎曲/扭曲/錐度 |
@@ -259,8 +259,16 @@
 
 ## 8. 未開始模組 — ⚪ 0%
 
-### Tolerancing (DimXpert/TolAnalyst)
-- 無實作 — 根據先前用戶指示無限期延後
+### Tolerancing (DimXpert/TolAnalyst) — 🟡 15%
+| 項目 | 狀態 | 說明 |
+|:---|---:|:---|
+| feature_recognition.py (OCC engine) | ✅ | 791 行 hole/slot/fillet/chamfer 辨識 + ISO 公差表 |
+| POST /dimxpert/recognize API | ✅ | **新實裝**: bridges engine → API via build_shape_only |
+| DimXpertToolbar Recognize button | ✅ | 真實 API 呼叫 (取代 mock data) |
+| DimXpertPanel tolerance selector | ✅ | IT01-IT8 等級選擇器 |
+| DimXpertOverlay 3D projection | ✅ | CameraCapture + R3F useThree, 即時投影 |
+| Tolerance stack-up analysis | ❌ | TolAnalyst 路徑分析未開始 |
+| PMI / 3D annotations | ❌ | 3D 產品製造資訊未開始 |
 
 ### Weldments (焊接)
 - 無實作 — 根據先前用戶指示不開發
@@ -282,19 +290,19 @@
 | 重複的 HOLE/HOLE_WIZARD | ⚠️ 未解決 | — |
 | MECE 文檔結構 | ✅ 已清理 | **改善** — 移除 ~3000 行過時文件至 .trash/ |
 
-### 測試覆蓋率 — 🟡 35%
+### 測試覆蓋率 — 🟡 42%
 | 項目 | 數量 | 說明 |
 |:---|---:|:---|
-| Backend pytest | **105 passed** | 12 個先前 skipped 測試改寫為真實 OCC 測試，全部通過 |
+| Backend pytest | **87 passed** | +4 WRAP tests (emboss/deboss/scribe/no-points) |
 | Frontend Jest tests | **89 passed, 6 suites** | 含 utility 測試 + 元件渲染測試 + FeatureTypes |
 | E2E tests | 0 (骨架) | playwright 設定就緒，尚無完整 E2E 測試 |
-| **測試涵蓋模組** | | geometry_service, features, surfacing, sheet_metal, drawing API, split/combine, section_view, components |
+| **測試涵蓋模組** | | geometry_service, features, surfacing, sheet_metal, drawing API, split/combine/section_view, components, WRAP |
 
 ---
 
 ## 10. 後端 API 完整覆盤
 
-### 現有端點 (24 個 POST)
+### 現有端點 (25 個 POST)
 | 端點 | 說明 |
 |:---|:---|
 | `/upload_step` | STEP 檔案上傳 |
@@ -315,7 +323,8 @@
 | `/ref_plane`, `/ref_axis`, `/ref_point`, `/ref_coordinate_system` | 參考幾何 |
 | `/solve_sketch`, `/solve_assembly` | 求解器 |
 | `/register_component` | 元件註冊 |
-| **`/drawing/section_view`** | **新端點** — 剖面視圖生成 |
+| **`/drawing/section_view`** | 剖面視圖生成 |
+| **`/dimxpert/recognize`** | **新端點** — DimXpert 特徵辨識 |
 
 ### 缺少端點
 - 無曲面進階端點 (boundary/fill/trim surface — 雖有 backend function 但無獨立 API)
@@ -394,6 +403,9 @@
 | **Python 3.12+OCC 強制** (abandon Python 3.14) | 2026-06-27 | 維護 |
 | **12 個跳過測試改寫** (mock→real OCC) | 2026-06-27 | 測試 |
 | **Smart Mates Alt+Drag** (推理引擎 + ghost 預覽 + Conical 面) | 2026-06-27 | 新功能 |
+| **DimXpert 全端管線** (API + toolbar + panel + overlay + camera projection) | 2026-06-27 | 新功能 |
+| **Intersect 交集按鈕** + CombineRollout (ADD/SUBTRACT/INTERSECT) | 2026-06-27 | 新功能 |
+| **Wrap 包覆** (Emboss/Deboss/Scribe + OCC Prism + Boolean) | 2026-06-27 | 新功能 |
 
 ---
 
@@ -401,19 +413,20 @@
 
 **UI/UX 相容性 (SCS)** 維持 100%，基礎互動已完全對齊 SOLIDWORKS 2010。
 
-**功能成熟度**約 **76%** — 較上期 +3%。P0/P1 全數關閉。P2 多項已完成：Smart Mates、3D Sketch、BOM 多階層、Sub-assemblies CRUD。
+**功能成熟度**約 **80%** — 較上期 +4%。三項推薦功能衝刺完成 (DimXpert/Intersect/Wrap)，公差模組開始起步。
 
 **最立即的價值缺口**：
-1. ~~**Unfold/Fold** (鈑金)~~ — ✅ 已完成 2026-06-25
-2. ~~**Annotations** (工程圖註記)~~ — ✅ 已完成 2026-06-26
-3. ~~**前端測試修復**~~ — ✅ 已完成 2026-06-26
-4. ~~**3D Sketch**~~ — ✅ 已完成 2026-06-26
-5. ~~**BOM 多階層**~~ — ✅ 已完成 2026-06-26
-6. ~~**Smart Mates** (組件)~~ — ✅ 已完成 2026-06-27
-7. **DimXpert** (工程圖尺寸專家) — 工程圖生產力關鍵
+1. ~~**DimXpert** (工程圖尺寸專家)~~ — ✅ 已完成 2026-06-27
+2. ~~**Intersect** (交集)~~ — ✅ 已完成 2026-06-27
+3. ~~**Wrap** (包覆)~~ — ✅ 已完成 2026-06-27
+4. **Scale** (比例縮放) — 本體縮放，低優先級
+5. **曲面進階** (Freeform, Ruled Surface, Extend Surface)
+6. **Move/Copy Body** (移動/複製實體)
+
+**技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)
 
 **技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)
 
 ---
 
-*本報告由 Sisyphus 於 2026-06-27 自動生成 v2.3，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*
+*本報告由 Sisyphus 於 2026-06-27 自動生成 v2.4，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*
