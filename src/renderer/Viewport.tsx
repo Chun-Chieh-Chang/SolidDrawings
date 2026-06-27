@@ -12,6 +12,8 @@ import { TopologySelector } from '../kernel/TopologySelector';
 import SmartMateOverlay from './SmartMateOverlay';
 import DimXpertOverlay from './DimXpertOverlay';
 import { CameraCapture } from './DimXpertCameraRef';
+import { ConfirmationCorner } from '../ui/ConfirmationCorner';
+import { Triad } from '../ui/Triad';
 
 
 const CameraHandler = () => {
@@ -1059,28 +1061,12 @@ const Viewport = ({ children }: ViewportProps) => {
 
   return (
     <div className="w-full h-full bg-linear-to-b from-[#FFFFFF] to-[#C8D2DF] relative">
-      {/* Confirmation Corner Widget */}
-      {(isSketchMode) && (
-        <div className="absolute top-4 right-4 z-50 flex flex-col gap-2 opacity-60 hover:opacity-100 transition-opacity">
-          <button 
-            onClick={() => setSketchMode(false)}
-            className="w-10 h-10 bg-white border border-slate-300 rounded shadow hover:bg-emerald-50 flex items-center justify-center text-emerald-600"
-            title="Exit Sketch"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
-          </button>
-          <button 
-            onClick={() => {
-              // Cancel sketch logic here
-              setSketchMode(false);
-            }}
-            className="w-10 h-10 bg-white border border-slate-300 rounded shadow hover:bg-red-50 flex items-center justify-center text-red-600"
-            title="Cancel Sketch"
-          >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
-          </button>
-        </div>
-      )}
+      {/* Confirmation Corner */}
+      <ConfirmationCorner
+        active={isSketchMode}
+        onConfirm={() => setSketchMode(false)}
+        onCancel={() => setSketchMode(false)}
+      />
 
       <Canvas
         shadows
@@ -1127,9 +1113,7 @@ const Viewport = ({ children }: ViewportProps) => {
       <SmartMateOverlay />
       <DimXpertOverlay />
 
-      <div className="absolute top-4 left-4 glass-effect p-2 rounded-lg text-[14px] font-mono text-slate-700 pointer-events-none">
-        VIEWPORT: {isSketchMode ? 'SKETCHING MODE (LOCKED)' : 'PERSPECTIVE'}
-      </div>
+      <Triad />
     </div>
   );
 };

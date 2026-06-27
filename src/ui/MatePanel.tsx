@@ -95,7 +95,7 @@ export const MatePanel = () => {
         };
 
         try {
-          const previewComponents = await assemblyService.solve(
+          const [previewComponents] = await assemblyService.solve(
             components,
             [...mates, tempMate],
             mateSelection,
@@ -145,7 +145,7 @@ export const MatePanel = () => {
       angle: mateType === 'ANGLE' ? angle : undefined,
     };
 
-    const finalComponents = await assemblyService.solve(
+    const [finalComponents, report] = await assemblyService.solve(
       components,
       [...mates, newMate],
       mateSelection,
@@ -153,6 +153,7 @@ export const MatePanel = () => {
     
     addMate(newMate);
     setComponents(finalComponents);
+    useCadStore.getState().setSolverReport(report);
     setAssemblyPreviewComponents(null);
     clearMateSelection();
   };
@@ -431,10 +432,38 @@ export const MatePanel = () => {
       {/* Existing Mates List */}
       {mates.length > 0 && (
         <div className="pt-2 border-t border-slate-200">
-          <div className="text-[12px] text-slate-500 font-bold uppercase mb-2">現有Mate ({mates.length})</div>
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[12px] text-slate-500 font-bold uppercase">現有Mate ({mates.length})</div>
+            <button
+              onClick={async () => {
+                await useCadStore.getState().solveMates();
+              }}
+              className="px-2 py-0.5 text-[9px] font-bold bg-indigo-100 text-indigo-600 rounded hover:bg-indigo-200 transition-colors"
+            >
+              Solve
+            </button>
+          </div>
           <div className="max-h-[120px] overflow-y-auto space-y-1 pr-1">
             {mates.map((mate) => (
-              <div key={mate.id} className="text-[12px] p-2 bg-slate-50 rounded border border-slate-100 flex items-center justify-between group"> <div className="flex flex-col"> <span className="font-bold text-slate-700">{mate.name}</span> <span className="text-[10px] text-slate-500 uppercase">{mate.type}</span> </div> <button 
+              <div key={mate.id} className={`text-[12px] p-2 rounded border flex items-center justify-between group ${mate.suppressed ? 'bg-gray-100 border-gray-200 opacity-60' : 'bg-slate-50 border-slate-100'}`}>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      useCadStore.getState().toggleMateSuppressed(mate.id);
+                    }}
+                    className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[8px] ${
+                      mate.suppressed ? 'bg-red-100 border-red-300 text-red-500' : 'bg-white border-gray-300 text-transparent'
+                    }`}
+                    title={mate.suppressed ? 'Suppressed — click to unsuppress' : 'Active — click to suppress'}
+                  >
+                    {mate.suppressed ? '!' : ''}
+                  </button>
+                  <div className="flex flex-col">
+                    <span className={`font-bold ${mate.suppressed ? 'text-gray-400 line-through' : 'text-slate-700'}`}>{mate.name}</span>
+                    <span className="text-[10px] text-slate-500 uppercase">{mate.type}</span>
+                  </div>
+                </div>
+                <button 
                   onClick={() => setMates(mates.filter(m => m.id !== mate.id))}
                   className="text-error opacity-0 group-hover:opacity-100 transition-all text-[11px] font-bold"
                 >
@@ -442,7 +471,8 @@ export const MatePanel = () => {
                 </button>
               </div>
             ))}
-          </div> </div>
+          </div>
+        </div>
       )}
     </div>
   );

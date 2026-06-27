@@ -35,6 +35,7 @@ describe('pendingFeatureCommand type union', () => {
       'SURFACE_OFFSET', 'SURFACE_KNIT', 'SURFACE_CUT',
       'REFERENCE_POINT', 'REVOLVED_CUT', 'DOME', 'COORDINATE_SYSTEM',
       'RIB', 'SURFACE_BOUNDARY', 'SURFACE_TRIM',
+      'SURFACE_FILL', 'PLANAR_SURFACE', 'SURFACE_EXTEND', 'SURFACE_UNTRIM', 'RULED_SURFACE',
       'SPLIT', 'COMBINE', 'BASE_FLANGE_TAB',
     ]);
 
@@ -42,6 +43,11 @@ describe('pendingFeatureCommand type union', () => {
     expect(validCommands.has('SPLIT')).toBe(true);
     expect(validCommands.has('COMBINE')).toBe(true);
     expect(validCommands.has('BASE_FLANGE_TAB')).toBe(true);
+    expect(validCommands.has('SURFACE_FILL')).toBe(true);
+    expect(validCommands.has('PLANAR_SURFACE')).toBe(true);
+    expect(validCommands.has('SURFACE_EXTEND')).toBe(true);
+    expect(validCommands.has('SURFACE_UNTRIM')).toBe(true);
+    expect(validCommands.has('RULED_SURFACE')).toBe(true);
 
     // Unknown type should not be in the set
     expect(validCommands.has('UNKNOWN_FEATURE')).toBe(false);
@@ -114,5 +120,81 @@ describe('Base Flange Tab feature parameter shape', () => {
     expect(feature.parameters.bendRadius).toBe(0.5);
     expect(feature.parameters.direction).toBe('ONE_DIRECTION');
     expect(feature.parameters.reverseDirection).toBe(false);
+  });
+});
+
+// ── New surfacing feature parameter shapes ───────────────────────────────────
+
+describe('Surface Fill feature parameter shape', () => {
+  it('constructs a valid filled surface feature object', () => {
+    const feature = {
+      id: 'feat_fill_test',
+      type: 'SURFACE_FILL' as const,
+      name: 'Fill-Surf 1',
+      parameters: {
+        boundary_points: [[0,0,0], [10,0,0], [10,10,0], [0,10,0]],
+        constraint_points: [],
+      },
+    };
+    expect(feature.type).toBe('SURFACE_FILL');
+    expect(feature.parameters.boundary_points.length).toBe(4);
+    expect(feature.parameters.constraint_points).toEqual([]);
+  });
+});
+
+describe('Planar Surface feature parameter shape', () => {
+  it('constructs a valid planar surface feature object', () => {
+    const feature = {
+      id: 'feat_planar_test',
+      type: 'PLANAR_SURFACE' as const,
+      name: 'Planar-Surf 1',
+      parameters: {
+        boundary_points: [[0,0,0], [10,0,0], [10,10,0], [0,10,0]],
+      },
+    };
+    expect(feature.type).toBe('PLANAR_SURFACE');
+    expect(feature.parameters.boundary_points.length).toBe(4);
+  });
+});
+
+describe('Extend Surface feature parameter shape', () => {
+  it('constructs a valid extend surface feature object', () => {
+    const feature = {
+      id: 'feat_extend_test',
+      type: 'SURFACE_EXTEND' as const,
+      name: 'Extend-Surf 1',
+      parameters: { distance: 10.0 },
+    };
+    expect(feature.type).toBe('SURFACE_EXTEND');
+    expect(feature.parameters.distance).toBe(10.0);
+  });
+});
+
+describe('Untrim Surface feature parameter shape', () => {
+  it('constructs a valid untrim surface feature object', () => {
+    const feature = {
+      id: 'feat_untrim_test',
+      type: 'SURFACE_UNTRIM' as const,
+      name: 'Untrim-Surf 1',
+      parameters: {},
+    };
+    expect(feature.type).toBe('SURFACE_UNTRIM');
+  });
+});
+
+describe('Ruled Surface feature parameter shape', () => {
+  it('constructs a valid ruled surface feature object', () => {
+    const feature = {
+      id: 'feat_ruled_test',
+      type: 'RULED_SURFACE' as const,
+      name: 'Ruled-Surf 1',
+      parameters: {
+        curve1_points: [[0,0,0], [5,5,0], [10,0,0]],
+        curve2_points: [[0,0,10], [5,5,10], [10,0,10]],
+      },
+    };
+    expect(feature.type).toBe('RULED_SURFACE');
+    expect(feature.parameters.curve1_points.length).toBe(3);
+    expect(feature.parameters.curve2_points.length).toBe(3);
   });
 });

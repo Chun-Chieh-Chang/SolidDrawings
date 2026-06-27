@@ -51,13 +51,17 @@ export type AppStateSlice = {
   setReferencePoints: (points: any[]) => void;
   referenceCoordinateSystems: any[];
   setReferenceCoordinateSystems: (systems: any[]) => void;
-  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null;
-  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => void;
+  pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SURFACE_FILL' | 'PLANAR_SURFACE' | 'SURFACE_EXTEND' | 'SURFACE_UNTRIM' | 'RULED_SURFACE' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null;
+  setPendingFeatureCommand: (cmd: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SURFACE_FILL' | 'PLANAR_SURFACE' | 'SURFACE_EXTEND' | 'SURFACE_UNTRIM' | 'RULED_SURFACE' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => void;
   defaultFilletRadius: number;
   defaultChamferDistance: number;
   commitPreciseSketchSolve: () => void;
   viewOrientationSelectorVisible: boolean;
   setViewOrientationSelectorVisible: (visible: boolean) => void;
+  engineStatus: 'CONNECTED' | 'DISCONNECTED';
+  setEngineStatus: (status: 'CONNECTED' | 'DISCONNECTED') => void;
+  units: 'MMGS' | 'IPS';
+  setUnits: (units: 'MMGS' | 'IPS') => void;
 };
 
 export const createAppState = (set: any, get: any) => ({
@@ -137,12 +141,18 @@ export const createAppState = (set: any, get: any) => ({
   referenceCoordinateSystems: [] as any[],
   setReferenceCoordinateSystems: (referenceCoordinateSystems: any[]) => set({ referenceCoordinateSystems }),
 
-  pendingFeatureCommand: null as ('FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null),
-  setPendingFeatureCommand: (pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => set({ pendingFeatureCommand }),
+  pendingFeatureCommand: null as ('FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SURFACE_FILL' | 'PLANAR_SURFACE' | 'SURFACE_EXTEND' | 'SURFACE_UNTRIM' | 'RULED_SURFACE' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null),
+  setPendingFeatureCommand: (pendingFeatureCommand: 'FILLET' | 'CHAMFER' | 'THICKEN' | 'PATTERN' | 'MIRROR' | 'DRAFT' | 'SHELL' | 'HOLE_WIZARD' | 'PLANE' | 'REFERENCE_PLANE' | 'SURFACE_OFFSET' | 'SURFACE_KNIT' | 'SURFACE_CUT' | 'REFERENCE_POINT' | 'REVOLVED_CUT' | 'DOME' | 'COORDINATE_SYSTEM' | 'RIB' | 'SURFACE_BOUNDARY' | 'SURFACE_TRIM' | 'SURFACE_FILL' | 'PLANAR_SURFACE' | 'SURFACE_EXTEND' | 'SURFACE_UNTRIM' | 'RULED_SURFACE' | 'SPLIT' | 'COMBINE' | 'BASE_FLANGE_TAB' | null) => set({ pendingFeatureCommand }),
   defaultFilletRadius: 2 as number,
   defaultChamferDistance: 1.5 as number,
 
   commitPreciseSketchSolve: () => { /* Logic would go here */ },
   viewOrientationSelectorVisible: false,
   setViewOrientationSelectorVisible: (viewOrientationSelectorVisible: boolean) => set({ viewOrientationSelectorVisible }),
+
+  engineStatus: 'DISCONNECTED' as 'CONNECTED' | 'DISCONNECTED',
+  setEngineStatus: (engineStatus: 'CONNECTED' | 'DISCONNECTED') => set({ engineStatus }),
+
+  units: 'MMGS' as 'MMGS' | 'IPS',
+  setUnits: (units: 'MMGS' | 'IPS') => set({ units }),
 });

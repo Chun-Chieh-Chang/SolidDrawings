@@ -1,21 +1,21 @@
 ﻿@import "tailwindcss";
 
 :root {
-  /* Official SolidWorks 2024 Industrial Palette (Light Theme Only for Precision) */
-  --background: #D6DADC;    /* Classic Windows/CAD Gray - Base background */
-  --surface: #F5F5F5;       /* Light Gray - Panel backgrounds */
-  --ribbon: #E8E8E8;        /* Ribbon background */
+  /* SW2010 Industrial Palette (Flat, No Shadows) */
+  --background: #E8E8E8;    /* SW2010 chrome gray - toolbars, title bars, status bar */
+  --surface: #F0F0F0;       /* Panel backgrounds (FeatureManager, PropertyManager) */
+  --ribbon: #DADADA;        /* SW2010 CommandManager tab bar background */
   --primary-text: #000000;  /* Pure Black - High contrast for labels */
-  --secondary-text: #404040; /* Dark Gray - Descriptions */
-  --accent: #005B9A;        /* SolidWorks Professional Blue */
-  --border: #A0A0A0;        /* Industrial Gray - Sharp borders */
+  --secondary-text: #505050; /* SW2010 secondary text */
+  --accent: #005B9A;        /* SolidWorks Professional Blue (selection highlight only) */
+  --border: #D0D0D0;        /* SW2010 1px solid border color */
   
   --success: #28a745;
   --error: #dc3545;
   --warning: #ffc107;
 
-  --radius-sm: 2px;
-  --radius-md: 4px;
+  --radius-sm: 1px;
+  --radius-md: 2px;
 }
 
 /* Force Light Theme by Default for CAD Environment */
@@ -46,14 +46,15 @@ body {
 }
 
 .cad-panel-header {
-  background: linear-gradient(to bottom, #F8F8F8, #E8E8E8);
+  background: #F0F0F0;
   border-bottom: 1px solid var(--border);
-  font-weight: 700;
-  padding: 4px 8px;
+  font-weight: 600;
+  padding: 3px 8px;
+  font-size: 11px;
 }
 
 .canvas-container {
-  background: radial-gradient(circle at center, #FFFFFF 0%, #BCC3C7 100%);
+  background: linear-gradient(to bottom, #E8F0F8 0%, #FFFFFF 100%);
 }
 
 /* Scrollbar for Professional Feel */

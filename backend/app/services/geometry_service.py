@@ -1,4 +1,4 @@
-import math
+﻿import math
 import json
 import hashlib
 import os
@@ -112,6 +112,11 @@ except ImportError:
 from .surfacing import (
     generate_boundary_surface,
     generate_trim_surface,
+    generate_filled_surface,
+    generate_planar_surface,
+    generate_extend_surface,
+    generate_untrim_surface,
+    generate_ruled_surface,
     _SURFACE_SHAPE_CACHE,
     _SURFACE_CACHE_MAX,
 )
@@ -655,7 +660,7 @@ def generate_iso_nut(size_name):
     final_nut = BRepAlgoAPI_Cut(body, hole).Shape()
     return final_nut
 
-# import_step_file, detect_interference — moved to export_utils.py
+# import_step_file, detect_interference ??moved to export_utils.py
 
 def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_features=[]):
     print(f"[DEBUG] build_feature_shape_in_isolation: type={f_type}, HAS_OCC={HAS_OCC}")
@@ -2383,6 +2388,59 @@ def process_features(features, deflection=0.01):
                 print(f"[ERROR] SURFACE_TRIM failed: {trim_err}")
             continue
 
+        elif f_type == 'SURFACE_FILL':
+            try:
+                boundary_points = params.get('boundary_points', [])
+                constraint_points = params.get('constraint_points')
+                result_hash = generate_filled_surface(boundary_points, constraint_points)
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as fill_err:
+                print(f"[ERROR] SURFACE_FILL failed: {fill_err}")
+            continue
+
+        elif f_type == 'PLANAR_SURFACE':
+            try:
+                boundary_points = params.get('boundary_points', [])
+                result_hash = generate_planar_surface(boundary_points)
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as ps_err:
+                print(f"[ERROR] PLANAR_SURFACE failed: {ps_err}")
+            continue
+
+        elif f_type == 'SURFACE_EXTEND':
+            try:
+                distance = float(params.get('distance', 5.0))
+                if final_shape is not None:
+                    result_hash = generate_extend_surface(final_shape, distance)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as ext_err:
+                print(f"[ERROR] SURFACE_EXTEND failed: {ext_err}")
+            continue
+
+        elif f_type == 'SURFACE_UNTRIM':
+            try:
+                if final_shape is not None:
+                    result_hash = generate_untrim_surface(final_shape)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as untrim_err:
+                print(f"[ERROR] SURFACE_UNTRIM failed: {untrim_err}")
+            continue
+
+        elif f_type == 'RULED_SURFACE':
+            try:
+                curve1 = params.get('curve1_points', [])
+                curve2 = params.get('curve2_points', [])
+                result_hash = generate_ruled_surface(curve1, curve2)
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as ruled_err:
+                print(f"[ERROR] RULED_SURFACE failed: {ruled_err}")
+            continue
+
         elif f_type == 'SPLIT':
             if final_shape is not None:
                 try:
@@ -2856,6 +2914,59 @@ def build_shape_only(
                 print(f"[ERROR] SURFACE_TRIM failed: {trim_err}")
             continue
 
+        elif f_type == 'SURFACE_FILL':
+            try:
+                boundary_points = params.get('boundary_points', [])
+                constraint_points = params.get('constraint_points')
+                result_hash = generate_filled_surface(boundary_points, constraint_points)
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as fill_err:
+                print(f"[ERROR] SURFACE_FILL failed: {fill_err}")
+            continue
+
+        elif f_type == 'PLANAR_SURFACE':
+            try:
+                boundary_points = params.get('boundary_points', [])
+                result_hash = generate_planar_surface(boundary_points)
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as ps_err:
+                print(f"[ERROR] PLANAR_SURFACE failed: {ps_err}")
+            continue
+
+        elif f_type == 'SURFACE_EXTEND':
+            try:
+                distance = float(params.get('distance', 5.0))
+                if final_shape is not None:
+                    result_hash = generate_extend_surface(final_shape, distance)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as ext_err:
+                print(f"[ERROR] SURFACE_EXTEND failed: {ext_err}")
+            continue
+
+        elif f_type == 'SURFACE_UNTRIM':
+            try:
+                if final_shape is not None:
+                    result_hash = generate_untrim_surface(final_shape)
+                    if result_hash and HAS_OCC:
+                        final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as untrim_err:
+                print(f"[ERROR] SURFACE_UNTRIM failed: {untrim_err}")
+            continue
+
+        elif f_type == 'RULED_SURFACE':
+            try:
+                curve1 = params.get('curve1_points', [])
+                curve2 = params.get('curve2_points', [])
+                result_hash = generate_ruled_surface(curve1, curve2)
+                if result_hash and HAS_OCC:
+                    final_shape = _SURFACE_SHAPE_CACHE.get(result_hash)
+            except Exception as ruled_err:
+                print(f"[ERROR] RULED_SURFACE failed: {ruled_err}")
+            continue
+
         elif f_type == 'SPLIT':
             if final_shape is not None:
                 try:
@@ -3028,7 +3139,7 @@ def build_shape_only(
 
         elif f_type == 'FLAT_PATTERN':
             # Flat Pattern: compute the flat shape from all features so far.
-            # This replaces — not fuses — the folded 3D shape with a planar
+            # This replaces ??not fuses ??the folded 3D shape with a planar
             # unfolded plate, positioned above the folded body.
             try:
                 shape_hash = params.get('occt_shape_hash')

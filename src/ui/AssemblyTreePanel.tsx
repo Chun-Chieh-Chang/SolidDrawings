@@ -23,11 +23,17 @@ export const AssemblyTreePanel = () => {
     loadExplodeStep,
     deleteExplodeStep,
     setShowExportModal,
+    mates,
+    setMates,
+    solverReport,
+    solveMates,
+    toggleMateSuppressed,
   } = useCadStore();
 
   const [newStepName, setNewStepName] = useState('');
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [showStepManager, setShowStepManager] = useState(false);
+  const [showMates, setShowMates] = useState(true);
 
   const handleToggleVisibility = (id: string) => {
     setComponents(components.map(c => c.id === id ? { ...c, visible: !c.visible } : c));
@@ -312,8 +318,90 @@ export const AssemblyTreePanel = () => {
         )}
       </div>
 
+      {/* Mates List */}
+      <div className="border-t border-slate-200">
+        <button
+          onClick={() => setShowMates(!showMates)}
+          className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+        >
+          <span>Mates ({mates.length})</span>
+          <span className="text-[9px]">{showMates ? '▾' : '▸'}</span>
+        </button>
+        {showMates && (
+          <div className="px-2 pb-2 space-y-1 max-h-36 overflow-y-auto">
+            {mates.length === 0 ? (
+              <div className="text-[10px] text-slate-400 italic text-center py-2">
+                No mates yet. Use Smart Mate to add.
+              </div>
+            ) : (
+              mates.map((mate) => (
+                <div
+                  key={mate.id}
+                  className={`flex items-center justify-between px-1.5 py-1 rounded text-[10px] ${
+                    mate.suppressed ? 'bg-gray-100 opacity-60' : 'bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); toggleMateSuppressed(mate.id); }}
+                      className={`w-3 h-3 rounded shrink-0 flex items-center justify-center text-[7px] ${
+                        mate.suppressed ? 'bg-red-200 text-red-600' : 'bg-white border border-gray-300'
+                      }`}
+                      title={mate.suppressed ? 'Suppressed' : 'Active'}
+                    >
+                      {mate.suppressed ? '×' : ''}
+                    </button>
+                    <span className={`font-medium truncate ${mate.suppressed ? 'line-through text-gray-400' : 'text-slate-700'}`}>
+                      {mate.name}
+                    </span>
+                    <span className="text-[8px] text-slate-400 uppercase shrink-0">{mate.type}</span>
+                  </div>
+                  <button
+                    onClick={() => setMates(mates.filter(m => m.id !== mate.id))}
+                    className="text-red-300 hover:text-red-500 ml-1 shrink-0"
+                    title="Delete mate"
+                  >
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" />
+                    </svg>
+                  </button>
+                </div>
+              ))
+            )}
+            {/* Solver status */}
+            {solverReport && (
+              <div className={`text-[9px] font-mono px-1 py-0.5 rounded ${
+                solverReport.status === 'SOLVED' ? 'bg-green-50 text-green-700' :
+                solverReport.status === 'ALL_FIXED' ? 'bg-blue-50 text-blue-600' :
+                solverReport.status === 'ERROR' ? 'bg-red-50 text-red-600' :
+                'bg-yellow-50 text-yellow-700'
+              }`}>
+                {solverReport.status === 'SOLVED' && `✓ Solved (residual: ${solverReport.residual?.toFixed(4)})`}
+                {solverReport.status === 'ALL_FIXED' && '⛔ All components fixed'}
+                {solverReport.status === 'FAILED' && `⚠ Solver failed (residual: ${solverReport.residual?.toFixed(4)})`}
+                {solverReport.status === 'ERROR' && '✗ Solver error'}
+                {solverReport.converged !== undefined && ` | ${solverReport.iterations} iters`}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Assembly Tools */}
       <div className="p-2 bg-slate-50 border-t border-slate-200 space-y-1.5">
+        <button
+          onClick={async () => {
+            await solveMates();
+          }}
+          className="w-full py-1.5 px-2 text-[11px] font-bold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded transition-colors flex items-center justify-center gap-1"
+          disabled={mates.length === 0}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="23 4 23 10 17 10" />
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10" />
+          </svg>
+          <span>Solve All Mates</span>
+        </button>
         <div className="grid grid-cols-2 gap-1">
           <button
             onClick={() => handleSetAllLightweight(true)}

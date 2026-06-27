@@ -295,6 +295,7 @@ export const useFeatureBuilders = (handleRebuild: () => void) => {
     if (editingFeatureId && existingFeature && existingFeature.type === 'SKETCH') {
       updateFeatureParams(editingFeatureId, nextParams);
     } else {
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: `feat_${uuidv4()}`,
         type: 'SKETCH',

@@ -37,6 +37,8 @@ export interface CADMate {
   alignment?: 'ALIGNED' | 'ANTI_ALIGNED';
   offset?: number;
   angle?: number;
+  /** When true, the mate is temporarily disabled without being deleted. */
+  suppressed?: boolean;
 }
 
 // ── Feature types ────────────────────────────────────────────────

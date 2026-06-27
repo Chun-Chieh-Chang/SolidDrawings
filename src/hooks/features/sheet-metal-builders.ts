@@ -71,6 +71,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
 
       // Create the feature record
       const featId = `feat_${uuidv4()}`;
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'EDGE_FLANGE',
@@ -158,6 +159,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
       }
 
       const featId = `feat_${uuidv4()}`;
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'MITER_FLANGE',
@@ -237,6 +239,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
       }
 
       const featId = `feat_${uuidv4()}`;
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'HEM',
@@ -311,6 +314,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
       }
 
       const featId = `feat_${uuidv4()}`;
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'FLAT_PATTERN',
@@ -388,6 +392,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
 
       const featId = `feat_${uuidv4()}`;
       const toolLabel = toolType.charAt(0) + toolType.slice(1).toLowerCase().replace(/_/g, ' ');
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'FORMING_TOOL',
@@ -458,6 +463,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
       }
 
       const featId = `feat_${uuidv4()}`;
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'UNFOLD',
@@ -525,6 +531,7 @@ export const useSheetMetalBuilders = (handleRebuild: () => void) => {
       }
 
       const featId = `feat_${uuidv4()}`;
+      useCadStore.getState().saveSnapshot();
       addFeature({
         id: featId,
         type: 'FOLD',

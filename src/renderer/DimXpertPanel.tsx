@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useCadStore } from '../store/useCadStore';
-import type { DimXpertGrade } from '../store/dimxpert-state';
+import type { DimXpertGrade, ToleranceCacheEntry, DeviationCacheEntry } from '../store/dimxpert-state';
 
 const TOLERANCE_GRADES: { value: DimXpertGrade; label: string; description: string }[] = [
   { value: 'IT01', label: 'IT01', description: 'Gauge tolerance' },
@@ -18,8 +18,8 @@ const TOLERANCE_GRADES: { value: DimXpertGrade; label: string; description: stri
 ];
 
 /**
- * DimXpertPanel shows recognized features with their dimensions
- * and allows toggling visibility.
+ * DimXpertPanel shows recognized features with their dimensions,
+ * tolerance grade selection, and visualized tolerance values.
  */
 export default function DimXpertPanel() {
   const {
@@ -30,8 +30,43 @@ export default function DimXpertPanel() {
     setIsDimXpertActive,
     dimxpertActiveGrade,
     setDimxpertActiveGrade,
+    computeTolerance,
+    computeDeviations,
+    toleranceCache,
+    deviationCache,
   } = useCadStore();
   const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
+  const fetchingRef = useRef(false);
+
+  // ── Fetch tolerance data when expanding features or changing grade ──
+  useEffect(() => {
+    if (expandedFeatures.size === 0) return;
+
+    const fetchTolerances = async () => {
+      fetchingRef.current = true;
+      const promises: Promise<any>[] = [];
+      for (const feature of features) {
+        if (!expandedFeatures.has(feature.id)) continue;
+        for (const dim of feature.dimensions) {
+          if (dim.type === 'ANGLE') continue; // ISO 286 is for linear sizes
+          const tolKey = `${dim.value}_${dimxpertActiveGrade}`;
+          const cached = toleranceCache[tolKey];
+          if (!cached || cached.loading) {
+            promises.push(computeTolerance(dim.value, dimxpertActiveGrade));
+          }
+          const devKey = `${dim.value}_${dimxpertActiveGrade}_H`;
+          const devCached = deviationCache[devKey];
+          if (!devCached || devCached.loading) {
+            promises.push(computeDeviations(dim.value, dimxpertActiveGrade, 'H'));
+          }
+        }
+      }
+      await Promise.all(promises);
+      fetchingRef.current = false;
+    };
+
+    fetchTolerances();
+  }, [expandedFeatures, dimxpertActiveGrade, features, computeTolerance, computeDeviations, toleranceCache, deviationCache]);
 
   if (!isDimXpertActive) return null;
 
@@ -172,13 +207,51 @@ export default function DimXpertPanel() {
             </div>
 
             {expandedFeatures.has(feature.id) && (
-              <div className="px-3 pb-2 space-y-1 border-t border-gray-100 pt-2">
-                {feature.dimensions.map((dim: any, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between text-xs">
-                    <span className="text-gray-500">{dim.type}</span>
-                    <span className="font-mono text-gray-700">{dim.label}</span>
-                  </div>
-                ))}
+              <div className="px-3 pb-2 border-t border-gray-100 pt-2">
+                {feature.dimensions.map((dim: any, idx: number) => {
+                  if (dim.type === 'ANGLE') {
+                    return (
+                      <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                        <span className="text-gray-500">{dim.type}</span>
+                        <span className="font-mono text-gray-700">{dim.label}</span>
+                      </div>
+                    );
+                  }
+                  const tolKey = `${dim.value}_${dimxpertActiveGrade}`;
+                  const tol = toleranceCache[tolKey] as ToleranceCacheEntry | undefined;
+                  const devKey = `${dim.value}_${dimxpertActiveGrade}_H`;
+                  const dev = deviationCache[devKey] as DeviationCacheEntry | undefined;
+
+                  return (
+                    <div key={idx} className="py-1 border-b border-gray-50 last:border-b-0">
+                      {/* Dimension type + value */}
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">{dim.type}</span>
+                        <span className="font-mono text-gray-700">{dim.label}</span>
+                      </div>
+                      {/* Tolerance info */}
+                      <div className="flex items-center justify-between mt-0.5">
+                        {tol?.loading ? (
+                          <span className="text-[9px] text-blue-400 italic">computing…</span>
+                        ) : tol?.error ? (
+                          <span className="text-[9px] text-red-400">{tol.error}</span>
+                        ) : tol ? (
+                          <div className="flex items-center gap-2 text-[9px] font-mono text-gray-500">
+                            <span className="bg-gray-100 px-1 rounded">{tol.grade}</span>
+                            <span>±{tol.tolerance_um} µm</span>
+                            <span className="text-gray-400">({tol.size_range})</span>
+                          </div>
+                        ) : null}
+                        {/* Deviation info */}
+                        {dev && !dev.loading && !dev.error && (
+                          <div className="text-[9px] font-mono text-gray-400">
+                            ({dev.lower_deviation_um < 0 ? '' : '+'}{dev.lower_deviation_um} / +{dev.upper_deviation_um} µm)
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
                 <div className="text-xs text-gray-400 mt-1">
                   Faces: {feature.faces.length} | Edges: {feature.edges.length}
                 </div>

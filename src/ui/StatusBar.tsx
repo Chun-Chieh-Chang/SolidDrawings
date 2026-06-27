@@ -17,6 +17,11 @@ export const StatusBar: React.FC = () => {
     referencePlanes,
     viewportDisplayMode,
     isLargeAssemblyMode,
+    engineStatus,
+    units,
+    setUnits,
+    gridSnap,
+    setGridSnap,
   } = useCadStore();
 
   const activeBasis = useMemo(() => {
@@ -65,15 +70,15 @@ export const StatusBar: React.FC = () => {
     const nodeIds = Object.keys(sketchNodes || {});
     if (nodeIds.length === 0) return { text: 'Empty', color: '#9ca3af' };
 
-    if (!solverReport) return { text: 'Under Defined', color: '#3b82f6' };
+    if (!solverReport) return { text: 'Under Defined', color: '#2563eb' };
 
     if (solverReport.dof < 0) {
-      return { text: 'Over Defined', color: '#ef4444' };
+      return { text: 'Over Defined', color: '#dc2626' };
     }
     if (solverReport.dof === 0) {
-      return { text: 'Fully Defined', color: '#22c55e' };
+      return { text: 'Fully Defined', color: '#16a34a' };
     } else {
-      return { text: `Under Defined (${solverReport.dof} DOF)`, color: '#3b82f6' };
+      return { text: `Under Defined (${solverReport.dof} DOF)`, color: '#2563eb' };
     }
   }, [isSketchMode, sketchNodes, solverReport]);
 
@@ -87,40 +92,86 @@ export const StatusBar: React.FC = () => {
   }, [viewportDisplayMode]);
 
   return (
-    <footer className="h-[26px] w-full flex items-center select-none text-[11px] font-sans border-t border-[#A0A0A0]" style={{ background: "linear-gradient(to bottom, #E8E8E8 0%, #D6D6D6 100%)" }}>
-      {/* Left Section */}
-      <div className="flex items-center gap-4 px-2 h-full flex-1">
+    <footer
+      className="flex items-center select-none text-[10px] font-sans border-t border-[#D0D0D0] shrink-0"
+      style={{ background: '#E8E8E8', height: '22px' }}
+    >
+      {/* Left Section — Contextual prompts */}
+      <div className="flex items-center gap-3 px-2 h-full flex-1 min-w-0">
+        {/* Mode label */}
         <span className="text-[#404040] font-medium whitespace-nowrap">
           {isLargeAssemblyMode ? 'Large Assembly' : isSketchMode ? 'Sketch Mode' : 'Part Mode'}
         </span>
         
+        {/* Sketch status indicator */}
         {definitionStatus && (
-          <span className="font-bold text-xs whitespace-nowrap" style={{ color: definitionStatus.color }}>
+          <span className="font-semibold whitespace-nowrap" style={{ color: definitionStatus.color }}>
             ● {definitionStatus.text}
           </span>
         )}
         
-        <span className="text-[#404040] font-mono whitespace-nowrap">
+        {/* Coordinates */}
+        <span className="text-[#404040] font-mono whitespace-nowrap text-[10px]">
           {displayCoords}
         </span>
       </div>
       
       {/* Divider */}
-      <div className="w-[1px] h-4 bg-[#A0A0A0]" />
+      <div className="w-px h-3 bg-[#B0B0B0] mx-1" />
       
-      {/* Right Section */}
-      <div className="flex items-center gap-3 px-2 h-full">
-        <span className="text-[#404040] font-medium whitespace-nowrap">
+      {/* Right Section — Controls */}
+      <div className="flex items-center h-full">
+        {/* Display style */}
+        <span className="text-[#404040] font-medium whitespace-nowrap px-2 text-[10px]">
           {displayMode}
         </span>
         
-        <span className="text-[#404040] font-medium whitespace-nowrap">
-          MMGS
-        </span>
-        
-        <span className="text-[#404040] font-medium whitespace-nowrap">
+        <div className="w-px h-3 bg-[#B0B0B0]" />
+
+        {/* Grid Snap Toggle */}
+        <button
+          onClick={() => setGridSnap(!gridSnap)}
+          className={`h-full px-2 flex items-center gap-1 border-none bg-transparent cursor-pointer transition-colors text-[10px] hover:bg-[#D0D0D0] ${gridSnap ? 'text-[#005B9A]' : 'text-[#606060]'}`}
+          title="Grid Snap"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+            <rect x="2" y="2" width="12" height="12" rx="1" />
+            <circle cx="8" cy="8" r="2" />
+            <path d="M8 2v3M8 11v3M2 8h3M11 8h3" />
+          </svg>
+        </button>
+
+        <div className="w-px h-3 bg-[#B0B0B0]" />
+
+        {/* Units Quick-Switch */}
+        <button
+          onClick={() => setUnits(units === 'MMGS' ? 'IPS' : 'MMGS')}
+          className="h-full px-2 flex items-center border-none bg-transparent cursor-pointer text-[#404040] font-medium hover:bg-[#D0D0D0] transition-colors text-[10px] whitespace-nowrap"
+          title={`Switch to ${units === 'MMGS' ? 'IPS' : 'MMGS'}`}
+        >
+          {units}
+        </button>
+
+        <div className="w-px h-3 bg-[#B0B0B0]" />
+
+        {/* Scale placeholder */}
+        <span className="text-[#404040] font-medium whitespace-nowrap px-2 text-[10px]">
           1:1
         </span>
+
+        <div className="w-px h-3 bg-[#B0B0B0]" />
+
+        {/* Kernel Status Dot */}
+        <div className="px-2 flex items-center gap-1">
+          <span
+            className="inline-block w-[6px] h-[6px] rounded-full"
+            style={{
+              background: engineStatus === 'CONNECTED' ? '#16a34a' : '#dc2626',
+              boxShadow: engineStatus === 'CONNECTED' ? '0 0 3px rgba(22,163,74,0.5)' : '0 0 3px rgba(220,38,38,0.5)',
+            }}
+            title={`Kernel ${engineStatus === 'CONNECTED' ? 'Connected' : 'Offline'}`}
+          />
+        </div>
       </div>
     </footer>
   );

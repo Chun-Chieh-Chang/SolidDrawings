@@ -113,6 +113,7 @@ export const useRevolveBuilders = (shared: SharedDeps) => {
         updateFeatureParams(featureId, nextParams);
       } else {
         featureId = `feat_${uuidv4()}`;
+        useCadStore.getState().saveSnapshot();
         addFeature({
           id: featureId,
           type: 'REVOLVE',

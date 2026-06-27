@@ -233,10 +233,12 @@ export type CombinedState = {
   setInterferenceResults: (results: any[]) => void;
   interferenceActive: boolean;
   setInterferenceActive: (active: boolean) => void;
-  solverReport: { dof: number; residual: number; nodes: Record<string, any>; max_residual?: number; iterations?: number; converged?: boolean } | null;
-  setSolverReport: (report: { dof: number; residual: number; nodes: Record<string, any> } | null) => void;
+  solverReport: { status?: string; dof: number; residual: number; nodes: Record<string, any>; max_residual?: number; iterations?: number; converged?: boolean } | null;
+  setSolverReport: (report: { status?: string; dof: number; residual: number; nodes: Record<string, any>; max_residual?: number; iterations?: number; converged?: boolean } | null) => void;
   assemblyPreviewComponents: import('./types').CADComponent[] | null;
   setAssemblyPreviewComponents: (components: import('./types').CADComponent[] | null) => void;
+  solveMates: () => Promise<boolean>;
+  toggleMateSuppressed: (id: string) => void;
   massProperties: { volume: number; surface_area: number; center_of_mass: number[]; inertia_matrix: number[][]; } | null;
   setMassProperties: (props: { volume: number; surface_area: number; center_of_mass: number[]; inertia_matrix: number[][]; } | null) => void;
   computedRefGeometry: any[];
@@ -315,6 +317,10 @@ export type CombinedState = {
   commitPreciseSketchSolve: () => void;
   viewOrientationSelectorVisible: boolean;
   setViewOrientationSelectorVisible: (visible: boolean) => void;
+  engineStatus: 'CONNECTED' | 'DISCONNECTED';
+  setEngineStatus: (status: 'CONNECTED' | 'DISCONNECTED') => void;
+  units: 'MMGS' | 'IPS';
+  setUnits: (units: 'MMGS' | 'IPS') => void;
   showMaterialModal: boolean;
   setShowMaterialModal: (show: boolean) => void;
   targetMaterialEntity: { type: 'PART' | 'COMPONENT' | 'FEATURE'; id: string } | null;
@@ -332,10 +338,14 @@ export type CombinedState = {
   toggleDimxpertFeatureVisibility: (id: string) => void;
   dimxpertAnnotations: import('./dimxpert-state').DimXpertAnnotation[];
   setDimxpertAnnotations: (annotations: import('./dimxpert-state').DimXpertAnnotation[]) => void;
-  dimxpertActiveGrade: string;
-  setDimxpertActiveGrade: (grade: string) => void;
+  dimxpertActiveGrade: import('./dimxpert-state').DimXpertGrade;
+  setDimxpertActiveGrade: (grade: import('./dimxpert-state').DimXpertGrade) => void;
   isDimXpertActive: boolean;
   setIsDimXpertActive: (active: boolean) => void;
+  toleranceCache: Record<string, import('./dimxpert-state').ToleranceCacheEntry>;
+  deviationCache: Record<string, import('./dimxpert-state').DeviationCacheEntry>;
+  computeTolerance: (nominal_mm: number, grade: import('./dimxpert-state').DimXpertGrade) => Promise<import('./dimxpert-state').ToleranceCacheEntry>;
+  computeDeviations: (nominal_mm: number, grade: import('./dimxpert-state').DimXpertGrade, fitType: string) => Promise<import('./dimxpert-state').DeviationCacheEntry>;
   drawingSheets: import('./types').DrawingSheetData[];
   activeSheetId: string;
   setDrawingSheets: (sheets: import('./types').DrawingSheetData[]) => void;
@@ -468,6 +478,8 @@ export const useCadStore = create<CombinedState>()(
         environmentMap: state.environmentMap,
         ribbonLayout: state.ribbonLayout,
         viewOrientationSelectorVisible: state.viewOrientationSelectorVisible,
+        engineStatus: state.engineStatus,
+        units: state.units,
         showMaterialModal: state.showMaterialModal,
         targetMaterialEntity: state.targetMaterialEntity,
         hoveredEntityId: state.hoveredEntityId,

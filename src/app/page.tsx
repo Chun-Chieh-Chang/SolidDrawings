@@ -41,12 +41,118 @@ import { EquationsModal } from '@/ui/Modals/EquationsModal';
 import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
 import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
 import { SheetMetalPanel } from '@/ui/SheetMetal';
+import { RollbackBar } from '@/ui/RollbackBar';
+import DimXpertPanel from '@/renderer/DimXpertPanel';
+
+// ── Left Panel Icon-only Tab SVGs ──
+
+const IconFeatureManager = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="1" y="1" width="6" height="5" rx=".5" />
+    <rect x="9" y="1" width="6" height="5" rx=".5" />
+    <rect x="5" y="7" width="6" height="5" rx=".5" />
+    <path d="M4 6v1M8 6v1M12 6v1" />
+  </svg>
+);
+
+const IconPropertyManager = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="1" width="12" height="14" rx="1" />
+    <line x1="4" y1="4" x2="12" y2="4" />
+    <line x1="4" y1="7" x2="12" y2="7" />
+    <line x1="4" y1="10" x2="9" y2="10" />
+    <circle cx="11.5" cy="10.5" r="1.5" />
+  </svg>
+);
+
+const IconConfigManager = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="1" width="12" height="3" rx=".5" />
+    <rect x="2" y="6" width="12" height="3" rx=".5" />
+    <rect x="2" y="11" width="12" height="3" rx=".5" />
+  </svg>
+);
+
+const IconDimXpert = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <line x1="2" y1="12" x2="7" y2="4" />
+    <line x1="7" y1="4" x2="12" y2="4" />
+    <line x1="12" y1="4" x2="14" y2="7" />
+    <line x1="7" y1="4" x2="7" y2="2" />
+    <circle cx="2" cy="12" r="1" />
+    <circle cx="7" cy="4" r="1" />
+    <circle cx="12" cy="4" r="1" />
+    <circle cx="14" cy="7" r="1" />
+  </svg>
+);
+
+// ── Right Panel Task Pane Tab Icons ──
+
+const IconDesignLibrary = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="12" height="12" rx="1" />
+    <line x1="5" y1="2" x2="5" y2="14" />
+    <line x1="8" y1="2" x2="8" y2="14" />
+    <line x1="11" y1="2" x2="11" y2="14" />
+    <line x1="2" y1="6" x2="14" y2="6" />
+  </svg>
+);
+
+const IconFileExplorer = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M2 13V3a1 1 0 0 1 1-1h3.5l2 2H13a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1z" />
+    <circle cx="10.5" cy="9.5" r="2" />
+    <line x1="12" y1="11" x2="13.5" y2="12.5" />
+  </svg>
+);
+
+const IconSearch = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round">
+    <circle cx="7" cy="7" r="4.5" />
+    <line x1="10.5" y1="10.5" x2="14" y2="14" />
+  </svg>
+);
+
+const IconViewPalette = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="2" width="5" height="5" rx=".5" />
+    <rect x="9" y="2" width="5" height="5" rx=".5" />
+    <rect x="2" y="9" width="5" height="5" rx=".5" />
+    <rect x="9" y="9" width="5" height="5" rx=".5" />
+  </svg>
+);
+
+const IconAppearances = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="8" cy="8" r="6" />
+    <circle cx="8" cy="8" r="2.5" fill="#505050" />
+    <path d="M8 2v2M8 12v2M2 8h2M12 8h2" />
+  </svg>
+);
+
+type TaskPaneTabId = 'LIBRARY' | 'FILE_EXPLORER' | 'SEARCH' | 'VIEW_PALETTE' | 'APPEARANCES';
+
+const TASK_PANE_TABS: { id: TaskPaneTabId; label: string; icon: React.FC }[] = [
+  { id: 'LIBRARY', label: 'Design Library', icon: IconDesignLibrary },
+  { id: 'FILE_EXPLORER', label: 'File Explorer', icon: IconFileExplorer },
+  { id: 'SEARCH', label: 'Search', icon: IconSearch },
+  { id: 'VIEW_PALETTE', label: 'View Palette', icon: IconViewPalette },
+  { id: 'APPEARANCES', label: 'Appearances', icon: IconAppearances },
+];
+
+const TASK_PANE_PLACEHOLDER: Record<TaskPaneTabId, string> = {
+  LIBRARY: '',
+  FILE_EXPLORER: 'File Explorer — Coming Soon',
+  SEARCH: 'Search — Coming Soon',
+  VIEW_PALETTE: 'View Palette — Coming Soon',
+  APPEARANCES: 'Appearances — Coming Soon',
+};
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
-  const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
-  const [sidebarTab, setSidebarTab] = useState<'TREE' | 'PROPERTIES' | 'CONFIGS'>('TREE');
-  const [taskPaneTab, setTaskPaneTab] = useState<'LIBRARY' | 'NONE'>('LIBRARY');
+  const [sidebarTab, setSidebarTab] = useState<'TREE' | 'PROPERTIES' | 'CONFIGS' | 'DIMX'>('TREE');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [taskPaneTab, setTaskPaneTab] = useState<TaskPaneTabId | 'NONE'>('LIBRARY');
   const [showMassPropsModal, setShowMassPropsModal] = useState(false);
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
   const [showEquationsModal, setShowEquationsModal] = useState(false);
@@ -72,6 +178,7 @@ export default function Home() {
     massProperties,
     showExportModal, setShowExportModal,
     setHint,
+    engineStatus, setEngineStatus,
   } = useCadStore();
 
   const { handleRebuild, resetRebuildCache, abortRebuild } = usePartRebuild(features, setMeshData, setLoading, setEngineStatus);
@@ -148,6 +255,38 @@ export default function Home() {
     return () => clearInterval(timer);
   }, [client]);
 
+  // Alt+Number Quick Jump — panel tabs & collapse
+  useEffect(() => {
+    const handleAltNav = (e: KeyboardEvent) => {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        switch (e.code) {
+          case 'Digit0': setSidebarCollapsed(c => !c); e.preventDefault(); break;
+          case 'Digit1': setSidebarTab('TREE'); if (sidebarCollapsed) setSidebarCollapsed(false); e.preventDefault(); break;
+          case 'Digit2': setSidebarTab('PROPERTIES'); if (sidebarCollapsed) setSidebarCollapsed(false); e.preventDefault(); break;
+          case 'Digit3': setSidebarTab('CONFIGS'); if (sidebarCollapsed) setSidebarCollapsed(false); e.preventDefault(); break;
+          case 'Digit4': setSidebarTab('DIMX'); if (sidebarCollapsed) setSidebarCollapsed(false); e.preventDefault(); break;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleAltNav);
+    return () => window.removeEventListener('keydown', handleAltNav);
+  }, [sidebarCollapsed]);
+
+  // Ctrl+Z Undo / Ctrl+Y Redo
+  useEffect(() => {
+    const handleUndoRedo = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ' && !e.shiftKey) {
+        e.preventDefault();
+        useCadStore.getState().undo();
+      } else if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey))) {
+        e.preventDefault();
+        useCadStore.getState().redo();
+      }
+    };
+    window.addEventListener('keydown', handleUndoRedo);
+    return () => window.removeEventListener('keydown', handleUndoRedo);
+  }, []);
+
   const handleEditFeatureSketch = useCallback((f: CADFeature) => {
     useCadStore.setState({
       editingFeatureId: f.id,
@@ -222,7 +361,24 @@ export default function Home() {
 
   return (
     <main className="flex flex-col h-screen w-screen overflow-hidden bg-background text-primary-text font-sans">
-      <TopMenu engineStatus={engineStatus} onExport={() => setShowExportModal(true)} />
+      <TopMenu
+        onExport={() => setShowExportModal(true)}
+        onOpenFile={async () => {
+          const r = await fileAPI.open();
+          if (r) {
+            const res = await fileAPI.read(r.path);
+            if (res.success && res.content) loadCadData(res.content, r.path);
+          }
+        }}
+        onSaveFile={handleSaveProject}
+        onNewFile={() => {
+          const ids = useCadStore.getState().features.map(f => f.id);
+          if (ids.length) useCadStore.getState().removeFeatures(ids);
+        }}
+        onPrint={handlePrintToPDF}
+        onUndo={() => useCadStore.getState().undo()}
+        onRebuild={handleRebuild}
+      />
       
       <RibbonController
         activeTab={activeTab}
@@ -243,81 +399,104 @@ export default function Home() {
         onShowEquations={() => setShowEquationsModal(true)}
       />
 
-      {engineStatus === 'DISCONNECTED' && (
-        <div className="bg-red-600 text-white text-[11px] font-black py-1 px-4 flex items-center justify-center gap-4 animate-pulse z-[100]">
-          <span>⚠️ GEOMETRY KERNEL OFFLINE</span>
-          <button onClick={() => HeavyEngineClient.getInstance().checkHealth().then(a => setEngineStatus(a?'CONNECTED':'DISCONNECTED'))} className="px-2 py-0.5 bg-white text-red-600 rounded text-[9px] font-black hover:bg-slate-100">RETRY</button>
-        </div>
-      )}
-
       <div className="flex-1 flex w-full overflow-hidden relative">
-        <aside className="w-[300px] h-full bg-[#F5F6F9] border-r border-slate-300 flex flex-col z-10 shrink-0">
-          <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
-            {["Tree", "Properties", "Configs"].map((tab, idx) => {
-              const tabId = (['TREE', 'PROPERTIES', 'CONFIGS'] as const)[idx];
-              const isActive = sidebarTab === tabId;
+        <aside className={`${sidebarCollapsed ? 'w-[28px]' : 'w-[280px]'} h-full bg-[#F0F0F0] border-r border-[#D0D0D0] flex flex-col z-10 shrink-0 transition-all duration-150`}>
+          {/* Icon-only tab strip: FeatureManager / PropertyManager / ConfigurationManager / DimXpertManager */}
+          <div className="h-[24px] w-full bg-[#E8E8E8] flex items-center border-b border-[#D0D0D0]">
+            {([
+              { id: 'TREE' as const, icon: IconFeatureManager, title: 'FeatureManager' },
+              { id: 'PROPERTIES' as const, icon: IconPropertyManager, title: 'PropertyManager' },
+              { id: 'CONFIGS' as const, icon: IconConfigManager, title: 'ConfigurationManager' },
+              { id: 'DIMX' as const, icon: IconDimXpert, title: 'DimXpertManager' },
+            ]).map((tab) => {
+              const isActive = sidebarTab === tab.id;
               return (
-                <div 
-                  key={tab} 
-                  onClick={() => setSidebarTab(tabId)}
-                  className={`flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter cursor-pointer border-r border-slate-300 ${isActive ? 'bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]' : 'text-slate-500 hover:bg-slate-100'}`}
+                <button
+                  key={tab.id}
+                  onClick={() => { if (sidebarCollapsed) setSidebarCollapsed(false); setSidebarTab(tab.id); }}
+                  title={tab.title}
+                  className={`w-[28px] h-full flex items-center justify-center cursor-pointer border-r border-[#D0D0D0] transition-colors ${
+                    isActive
+                      ? 'bg-white'
+                      : 'text-[#606060] hover:bg-[#D8D8D8]'
+                  }`}
                 >
-                  {tab}
-                </div>
+                  <tab.icon />
+                </button>
               );
             })}
+            {/* Collapse/Expand toggle */}
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="ml-auto w-[20px] h-full flex items-center justify-center text-[#909090] hover:text-[#505050] hover:bg-[#D8D8D8] border-none bg-transparent cursor-pointer"
+              title={sidebarCollapsed ? 'Expand panel' : 'Collapse panel'}
+            >
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+                {sidebarCollapsed ? <polyline points="10,3 5,8 10,13" /> : <polyline points="6,3 11,8 6,13" />}
+              </svg>
+            </button>
           </div>
-          <div className="flex-grow flex flex-col overflow-hidden">
-            {sidebarTab === 'CONFIGS' ? (
-              <ConfigurationManagerPanel />
-            ) : isSketchMode || sidebarTab === 'PROPERTIES' ? (
-              <div className="flex-grow flex flex-col overflow-hidden">
-                {isSketchMode ? <SketchPropertyManager /> : (
-                  selectedFeature ? (
-                    <PartFeaturePropertyManager
-                      selectedFeature={selectedFeature}
-                      features={features}
-                      onParamChange={onParamChange}
-                      onEditSketch={handleEditFeatureSketch}
-                      onSelectFeature={setSelectedId}
-                      onBuildSweepLoft={handleBuildSweepLoft}
-                    />
-                  ) : <div className="p-10 text-center text-slate-400 italic text-[11px]">No feature selected</div>
-                )}
-              </div>
-            ) : activeTab === 'ASSEMBLY' ? (
-              <div className="flex-1 flex flex-col p-2 gap-2 bg-[#F8FAFC]"><AssemblyTreePanel /><MatePanel /></div>
-            ) : measurementMode !== 'NONE' ? (
-              <MeasurementPanel />
-            ) : interferenceActive ? (
-              <InterferencePanel />
-            ) : activeTab === 'SHEET_METALS' ? (
-              <SheetMetalPanel active={true} />
-            ) : (
-              <FeatureManagerPanel
-                features={features}
-                rollbackIndex={rollbackIndex}
-                setRollbackIndex={setRollbackIndex}
-                activePlane={activePlane}
-                setActivePlane={setActivePlane}
-                selectedId={selectedId}
-                setSelectedId={setSelectedId}
-                selectedSubNodeType={selectedSubNodeType}
-                setSelectedSubNodeType={setSelectedSubNodeType}
-                editingFeatureId={useCadStore.getState().editingFeatureId}
-                visibleSketches={visibleSketches}
-                toggleSketchVisibility={toggleSketchVisibility}
-                removeFeature={removeFeature}
-                removeFeatures={removeFeatures}
-                onRebuild={handleRebuild}
-                onEditFeatureSketch={handleEditFeatureSketch}
-                onStartPlaneSketch={handleStartPlaneSketch}
-                onPlaneContextMenu={handlePlaneContextMenu}
-              />
-            )}
 
-            <SectionViewPropertyManager />
-          </div>
+          {!sidebarCollapsed && (
+            <>
+              {/* Rollback Bar (below tab strip) */}
+              <RollbackBar enabled={sidebarTab === 'TREE'} position={1} />
+
+              <div className="flex-grow flex flex-col overflow-hidden">
+                {sidebarTab === 'CONFIGS' ? (
+                  <ConfigurationManagerPanel />
+                ) : sidebarTab === 'DIMX' ? (
+                  <DimXpertPanel />
+                ) : isSketchMode || sidebarTab === 'PROPERTIES' ? (
+                  <div className="flex-grow flex flex-col overflow-hidden">
+                    {isSketchMode ? <SketchPropertyManager /> : (
+                      selectedFeature ? (
+                        <PartFeaturePropertyManager
+                          selectedFeature={selectedFeature}
+                          features={features}
+                          onParamChange={onParamChange}
+                          onEditSketch={handleEditFeatureSketch}
+                          onSelectFeature={setSelectedId}
+                          onBuildSweepLoft={handleBuildSweepLoft}
+                        />
+                      ) : <div className="p-10 text-center text-slate-400 italic text-[11px]">No feature selected</div>
+                    )}
+                  </div>
+                ) : activeTab === 'ASSEMBLY' ? (
+                  <div className="flex-1 flex flex-col p-2 gap-2 bg-[#F8FAFC]"><AssemblyTreePanel /><MatePanel /></div>
+                ) : measurementMode !== 'NONE' ? (
+                  <MeasurementPanel />
+                ) : interferenceActive ? (
+                  <InterferencePanel />
+                ) : activeTab === 'SHEET_METALS' ? (
+                  <SheetMetalPanel active={true} />
+                ) : (
+                  <FeatureManagerPanel
+                    features={features}
+                    rollbackIndex={rollbackIndex}
+                    setRollbackIndex={setRollbackIndex}
+                    activePlane={activePlane}
+                    setActivePlane={setActivePlane}
+                    selectedId={selectedId}
+                    setSelectedId={setSelectedId}
+                    selectedSubNodeType={selectedSubNodeType}
+                    setSelectedSubNodeType={setSelectedSubNodeType}
+                    editingFeatureId={useCadStore.getState().editingFeatureId}
+                    visibleSketches={visibleSketches}
+                    toggleSketchVisibility={toggleSketchVisibility}
+                    removeFeature={removeFeature}
+                    removeFeatures={removeFeatures}
+                    onRebuild={handleRebuild}
+                    onEditFeatureSketch={handleEditFeatureSketch}
+                    onStartPlaneSketch={handleStartPlaneSketch}
+                    onPlaneContextMenu={handlePlaneContextMenu}
+                  />
+                )}
+
+                <SectionViewPropertyManager />
+              </div>
+            </>
+          )}
         </aside>
 
         <section className="flex-grow h-full relative" onContextMenu={(e) => e.preventDefault()}>
@@ -362,29 +541,59 @@ export default function Home() {
           {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} activeTab={activeTab} />}
         </section>
 
-        {/* Right Task Pane (Design Library) */}
+        {/* Right Task Pane (with vertical icon tab strip) */}
         {taskPaneTab !== 'NONE' && (
-          <aside className="w-[280px] h-full bg-[#F5F6F9] border-l border-slate-300 flex flex-col z-10 shrink-0 animate-in slide-in-from-right duration-300">
-            <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
-               <div className="flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]">
-                 Library
-               </div>
-               <button 
-                 onClick={() => setTaskPaneTab('NONE')}
-                 className="px-2 text-slate-400 hover:text-slate-600"
-               >✕</button>
+          <aside className="flex h-full z-10 shrink-0 animate-in slide-in-from-right duration-300">
+            {/* Content area */}
+            <div className="w-[260px] h-full bg-[#F0F0F0] border-l border-[#D0D0D0] flex flex-col">
+              <div className="h-[24px] bg-[#E8E8E8] border-b border-[#D0D0D0] flex items-center px-2 shrink-0">
+                <span className="text-[10px] font-medium text-[#505050]">
+                  {TASK_PANE_TABS.find(t => t.id === taskPaneTab)?.label ?? ''}
+                </span>
+                <button
+                  onClick={() => setTaskPaneTab('NONE')}
+                  className="ml-auto text-[#909090] hover:text-[#505050] text-[12px] leading-none px-1"
+                >✕</button>
+              </div>
+              {taskPaneTab === 'LIBRARY' ? (
+                <DesignLibraryPanel />
+              ) : (
+                <div className="flex-1 flex items-center justify-center text-[11px] text-[#909090] italic px-4 text-center">
+                  {TASK_PANE_PLACEHOLDER[taskPaneTab]}
+                </div>
+              )}
             </div>
-            <DesignLibraryPanel />
+
+            {/* Vertical icon tab strip */}
+            <div className="w-[28px] h-full bg-[#E8E8E8] border-l border-[#D0D0D0] flex flex-col items-center py-1 gap-0.5 shrink-0">
+              {TASK_PANE_TABS.map((tab) => {
+                const isActive = taskPaneTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setTaskPaneTab(tab.id)}
+                    title={tab.label}
+                    className={`w-[22px] h-[22px] flex items-center justify-center rounded-sm transition-colors ${
+                      isActive
+                        ? 'bg-white border border-[#C0C0C0]'
+                        : 'hover:bg-[#D0D0D0]'
+                    }`}
+                  >
+                    <tab.icon />
+                  </button>
+                );
+              })}
+            </div>
           </aside>
         )}
 
         {/* Task Pane Toggle handle if closed */}
         {taskPaneTab === 'NONE' && (
-          <div 
+          <div
             onClick={() => setTaskPaneTab('LIBRARY')}
-            className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-24 bg-white border-l border-y border-slate-300 rounded-l-md shadow-md cursor-pointer flex items-center justify-center text-slate-400 hover:text-primary transition-all z-20 hover:w-8 group"
+            className="absolute right-0 top-1/2 -translate-y-1/2 w-6 h-24 bg-[#E8E8E8] border-l border-y border-[#D0D0D0] cursor-pointer flex items-center justify-center text-[#909090] hover:text-[#505050] transition-all z-20 group"
           >
-            <span className="rotate-90 font-black text-[10px] whitespace-nowrap tracking-widest group-hover:text-primary transition-colors">TASK PANE</span>
+            <span className="rotate-90 font-normal text-[9px] whitespace-nowrap tracking-wider group-hover:text-[#505050] transition-colors">TASKS</span>
           </div>
         )}
       </div>

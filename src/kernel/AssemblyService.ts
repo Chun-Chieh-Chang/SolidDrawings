@@ -17,26 +17,28 @@ export class AssemblyService {
 
   /**
    * Solve assembly mates using the backend Scipy solver.
+   * Returns [updatedComponents, solverReport].
    */
   public async solve(
     components: CADComponent[],
     mates: CADMate[],
     mateSelection: MateSelectionEntity[] = [],
-  ): Promise<CADComponent[]> {
+  ): Promise<[CADComponent[], any]> {
     const client = HeavyEngineClient.getInstance();
     const componentsDict = componentsToSolverDict(components);
-    const matesPayload = matesToSolverPayload(mates, mateSelection);
+    const activeMates = mates.filter(m => !m.suppressed);
+    const matesPayload = matesToSolverPayload(activeMates, mateSelection);
 
     try {
       const result = await client.solveAssembly(componentsDict, matesPayload);
+      const report = result?.report ?? null;
       if (result && result.components) {
-        // Map back to array
-        return components.map(c => result.components[c.id] || c);
+        return [components.map(c => result.components[c.id] || c), report];
       }
-      return components;
+      return [components, report];
     } catch (err) {
       console.error('[AssemblyService] Solver failed:', err);
-      return components;
+      return [components, { status: 'ERROR', residual: -1 }];
     }
   }
 

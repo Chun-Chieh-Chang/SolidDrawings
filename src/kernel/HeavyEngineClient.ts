@@ -176,7 +176,8 @@ export class HeavyEngineClient {
 
   public async sectionView(features: CADFeature[], cutPlane: any, planeType?: string): Promise<any> {
     try {
-      const response = await fetch(`${this.baseUrl}/section_view`, {
+      const drawingBaseUrl = this.baseUrl.replace('/geometry', '/drawing');
+      const response = await fetch(`${drawingBaseUrl}/section_view`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ features, cutPlane, planeType: planeType || 'FRONT' }),

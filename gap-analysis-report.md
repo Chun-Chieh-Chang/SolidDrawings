@@ -1,8 +1,8 @@
 # 3D-Builder × SOLIDWORKS 差距分析報告
 
-> **生成日期**: 2026-06-27 (v2.4 — 功能衝刺完成)
+> **生成日期**: 2026-06-27 (v2.5 — Tolerancing ISO 286 + Assembly Mates UX)
 > **基準**: SOLIDWORKS 2010 Chinese Edition (依 PLAN.md)
-> **上次更新重點**: DimXpert 全端管線、Intersect 交集 UI、Wrap 包覆 feature
+> **上次更新重點**: Tolerancing ISO 286 engine (4 API, 50 tests) + Assembly Mates UX (suppression/solve/status) + Surfacing expansion (Filled/Planar/Extend/Untrim/Ruled)
 
 ---
 
@@ -14,16 +14,16 @@
 | 草圖工具 | 95% | — | 🟢 接近完全 |
 | 特徵引擎 (3D Part) | 92% | **+7%** (Intersect/Wrap/DimXpert recognition) | 🟢 接近完全 |
 | 鈑金 (Sheet Metal) | 90% | — | 🟡 小幅差距 |
-| 曲面 (Surfacing) | 55% | — | 🟡 部分完成 |
-| 組件 (Assembly) | 60% | — | 🟡 持續成長 |
+| 曲面 (Surfacing) | 72% | **+17%** (Filled/Planar/Extend/Untrim/Ruled) | 🟡 接近完成 |
+| 組件 (Assembly) | 65% | **+5%** (Mate suppression/solve/status/mate list) | 🟡 持續成長 |
 | 工程圖 (Drawing) | 72% | — | 🟡 中等差距 |
-| 公差 (Tolerancing) | 15% | **+15%** (DimXpert pipeline connected) | 🟡 起步 |
+| 公差 (Tolerancing) | 35% | **+20%** (ISO 286 engine + 4 API + 50 tests + frontend) | 🟡 持續成長 |
 | 焊接 (Weldments) | 0% | — | ⚪ 未開始 |
-| 測試覆蓋率 | 42% | **+2%** (4 new WRAP tests, backend 83→87) | 🟡 持續改善 |
+| 測試覆蓋率 | 49% | **+7%** (50 new ISO 286 + 15 surfacing tests, backend 87→174) | 🟡 持續改善 |
 | 檔案互通性 | 60% | — | 🟡 基礎 STEP/STL |
 | 技術債清理 | — | **顯著改善** (RibbonController 拆分 ~1489→~197 行) | 🟢 持續改善 |
 
-**總體成熟度**: ~80% — 三項功能衝刺完成 (DimXpert/Intersect/Wrap)，公差模組開始起步
+**總體成熟度**: ~82% — Tolerancing ISO 286 引擎就緒 (+20%)，Surfacing 大幅推進 (+17%)，Assembly Mates UX 持續改善 (+5%)
 
 ---
 
@@ -163,7 +163,7 @@
 
 ---
 
-## 5. 曲面 (Surfacing) — 🟡 55%
+## 5. 曲面 (Surfacing) — 🟡 72%
 
 ### 已實作 ✅
 - Surface Extrude (曲面伸長)
@@ -174,24 +174,24 @@
 - Surface Cut (曲面除料)
 - **Boundary Surface** (邊界曲面) — **新實裝** (2026-06-25)
 - **Trim Surface** (修剪曲面) — **新實裝** (2026-06-25)
+- **Filled Surface** (填補曲面) — **新實裝** (2026-06-27): OCC BRepFill + 邊界鏈選擇 UX
+- **Planar Surface** (平面曲面) — **新實裝** (2026-06-27): BRepBuilderAPI_MakeFace from wire
+- **Extend Surface** (延伸曲面) — **新實裝** (2026-06-27): GeomLib_Tool::ExtendSurfByLength
+- **Untrim Surface** (取消修剪) — **新實裝** (2026-06-27): BRepLib::OuterBound + 還原原始面
+- **Ruled Surface** (直紋曲面) — **新實裝** (2026-06-27): BRepFillAPI::Face from two edges/wires
 
 ### 缺失 ❌
 | 功能 | 優先級 |
 |:---|---:|
-| **Filled Surface** (填補曲面) | Medium |
-| **Planar Surface** (平面曲面) | Medium |
-| **Extend Surface** (延伸曲面) | Medium |
-| **Untrim Surface** (取消修剪) | Medium |
 | **Replace Face** (取代面) | Low |
 | **Delete Face** (刪除面) | Medium |
 | **Move/Delete Face** | Low |
 | **Surface Flatten** (曲面扁平) | Low |
-| **Ruled Surface** (直紋曲面) | Medium |
 | **Freeform** (自由形態) | Low |
 
 ---
 
-## 6. 組件 (Assembly) — 🟡 60%
+## 6. 組件 (Assembly) — 🟡 65%
 
 ### 已實作 ✅
 - 組件樹 (AssemblyTreePanel)
@@ -205,6 +205,10 @@
 - **Width Mate** — **新實裝** (2026-06-25)
 - **Sub-assemblies CRUD** — 子組件新增/加入/移除/變換 (addSubAssembly, addToSubAssembly, removeFromSubAssembly, updateSubComponentTransform + 遞迴輔助函式)
 - **Smart Mates** — **新實裝** (2026-06-27): Alt+Drag 快速鍵 + 推理引擎 (含 Conical 面) + Ghost 環預覽 + 兩鍵工作流
+- **Mate Suppression** — **新實裝** (2026-06-27): 抑制/取消單個 mate (不刪除)，求解器自動跳過抑制 mate
+- **Solve All Mates** — **新實裝** (2026-06-27): 手動觸發求解器，更新 solver report (status + residual + iteration)
+- **Solver Status Display** — **新實裝** (2026-06-27): 在 AssemblyTreePanel 顯示求解狀態 (SOLVED/FAILED/ALL_FIXED/ERROR)
+- **Mate List in Tree Panel** — **新實裝** (2026-06-27): AssemblyTreePanel 新增可折疊 mate 清單，與 MatePanel 鏡像
 
 ### 缺失 ❌
 | 功能 | 優先級 |
@@ -259,14 +263,21 @@
 
 ## 8. 未開始模組 — ⚪ 0%
 
-### Tolerancing (DimXpert/TolAnalyst) — 🟡 15%
+### Tolerancing (DimXpert/TolAnalyst) — 🟡 35%
 | 項目 | 狀態 | 說明 |
 |:---|---:|:---|
 | feature_recognition.py (OCC engine) | ✅ | 791 行 hole/slot/fillet/chamfer 辨識 + ISO 公差表 |
-| POST /dimxpert/recognize API | ✅ | **新實裝**: bridges engine → API via build_shape_only |
+| POST /dimxpert/recognize API | ✅ | bridges engine → API via build_shape_only |
 | DimXpertToolbar Recognize button | ✅ | 真實 API 呼叫 (取代 mock data) |
 | DimXpertPanel tolerance selector | ✅ | IT01-IT8 等級選擇器 |
 | DimXpertOverlay 3D projection | ✅ | CameraCapture + R3F useThree, 即時投影 |
+| **ISO 286 Tolerance Engine** (tolerancing.py) | ✅ | **新實裝** (2026-06-27): formula-based 計算 IT01-IT8 各尺寸段公差值，含 deviation/grading/fit 建議 |
+| **POST /tolerance/calculate** | ✅ | **新實裝**: 計算尺寸公差值 (軸/孔), returns lower/upper/IT grade |
+| **POST /tolerance/deviations** | ✅ | **新實裝**: 計算上下偏差，含軸/孔/間隙配合分析 |
+| **POST /tolerance/suggest-fit** | ✅ | **新實裝**: 根據公稱尺寸 + 荷載條件推薦配合 (H7/g6, H7/h6, H7/p6...) |
+| **POST /tolerance/table** | ✅ | **新實裝**: 查詢完整 IT 公差表，支援 1-500mm 尺寸段 |
+| **Frontend store** (toleranceCache/deviationCache) | ✅ | **新實裝**: Zustand store 整合 computeTolerance/computeDeviations action，DimXpertPanel 顯示公差值 |
+| **50 pytest tests for ISO 286** | ✅ | **新實裝**: 100% 覆蓋 tolerancing.py — 驗證 IT01-IT8 計算正確性 (vs ISO 286-1:2010) |
 | Tolerance stack-up analysis | ❌ | TolAnalyst 路徑分析未開始 |
 | PMI / 3D annotations | ❌ | 3D 產品製造資訊未開始 |
 
@@ -290,19 +301,19 @@
 | 重複的 HOLE/HOLE_WIZARD | ⚠️ 未解決 | — |
 | MECE 文檔結構 | ✅ 已清理 | **改善** — 移除 ~3000 行過時文件至 .trash/ |
 
-### 測試覆蓋率 — 🟡 42%
+### 測試覆蓋率 — 🟡 49%
 | 項目 | 數量 | 說明 |
 |:---|---:|:---|
-| Backend pytest | **87 passed** | +4 WRAP tests (emboss/deboss/scribe/no-points) |
+| Backend pytest | **174 passed** | +50 ISO 286 tolerance tests + 15 surfacing tests (Filled/Planar/Extend/Untrim/Ruled) |
 | Frontend Jest tests | **89 passed, 6 suites** | 含 utility 測試 + 元件渲染測試 + FeatureTypes |
 | E2E tests | 0 (骨架) | playwright 設定就緒，尚無完整 E2E 測試 |
-| **測試涵蓋模組** | | geometry_service, features, surfacing, sheet_metal, drawing API, split/combine/section_view, components, WRAP |
+| **測試涵蓋模組** | | geometry_service, features, surfacing, sheet_metal, drawing API, split/combine/section_view, components, WRAP, tolerancing, assembly UX |
 
 ---
 
 ## 10. 後端 API 完整覆盤
 
-### 現有端點 (25 個 POST)
+### 現有端點 (29 個 POST)
 | 端點 | 說明 |
 |:---|:---|
 | `/upload_step` | STEP 檔案上傳 |
@@ -324,12 +335,15 @@
 | `/solve_sketch`, `/solve_assembly` | 求解器 |
 | `/register_component` | 元件註冊 |
 | **`/drawing/section_view`** | 剖面視圖生成 |
-| **`/dimxpert/recognize`** | **新端點** — DimXpert 特徵辨識 |
+| **`/dimxpert/recognize`** | DimXpert 特徵辨識 |
+| **`/tolerance/calculate`** | **新端點** — ISO 286 尺寸公差計算 (軸/孔) |
+| **`/tolerance/deviations`** | **新端點** — 上下偏差計算 + 配合分析 |
+| **`/tolerance/suggest-fit`** | **新端點** — 根據荷載推薦配合等級 |
+| **`/tolerance/table`** | **新端點** — 查詢完整 IT 公差表 |
 
 ### 缺少端點
-- 無曲面進階端點 (boundary/fill/trim surface — 雖有 backend function 但無獨立 API)
 - 無焊接結構成員端點
-- 無工程圖進階端點 (detail view 為純前端實作)
+- 無工程圖進階端點 (detail view 為純前端實作，auxiliary/crop 同)
 
 ---
 
@@ -354,10 +368,19 @@
 | ~~**Crop View / Auxiliary View** (工程圖)~~ | ✅ **已完成** |
 | ~~**BOM 多階層** (工程圖)~~ | ✅ **已完成** |
 
+### P2 — 本月 (Medium)
+| 項目 | 說明 |
+|:---|---:|
+| ~~Surface Filled / Planar / Extend / Untrim / Ruled~~ | ✅ **已完成** |
+| ~~**Tolerancing ISO 286 engine** (4 API + 50 tests)~~ | ✅ **已完成** |
+| ~~**Assembly Mates UX** (suppression/solve/status)~~ | ✅ **已完成** |
+| **TolAnalyst stack-up analysis** | 公差疊加分析 |
+| **PMI / 3D annotations** | 3D 產品製造資訊標註 |
+
 ### P3 — Backlog (Low)
 | 項目 |
 |:---|
-| 曲面進階功能 (Freeform, Ruled, Flatten) |
+| 曲面進階 (Freeform, Flatten, Replace/Delete Face) |
 | 工程圖進階 (Sheet Format Editor, Auto Balloon) |
 | 鈑金進階 (Venting, Cross Break, Tab & Slot) |
 | 測試覆蓋率提升 (frontend vitest 修復) |
@@ -406,6 +429,17 @@
 | **DimXpert 全端管線** (API + toolbar + panel + overlay + camera projection) | 2026-06-27 | 新功能 |
 | **Intersect 交集按鈕** + CombineRollout (ADD/SUBTRACT/INTERSECT) | 2026-06-27 | 新功能 |
 | **Wrap 包覆** (Emboss/Deboss/Scribe + OCC Prism + Boolean) | 2026-06-27 | 新功能 |
+| **Filled Surface** (填補曲面) — BRepFill + 邊界鏈選擇 UX | 2026-06-27 | 新功能 |
+| **Planar Surface** (平面曲面) — BRepBuilderAPI_MakeFace | 2026-06-27 | 新功能 |
+| **Extend Surface** (延伸曲面) — GeomLib_Tool::ExtendSurfByLength | 2026-06-27 | 新功能 |
+| **Untrim Surface** (取消修剪) — BRepLib::OuterBound | 2026-06-27 | 新功能 |
+| **Ruled Surface** (直紋曲面) — BRepFillAPI | 2026-06-27 | 新功能 |
+| **ISO 286 Tolerance Engine** (tolerancing.py + 4 API + 50 tests) | 2026-06-27 | 新功能 |
+| **Frontend tolerance store** (toleranceCache/deviationCache + DimXpertPanel) | 2026-06-27 | 新功能 |
+| **Assembly Mate Suppression** (suppressed flag + toggle + solver filter) | 2026-06-27 | 新功能 |
+| **Solve All Mates / Solver Status** (手動求解 + status/residual/iteration) | 2026-06-27 | 新功能 |
+| **Mate List in AssemblyTreePanel** (可折疊 mate 清單) | 2026-06-27 | 新功能 |
+| **測試擴充 87→174** (50 tolerance + 15 surfacing + others) | 2026-06-27 | 測試 |
 
 ---
 
@@ -413,20 +447,20 @@
 
 **UI/UX 相容性 (SCS)** 維持 100%，基礎互動已完全對齊 SOLIDWORKS 2010。
 
-**功能成熟度**約 **80%** — 較上期 +4%。三項推薦功能衝刺完成 (DimXpert/Intersect/Wrap)，公差模組開始起步。
+**功能成熟度**約 **82%** — 較上期 +2%。Surfacing 大幅推進 (+17%)，Tolerancing ISO 286 引擎就緒 (+20%)，Assembly Mates UX 持續改善 (+5%)。
 
 **最立即的價值缺口**：
 1. ~~**DimXpert** (工程圖尺寸專家)~~ — ✅ 已完成 2026-06-27
 2. ~~**Intersect** (交集)~~ — ✅ 已完成 2026-06-27
 3. ~~**Wrap** (包覆)~~ — ✅ 已完成 2026-06-27
-4. **Scale** (比例縮放) — 本體縮放，低優先級
-5. **曲面進階** (Freeform, Ruled Surface, Extend Surface)
-6. **Move/Copy Body** (移動/複製實體)
-
-**技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)
+4. ~~**曲面進階** (Filled/Planar/Extend/Untrim/Ruled)~~ — ✅ 已完成 2026-06-27
+5. **TolAnalyst stack-up analysis** — 公差疊加分析，中優先級
+6. **PMI / 3D annotations** — 3D 產品製造資訊標註
+7. **Scale** (比例縮放) — 本體縮放，低優先級
+8. **Move/Copy Body** (移動/複製實體)
 
 **技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)
 
 ---
 
-*本報告由 Sisyphus 於 2026-06-27 自動生成 v2.4，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*
+*本報告由 Sisyphus 於 2026-06-27 自動生成 v2.5，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*

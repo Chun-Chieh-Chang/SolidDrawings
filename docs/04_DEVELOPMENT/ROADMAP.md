@@ -24,23 +24,27 @@ gantt
     模具設計              :         mold1, 2025-07-01, 2025-09-30
 ```
 
-## 階段一：核心建模 (已完成 80%)
+## 階段一：核心建模 (已完成 95%)
 
 ### ✅ 已完成項目
 - [x] 基本零件建模功能
 - [x] 草圖繪製系統
-- [x] Sweep 幾何引擎 (後端)
-- [x] 基本特徵 (拉伸/旋轉/掃描)
+- [x] 所有基礎特徵 (拉伸/旋轉/掃描/疊層拉伸/螺旋)
+- [x] 進階特徵 (圓角/倒角/抽殼/筋/拔模/穹頂)
+- [x] 布林運算 (Split/Combine/Intersect)
+- [x] Wrap 包覆 (Emboss/Deboss/Scribe)
+- [x] 曲面系統 (Extrude/Revolve/Loft/Offset/Knit/Cut/Boundary/Trim + **Filled/Planar/Extend/Untrim/Ruled**)
+- [x] 參考幾何 (平面/軸/點/座標系)
+- [x] 陣列與鏡射 (Linear/Circular/Fill Pattern, Mirror)
+- [x] Hole Wizard (鑽孔精靈)
 
 ### 🔧 進行中項目
-- [ ] Sweep Profile/Path 選擇 UX 修正 (G1)
-- [ ] 引導曲線 UI 實作 (G2)
-- [ ] 掃出方向控制項 (G3)
+- [ ] Sweep Profile/Path 選擇 UX 修正
+- [ ] 曲面進階 (Freeform, Flatten, Replace/Delete Face)
 
-### 📅 近期目標 (2026 Q2)
-- 完成 G1-G3 所有缺口修正
-- 建立 Configuration 管理系統
-- 完善 2D/3D 轉換功能
+### 📅 近期目標
+- 完成 Sweep UX 修正
+- 曲面殘留功能 (Freeform, Flatten)
 
 ### 🧹 技術債清理 (已完成)
 - [x] 將 CAD 匯出/匯入函式（STEP、干涉檢測、拓撲分析）抽出至 `export_utils.py`
@@ -52,30 +56,43 @@ gantt
 - [x] `geometry_service.py` 從 5939 行降至 3547 行（-2391 行，-40%）
 - [x] 前端 `FeatureManagerPanel.tsx` 全面型別化，消除 `any` 宣告
 
-## 階段二：組件與工程圖 (規劃中)
+## 階段二：組件與工程圖 (已完成 85%)
 
-### 工程圖模組開發
-- 工程圖基本要素
-- 尺寸標準規範
-- 標註系統
-- BOM 表生成
+### ✅ 已完成項目
+- [x] 組件樹 + Mate 面板
+- [x] Mates 系統 (Coincident/Concentric/Distance/Angle/Tangent/Parallel/Perpendicular)
+- [x] 進階 Mates (Profile Center / Symmetric / Width / Smart Mates)
+- [x] Mate Suppression + Solve All Mates + Solver Status Display
+- [x] 子組件 CRUD (addSubAssembly / removeFromSubAssembly / 遞迴 transform)
+- [x] 爆炸視圖
+- [x] 干涉檢查
+- [x] 工程圖基本框架 + 三視圖投影
+- [x] 剖面視圖 / 局部放大圖 / 輔助視圖 / 裁剪視圖
+- [x] 尺寸標註互動 (Smart Dimensions)
+- [x] 註記 / GD&T / 中心標記 / 零件號球
+- [x] BOM 多階層樹狀表
+- [x] 標題欄 + 圖紙設定
+- [x] 匯出 PDF
 
-### 組件管理增強
-- 配合關係系統
-- 大型組件處理
-- 爆炸視圖功能
+### 🔧 進行中項目
+- [ ] Assembly Features (組件特徵)
+- [ ] Pattern/Mirror Component (元件陣列/鏡射)
+- [ ] Collision Detection (碰撞偵測)
+- [ ] 工程圖進階 (Sheet Format Editor, Auto Balloon)
 
-## 階段三：模擬與分析 (預備階段)
+## 階段三：模擬與分析 (部分完成)
 
 ### FEA 模擬整合
-- 結構分析求解器
-- 熱分析模組
-- 流體分析模組
+- ❌ 尚未開始
 
-### 公差分析
-- TolAnalyst 整合
-- 尺寸公差系統
-- 幾何公差系統
+### 公差分析 (已完成 35%)
+- [x] ISO 286 公差引擎 (tolerancing.py) — formula-based IT01-IT8 計算
+- [x] 4 個 REST API 端點 (calculate / deviations / suggest-fit / table)
+- [x] 50 個 pytest 測試 (驗證 ISO 286-1:2010 正確性)
+- [x] Frontend store integration (toleranceCache / deviationCache / DimXpertPanel)
+- [x] DimXpert 特徵辨識管線 (feature_recognition.py → API → 3D Overlay)
+- [ ] TolAnalyst 公差疊加分析
+- [ ] PMI / 3D annotations
 
 ## 階段四：專業模組 (長期規劃)
 

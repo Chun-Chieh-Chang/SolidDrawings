@@ -80,6 +80,9 @@ export type AssemblySlice = {
   setMotionStudy: (study: Partial<MotionStudyState>) => void;
   addMotionDriver: (driver: MotionDriver) => void;
   removeMotionDriver: (id: string) => void;
+  // ── Solve mates ────────────────────────────────────────────────
+  solveMates: () => Promise<boolean>;
+  toggleMateSuppressed: (id: string) => void;
   sectionView: SectionViewState;
   setSectionView: (view: Partial<SectionViewState>) => void;
   // ── Smart Mates ────────────────────────────────────────────
@@ -317,4 +320,26 @@ export const createAssemblyState = (set: any, get: any) => ({
     set((state: any) => ({ motionStudy: { ...state.motionStudy, drivers: [...state.motionStudy.drivers, driver] } })),
   removeMotionDriver: (id: string) =>
     set((state: any) => ({ motionStudy: { ...state.motionStudy, drivers: state.motionStudy.drivers.filter((d: MotionDriver) => d.id !== id) } })),
+  // ── Solve mates ────────────────────────────────────────────────
+  solveMates: async () => {
+    const { components, mates, mateSelection, setComponents, setSolverReport } = get();
+    const svc = new (await import('../kernel/AssemblyService')).AssemblyService();
+    try {
+      const [solved, report] = await svc.solve(components, mates, mateSelection);
+      setComponents(solved);
+      setSolverReport(report);
+      return report?.status === 'SOLVED';
+    } catch {
+      setSolverReport({ status: 'ERROR', residual: -1 });
+      return false;
+    }
+  },
+  toggleMateSuppressed: (id: string) => {
+    get().saveSnapshot();
+    set((state: any) => ({
+      mates: state.mates.map((m: any) =>
+        m.id === id ? { ...m, suppressed: !m.suppressed } : m
+      ),
+    }));
+  },
 });
