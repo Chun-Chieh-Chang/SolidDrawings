@@ -37,10 +37,20 @@ gantt
 - [ ] 引導曲線 UI 實作 (G2)
 - [ ] 掃出方向控制項 (G3)
 
-### 📅 近期目標 (2024 Q2)
+### 📅 近期目標 (2026 Q2)
 - 完成 G1-G3 所有缺口修正
 - 建立 Configuration 管理系統
 - 完善 2D/3D 轉換功能
+
+### 🧹 技術債清理 (已完成)
+- [x] 將 CAD 匯出/匯入函式（STEP、干涉檢測、拓撲分析）抽出至 `export_utils.py`
+- [x] 將 HLR 投影、尋找面、實體轉換、偏移、交集函式抽出至 `projection_utils.py`
+- [x] 將參考幾何（平面、軸、點、座標系）函式抽出至 `reference_geometry.py`
+- [x] 將 mock mesh 生成函式抽出至 `mock_geometry.py`
+- [x] 將鈑金函式及快取字典追加至 `sheet_metal.py`
+- [x] 移除 `geometry_service.py` 中重複的 `import_step_file` / `detect_interference`
+- [x] `geometry_service.py` 從 5939 行降至 3547 行（-2391 行，-40%）
+- [x] 前端 `FeatureManagerPanel.tsx` 全面型別化，消除 `any` 宣告
 
 ## 階段二：組件與工程圖 (規劃中)
 
