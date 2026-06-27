@@ -18,6 +18,7 @@ import { DraftRollout } from './draft-rollout';
 import { ThickenSurfaceRollout } from './thicken-surface-rollout';
 import { DomeRollout } from './dome-rollout';
 import { CombineRollout } from './combine-rollout';
+import { WrapRollout } from './wrap-rollout';
 import { DumbSolidRollout, LoftRollout } from './loft-dumb-rollout';
 import type { PartFeaturePropertyManagerProps } from './types';
 
@@ -91,6 +92,8 @@ export function PartFeaturePropertyManager({
         return <DomeRollout selectedFeature={selectedFeature} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
       case 'COMBINE':
         return <CombineRollout selectedFeature={selectedFeature} features={features} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
+      case 'WRAP':
+        return <WrapRollout selectedFeature={selectedFeature} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
       default:
         return null;
     }

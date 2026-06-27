@@ -1197,6 +1197,143 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
         z = float(params.get('z', 0.0))
         current_feat_shape = BRepPrimAPI_MakeSphere(gp_Pnt(x, y, z), r).Shape()
 
+    elif f_type == 'WRAP':
+        """
+        Wrap a 2D sketch onto a surface.
+        Parameters:
+          - wrap_type: 'EMBOSS' | 'DEBOSS' | 'SCRIBE'
+          - thickness: float (for emboss/deboss)
+          - points: 2D sketch points (same as EXTRUDE)
+          - plane: sketch plane ('FRONT'|'TOP'|'RIGHT'|'FACE'|plane_id)
+          - faceOrigin, faceNormal: (when plane='FACE')
+          - x, y, z: plane origin offset
+        """
+        try:
+            wrap_type = params.get('wrap_type', 'EMBOSS')
+            thickness = float(params.get('thickness', 1.0))
+            points_2d = params.get('points', [])
+            plane_type = params.get('plane', 'FRONT')
+
+            if not points_2d:
+                print("[WARNING] WRAP: no sketch points")
+                return None
+
+            # Normalize to nested loops
+            if points_2d and isinstance(points_2d[0], list) and len(points_2d[0]) > 0 and isinstance(points_2d[0][0], list):
+                loops = points_2d
+            else:
+                loops = [points_2d]
+
+            # Clean points (same as EXTRUDE)
+            cleaned_loops = []
+            for loop in loops:
+                filtered = []
+                for pt in loop:
+                    if not pt: continue
+                    if not filtered:
+                        filtered.append(pt)
+                    else:
+                        prev = filtered[-1]
+                        dist = math.hypot(float(pt[0]) - float(prev[0]), float(pt[1]) - float(prev[1]))
+                        if dist > 1e-4: filtered.append(pt)
+                if len(filtered) > 1:
+                    first, last = filtered[0], filtered[-1]
+                    d = math.hypot(first[0]-last[0], first[1]-last[1])
+                    if d < 1e-4: filtered.pop()
+                if len(filtered) >= 3: cleaned_loops.append(filtered)
+
+            if not cleaned_loops:
+                return None
+
+            # Resolve sketch plane
+            x_origin = float(params.get('x', 0.0))
+            y_origin = float(params.get('y', 0.0))
+            z_origin = float(params.get('z', 0.0))
+
+            if plane_type == 'FRONT':
+                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1), gp_Dir(1, 0, 0))
+            elif plane_type == 'TOP':
+                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 1, 0), gp_Dir(1, 0, 0))
+            elif plane_type == 'RIGHT':
+                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(1, 0, 0), gp_Dir(0, 1, 0))
+            elif plane_type == 'FACE':
+                fo = params.get('faceOrigin', [0,0,0])
+                fn = params.get('faceNormal', [0,0,1])
+                ox, oy, oz = float(fo[0]), float(fo[1]), float(fo[2])
+                nx, ny, nz = float(fn[0]), float(fn[1]), float(fn[2])
+                nlen = math.sqrt(nx*nx+ny*ny+nz*nz)
+                if nlen > 1e-6: nx, ny, nz = nx/nlen, ny/nlen, nz/nlen
+                else: nx, ny, nz = 0, 0, 1
+                if abs(nx) < 1e-5 and abs(ny) < 1e-5:
+                    xx, xy, xz = 1.0, 0.0, 0.0
+                else:
+                    xx, xy, xz = -ny, nx, 0.0
+                    xlen = math.sqrt(xx*xx+xy*xy)
+                    xx, xy = xx/xlen, xy/xlen
+                ax2 = gp_Ax2(gp_Pnt(ox, oy, oz), gp_Dir(nx, ny, nz), gp_Dir(xx, xy, xz))
+            else:
+                ax2 = gp_Ax2(gp_Pnt(x_origin, y_origin, z_origin), gp_Dir(0, 0, 1))
+
+            # Build the sketch face
+            wires = []
+            for loop in cleaned_loops:
+                wire = _build_wire_from_points(loop)
+                wires.append(wire)
+            if not wires:
+                return None
+
+            make_face = BRepBuilderAPI_MakeFace(wires[0])
+            for inner_wire in wires[1:]:
+                make_face.Add(inner_wire)
+            face = make_face.Face()
+
+            # Move face to its plane
+            trsf = gp_Trsf()
+            trsf.SetTransformation(gp_Ax3(ax2), gp_Ax3())
+            face.Move(TopLoc_Location(trsf))
+
+            if wrap_type == 'SCRIBE':
+                # Scribe: return the face as-is (surface wrap only, no volume)
+                current_feat_shape = face
+            else:
+                # EMBOSS or DEBOSS: extrude the face
+                normal_dir = ax2.Direction()
+                mag = thickness
+                # For deboss, extrude inward (negative direction)
+                if wrap_type == 'DEBOSS':
+                    mag = -thickness
+                vec = gp_Vec(normal_dir.X() * mag, normal_dir.Y() * mag, normal_dir.Z() * mag)
+
+                prism_tool = BRepPrimAPI_MakePrism(face, vec)
+                extruded_shape = prism_tool.Shape()
+
+                if parent_shape is not None and not parent_shape.IsNull():
+                    if wrap_type == 'EMBOSS':
+                        # Fuse the extruded shape onto the parent
+                        fuse = BRepAlgoAPI_Fuse(parent_shape, extruded_shape)
+                        fuse.Build()
+                        if fuse.IsDone():
+                            current_feat_shape = fuse.Shape()
+                        else:
+                            current_feat_shape = extruded_shape
+                    else:  # DEBOSS
+                        # Cut the extruded shape from the parent
+                        cut = BRepAlgoAPI_Cut(parent_shape, extruded_shape)
+                        cut.Build()
+                        if cut.IsDone():
+                            current_feat_shape = cut.Shape()
+                        else:
+                            current_feat_shape = extruded_shape
+                else:
+                    # No parent: just the extruded shape
+                    current_feat_shape = extruded_shape
+
+        except Exception as wrap_err:
+            print(f"[ERROR] WRAP failed: {wrap_err}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     elif f_type == 'SWEEP':
         profile_points = params.get('profile_points', [])
         path_points = params.get('path_points', [])

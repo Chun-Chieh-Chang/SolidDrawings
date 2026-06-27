@@ -95,6 +95,12 @@ export const FeaturesTab: React.FC<RibbonTabProps> = ({
         </div>
         <span className="text-[10px] font-bold text-slate-800 leading-none uppercase text-center">Lofted<br/>Cut</span>
       </button>
+      <button onClick={() => { const featId = `feat_${uuidv4()}`; addFeature({ id: featId, type: 'WRAP', name: `Wrap ${features.filter(f => f.type === 'WRAP').length + 1}`, parameters: { wrap_type: 'EMBOSS', thickness: 1.0, plane: 'TOP', points: [] } }); setSelectedId(featId); setActiveTab('FEATURES'); setHint('Wrap: sketch a profile on a plane to wrap onto the surface.'); }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group`} title="Wrap">
+        <div className="w-10 h-10 flex items-center justify-center text-emerald-600 transition-transform group-hover:scale-110">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M3 12c0-4 3-8 9-8s9 4 9 8-3 8-9 8-9-4-9-8z"/><path d="M3 12h18"/><path d="M12 4c-2 0-4 4-4 8s2 8 4 8" opacity="0.5"/></svg>
+        </div>
+        <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Wrap</span>
+      </button>
       <button onClick={() => { if (features.length === 0) { alert('Create a solid body first!'); return; } const featId = `feat_${uuidv4()}`; addFeature({ id: featId, type: 'FILLET', name: `Fillet ${features.filter(f => f.type === 'FILLET').length + 1}`, parameters: { radius: 2, radius2: 2, refs: [] } }); setSelectedId(featId); appliedEdgeFeatureRef.current = null; setActiveTab('FEATURES'); if (skipWizardIfRobotWorking()) { setPendingFeatureCommand('FILLET'); setSelectedTopology(null); setHint('Select an edge to fillet, then adjust parameters.'); } }} className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border ${pendingFeatureCommand === 'FILLET' ? 'border-[#005B9A] bg-white shadow-sm' : 'border-transparent hover:bg-white hover:border-[#A0A0A0]'} active:bg-slate-100 group`} title="Fillet">
         <div className="w-10 h-10 flex items-center justify-center text-[#005B9A] transition-transform group-hover:scale-110">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 2a7 7 0 0 1 7 7"/></svg>

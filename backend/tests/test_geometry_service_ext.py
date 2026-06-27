@@ -302,3 +302,77 @@ class TestGenerateSectionView:
             result = generate_section_view([], {}, pt)
             assert isinstance(result, dict)
             assert "visible_lines" in result
+
+
+# ── Wrap (包覆) ──────────────────────────────────────────────────────────
+
+
+class TestGenerateWrap:
+    """Wrap builds an emboss/deboss/scribe feature via OCC."""
+
+    WRAP_FEATURES = [
+        {"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}},
+    ]
+
+    def test_emboss_returns_shape(self):
+        """Wrap EMBOSS with sketch points should return a valid shape."""
+        from app.services.geometry_service import build_feature_shape_in_isolation
+        # Build a parent box first
+        parent = build_feature_shape_in_isolation('BOX', {"depth": 5.0, "width": 10.0, "height": 10.0})
+        assert parent is not None
+
+        # Wrap a small square on top
+        params = {
+            "wrap_type": "EMBOSS",
+            "thickness": 2.0,
+            "plane": "TOP",
+            "points": [[1,1,5], [3,1,5], [3,3,5], [1,3,5]],
+            "x": 0, "y": 0, "z": 0,
+        }
+        result = build_feature_shape_in_isolation('WRAP', params, parent)
+        assert result is not None
+        assert not result.IsNull()
+
+    def test_deboss_returns_shape(self):
+        """Wrap DEBOSS should return a valid shape (cut from parent)."""
+        from app.services.geometry_service import build_feature_shape_in_isolation
+        parent = build_feature_shape_in_isolation('BOX', {"depth": 5.0, "width": 10.0, "height": 10.0})
+        assert parent is not None
+
+        params = {
+            "wrap_type": "DEBOSS",
+            "thickness": 1.0,
+            "plane": "TOP",
+            "points": [[2,2,5], [4,2,5], [4,4,5], [2,4,5]],
+            "x": 0, "y": 0, "z": 0,
+        }
+        result = build_feature_shape_in_isolation('WRAP', params, parent)
+        assert result is not None
+        assert not result.IsNull()
+
+    def test_scribe_returns_face(self):
+        """Wrap SCRIBE should return a face (no volume)."""
+        from app.services.geometry_service import build_feature_shape_in_isolation
+        from OCC.Core.TopAbs import TopAbs_FACE
+        from OCC.Core.TopExp import TopExp_Explorer
+
+        params = {
+            "wrap_type": "SCRIBE",
+            "thickness": 0,
+            "plane": "FRONT",
+            "points": [[0,0,0], [5,0,0], [5,5,0], [0,5,0]],
+            "x": 0, "y": 0, "z": 0,
+        }
+        result = build_feature_shape_in_isolation('WRAP', params)
+        assert result is not None
+        assert not result.IsNull()
+        # Scribe should produce a face
+        exp = TopExp_Explorer(result, TopAbs_FACE)
+        assert exp.More()
+
+    def test_no_points_returns_none(self):
+        """Wrap without sketch points should return None."""
+        from app.services.geometry_service import build_feature_shape_in_isolation
+        params = {"wrap_type": "EMBOSS", "thickness": 1.0, "points": []}
+        result = build_feature_shape_in_isolation('WRAP', params)
+        assert result is None
