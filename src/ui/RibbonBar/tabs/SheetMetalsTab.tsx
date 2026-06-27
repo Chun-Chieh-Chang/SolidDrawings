@@ -98,6 +98,20 @@ export const SheetMetalsTab: React.FC<RibbonTabProps> = ({
         </div>
         <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Cutout</span>
       </button>
+      <div className="w-[1px] h-10 bg-border/50 mx-1" />
+      {/* Venting */}
+      <button onClick={() => { if (handleCreateFormingTool) { handleCreateFormingTool({ toolType: 'VENT_CIRCULAR', width: 50, height: 30, depth: 3, radius: 3, angle: 0, thickness: 1.0, direction: 'OUTSIDE' }); } else { setHint('Select a face, then apply Vent (circular holes) forming tool.'); } setActiveTab('SHEET_METALS'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Vent - Circular Holes">
+        <div className="w-10 h-10 flex items-center justify-center text-teal-600 transition-transform group-hover:scale-110">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><circle cx="8" cy="10" r="2"/><circle cx="16" cy="10" r="2"/><circle cx="8" cy="16" r="2"/><circle cx="16" cy="16" r="2"/></svg>
+        </div>
+        <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Vent<br/>Holes</span>
+      </button>
+      <button onClick={() => { if (handleCreateFormingTool) { handleCreateFormingTool({ toolType: 'VENT_RECTANGULAR', width: 50, height: 30, depth: 3, radius: 3, angle: 0, thickness: 1.0, direction: 'OUTSIDE' }); } else { setHint('Select a face, then apply Vent (rectangular slots) forming tool.'); } setActiveTab('SHEET_METALS'); }} className="flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 group" title="Vent - Rectangular Slots">
+        <div className="w-10 h-10 flex items-center justify-center text-teal-600 transition-transform group-hover:scale-110">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="6" y1="16" x2="18" y2="16"/></svg>
+        </div>
+        <span className="text-[10px] font-bold text-slate-800 leading-none uppercase">Vent<br/>Slots</span>
+      </button>
     </div>
   );
 };
