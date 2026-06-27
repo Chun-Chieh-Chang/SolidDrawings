@@ -287,6 +287,12 @@ export type CombinedState = {
   setSmartMateActive: (active: boolean) => void;
   smartMateSource: any;
   setSmartMateSource: (src: any) => void;
+  smartMateDragActive: boolean;
+  setSmartMateDragActive: (active: boolean) => void;
+  smartMateGhostPosition: [number, number, number] | null;
+  setSmartMateGhostPosition: (pos: [number, number, number] | null) => void;
+  smartMateHoverTarget: any;
+  setSmartMateHoverTarget: (target: any) => void;
   explodedView: import('./types').ExplodedViewState;
   setExplodedView: (view: Partial<import('./types').ExplodedViewState>) => void;
   setExplosionFactor: (factor: number) => void;

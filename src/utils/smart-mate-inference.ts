@@ -35,6 +35,7 @@ function faceCurvature(sig: FaceSignature | EdgeSignature | undefined): 'PLANE' 
   if (!f) return 'UNKNOWN';
   if (f.surface_type === 'PLANE' || (f.curvature === 'ZERO' && f.surface_type !== 'CYLINDER')) return 'PLANE';
   if (f.surface_type === 'CYLINDER' || f.curvature === 'CONSTANT') return 'CYLINDRICAL';
+  if (f.surface_type === 'CONE' || f.curvature === 'CONE') return 'CONICAL';
   if (f.curvature === 'SPHERE') return 'SPHERICAL';
   return 'UNKNOWN';
 }
@@ -46,6 +47,7 @@ function topoTypeLabel(t: SelectedTopology): string {
     const curv = faceCurvature(t.signature);
     if (curv === 'PLANE') return 'PLANE';
     if (curv === 'CYLINDRICAL') return 'CYLINDRICAL_FACE';
+    if (curv === 'CONICAL') return 'CONICAL';
     return 'FACE';
   }
   return 'UNKNOWN';
@@ -163,6 +165,21 @@ export function inferSmartMate(
   // ── SPHERICAL + PLANE → Tangent ────────────────────────
   if ((sLabel === 'SPHERICAL' && tLabel === 'PLANE') || (sLabel === 'PLANE' && tLabel === 'SPHERICAL')) {
     return { mateType: 'TANGENT', alignment: 'ALIGNED', confidence: 0.8, label: 'Tangent (sphere to plane)' };
+  }
+
+  // ── CONICAL + CONICAL → Concentric ─────────────────────
+  if (sLabel === 'CONICAL' && tLabel === 'CONICAL') {
+    return { mateType: 'CONCENTRIC', alignment: 'ALIGNED', confidence: 0.75, label: 'Concentric (conical)' };
+  }
+
+  // ── CONICAL + PLANE → Coincident ───────────────────────
+  if ((sLabel === 'CONICAL' && tLabel === 'PLANE') || (sLabel === 'PLANE' && tLabel === 'CONICAL')) {
+    return { mateType: 'COINCIDENT', alignment: 'ALIGNED', confidence: 0.6, label: 'Coincident (cone to plane)' };
+  }
+
+  // ── CONICAL + CYLINDRICAL → Concentric ─────────────────
+  if ((sLabel === 'CONICAL' && tLabel === 'CYLINDRICAL_FACE') || (sLabel === 'CYLINDRICAL_FACE' && tLabel === 'CONICAL')) {
+    return { mateType: 'CONCENTRIC', alignment: 'ALIGNED', confidence: 0.7, label: 'Concentric (cone to cylinder)' };
   }
 
   // ── Fallback: Coincident with low confidence ────────────

@@ -87,6 +87,12 @@ export type AssemblySlice = {
   setSmartMateActive: (active: boolean) => void;
   smartMateSource: SelectedTopology | null;
   setSmartMateSource: (src: SelectedTopology | null) => void;
+  smartMateDragActive: boolean;
+  setSmartMateDragActive: (active: boolean) => void;
+  smartMateGhostPosition: [number, number, number] | null;
+  setSmartMateGhostPosition: (pos: [number, number, number] | null) => void;
+  smartMateHoverTarget: SelectedTopology | null;
+  setSmartMateHoverTarget: (target: SelectedTopology | null) => void;
   // ── Sub-assembly CRUD ────────────────────────────────────────
   addSubAssembly: (parentId: string, name: string) => void;
   addToSubAssembly: (subAssemblyId: string, component: CADComponent) => void;
@@ -186,6 +192,12 @@ export const createAssemblyState = (set: any, get: any) => ({
   setSmartMateActive: (smartMateActive: boolean) => set({ smartMateActive }),
   smartMateSource: null as SelectedTopology | null,
   setSmartMateSource: (smartMateSource: SelectedTopology | null) => set({ smartMateSource }),
+  smartMateDragActive: false,
+  setSmartMateDragActive: (smartMateDragActive: boolean) => set({ smartMateDragActive }),
+  smartMateGhostPosition: null as [number, number, number] | null,
+  setSmartMateGhostPosition: (smartMateGhostPosition: [number, number, number] | null) => set({ smartMateGhostPosition }),
+  smartMateHoverTarget: null as SelectedTopology | null,
+  setSmartMateHoverTarget: (smartMateHoverTarget: SelectedTopology | null) => set({ smartMateHoverTarget }),
 
   // ── Sub-assembly CRUD ────────────────────────────────────────
   addSubAssembly: (parentId: string, name: string) => {
