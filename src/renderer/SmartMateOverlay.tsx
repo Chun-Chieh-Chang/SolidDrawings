@@ -126,9 +126,10 @@ export default function SmartMateOverlay() {
   }, []);
 
   // ── Create mate from source and target ────────────────────────
+  type SelectorNonNull = NonNullable<typeof topologySelector>;
   const createMate = useCallback((
     source: NonNullable<ReturnType<typeof useCadStore.getState>['smartMateSource']>,
-    target: NonNullable<ReturnType<typeof topologySelector.selectAtPosition>>,
+    target: NonNullable<ReturnType<SelectorNonNull['selectAtPosition']>>,
   ) => {
     const result = inferSmartMate(source, target);
     if (result && result.confidence >= 0.3) {
