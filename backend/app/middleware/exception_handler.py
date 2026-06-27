@@ -10,7 +10,9 @@ import traceback
 from typing import Any, Dict
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
@@ -126,6 +128,21 @@ def register_exception_handlers(app: FastAPI, include_details: bool = False):
     app.add_middleware(ExceptionHandlerMiddleware, include_details=include_details)
     
     # Register route-level handlers for specific exception types
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_error_handler(request: Request, exc: RequestValidationError):
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "type": "RequestValidationError",
+                    "message": "Request validation failed",
+                    "details": exc.errors(),
+                    "path": request.url.path,
+                    "method": request.method,
+                }
+            },
+        )
+
     @app.exception_handler(ValidationError)
     async def validation_error_handler(request: Request, exc: ValidationError):
         return JSONResponse(
