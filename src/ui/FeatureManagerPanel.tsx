@@ -110,13 +110,32 @@ function SortableRollbackBar({ id, rollbackIndex, setRollbackIndex }: { id: stri
   );
 }
 
+interface SortableFeatureItemProps {
+  id: string;
+  feature: CADFeature;
+  fIdx: number;
+  isRolledBack: boolean;
+  relState: TreeRelation | null;
+  editingFeatureId: string | null;
+  selectedId: string | null;
+  selectedSubNodeType: string | null | undefined;
+  setSelectedId: (id: string | null) => void;
+  setSelectedSubNodeType: (t: 'SKETCH' | 'FEATURE' | null) => void;
+  onEditFeatureSketch: (feat: CADFeature) => void;
+  onRebuild: () => void;
+  features: CADFeature[];
+  setHoveredTreeId: (id: string | null) => void;
+  visibleSketches?: string[];
+  toggleSketchVisibility?: (id: string) => void;
+}
+
 function SortableFeatureItem({ 
   id, feature, fIdx, isRolledBack, relState, 
   editingFeatureId, selectedId, selectedSubNodeType, 
   setSelectedId, setSelectedSubNodeType, onEditFeatureSketch, 
   onRebuild, features, setHoveredTreeId,
   visibleSketches, toggleSketchVisibility
-}: any) {
+}: SortableFeatureItemProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   const style = {
@@ -226,7 +245,7 @@ function SortableFeatureItem({
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                toggleSketchVisibility(feature.id);
+                toggleSketchVisibility?.(feature.id);
               }}
               className={`p-0.5 rounded transition-all hover:bg-slate-200 ${
                 visibleSketches?.includes(feature.id) ? 'text-[#005B9A]' : 'text-slate-300'
@@ -246,13 +265,38 @@ function SortableFeatureItem({
   );
 }
 
+type TreeDataItem =
+  | { id: string; type: 'ROLLBACK' }
+  | { id: string; type?: undefined; feature: CADFeature; fIdx: number; isRolledBack: boolean; relState: TreeRelation | null };
+
+interface FeatureManagerPanelProps {
+  features: CADFeature[];
+  rollbackIndex: number | null;
+  setRollbackIndex: (i: number | null) => void;
+  activePlane?: string | null;
+  setActivePlane: (p: string) => void;
+  selectedId: string | null;
+  setSelectedId: (id: string | null) => void;
+  selectedSubNodeType?: string | null;
+  setSelectedSubNodeType: (t: 'SKETCH' | 'FEATURE' | null) => void;
+  editingFeatureId: string | null;
+  removeFeature: (id: string) => void;
+  removeFeatures: (ids: string[]) => void;
+  onRebuild: () => void;
+  onEditFeatureSketch: (feat: CADFeature) => void;
+  onStartPlaneSketch: (plane: 'FRONT' | 'TOP' | 'RIGHT') => void;
+  onPlaneContextMenu: (e: React.MouseEvent, plane: string) => void;
+  visibleSketches?: string[];
+  toggleSketchVisibility?: (id: string) => void;
+}
+
 export function FeatureManagerPanel({ 
   features, rollbackIndex, setRollbackIndex, activePlane, setActivePlane,
   selectedId, setSelectedId, selectedSubNodeType, setSelectedSubNodeType,
   editingFeatureId, onRebuild, onEditFeatureSketch,
   onStartPlaneSketch, onPlaneContextMenu,
   visibleSketches, toggleSketchVisibility
-}: any) {
+}: FeatureManagerPanelProps) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line
@@ -270,22 +314,22 @@ export function FeatureManagerPanel({
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
-      const oldIndex = features.findIndex((f: any) => f.id === active.id);
-      const newIndex = features.findIndex((f: any) => f.id === over.id);
+      const oldIndex = features.findIndex((f: CADFeature) => f.id === active.id);
+      const newIndex = features.findIndex((f: CADFeature) => f.id === over.id);
       reorderFeatures(oldIndex, newIndex);
       setTimeout(onRebuild, 50);
     }
   };
 
   const { parents, children } = useMemo(() => {
-    const feat = features.find((f: any) => f.id === selectedId);
+    const feat = features.find((f: CADFeature) => f.id === selectedId);
     if (!feat) return { parents: [], children: [] };
     return getParentsAndChildren(feat, features);
   }, [selectedId, features]);
 
-  const treeData = useMemo(() => {
-    const data: any[] = [];
-    features.forEach((f: any, idx: number) => {
+  const treeData = useMemo((): TreeDataItem[] => {
+    const data: TreeDataItem[] = [];
+    features.forEach((f: CADFeature, idx: number) => {
       let rel: TreeRelation | null = null;
       if (parents.some(p => p.id === f.id)) rel = 'PARENT';
       if (children.some(c => c.id === f.id)) rel = 'CHILD';
@@ -348,7 +392,7 @@ export function FeatureManagerPanel({
             collisionDetection={closestCenter} 
             onDragEnd={handleDragEnd}
           >
-            <SortableContext items={features.map((f: any) => f.id)} strategy={verticalListSortingStrategy}>
+            <SortableContext items={features.map((f: CADFeature) => f.id)} strategy={verticalListSortingStrategy}>
               {treeData.map((item) => (
                 item.type === 'ROLLBACK' ? (
                   <SortableRollbackBar 
