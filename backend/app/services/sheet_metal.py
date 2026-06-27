@@ -3,6 +3,7 @@ Sheet Metal module — forming tool geometry generation.
 Extracted from geometry_service.py for modularity.
 """
 
+import math
 import uuid
 
 # Global flags
@@ -14,10 +15,12 @@ _FORMING_TOOL_CACHE_MAX = 64
 
 # Try loading OpenCASCADE
 try:
-    from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Trsf
-    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeSphere
+    from OCC.Core.gp import gp_Pnt, gp_Vec, gp_Trsf, gp_Dir, gp_Ax1, gp_Ax2
+    from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism, BRepPrimAPI_MakeCylinder
     from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Cut, BRepAlgoAPI_Fuse
-    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform
+    from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_Transform, BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
+    from OCC.Core.GC import GC_MakeArcOfCircle
+    from OCC.Core.TopoDS import TopoDS_Shape
     HAS_OCC = True
 except ImportError:
     HAS_OCC = False
@@ -276,3 +279,381 @@ def generate_forming_tool(
         import traceback
         traceback.print_exc()
         raise RuntimeError(f"Forming tool generation ({tool_type}) failed: {e}")
+
+
+# ── Edge Flange caches ────────────────────────────────────────────────────────
+_EDGE_FLANGE_SHAPE_CACHE: dict[str, object] = {}
+_EDGE_FLANGE_CACHE_MAX = 64
+_MITER_FLANGE_SHAPE_CACHE: dict[str, object] = {}
+_MITER_FLANGE_CACHE_MAX = 64
+_HEM_SHAPE_CACHE: dict[str, object] = {}
+_HEM_CACHE_MAX = 64
+_FLAT_PATTERN_SHAPE_CACHE: dict[str, object] = {}
+_FLAT_PATTERN_CACHE_MAX = 16
+_EDGE_DIRECTIONS = {'+X': 0, '-X': 1, '+Y': 2, '-Y': 3}
+
+
+def _bend_allowance(angle_deg: float, radius: float, thickness: float, k_factor: float = 0.44) -> float:
+    """Bend allowance per the standard K-factor formula."""
+    return (math.pi / 180.0) * angle_deg * (radius + k_factor * thickness)
+
+
+def _infer_flange_edge_dir(params: dict) -> str:
+    """Heuristic: guess which edge (+X/-X/+Y/-Y) a flange is attached to."""
+    edge_dir = params.get('edge_dir', '')
+    if edge_dir in _EDGE_DIRECTIONS:
+        return edge_dir
+    return '+Y'
+
+
+def generate_edge_flange(
+    base_feature_id: str,
+    edge_ref: str,
+    flange_height: float,
+    bend_radius: float,
+    bend_angle: float,
+    thickness: float,
+    k_factor: float = 0.5,
+    direction: str = 'OUTSIDE',
+    relief_type: str = 'RECTANGULAR',
+) -> str:
+    """Generate a sheet metal edge flange feature using OpenCASCADE."""
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        angle_rad = math.radians(bend_angle)
+        flange_dir = gp_Dir(
+            math.sin(angle_rad),
+            0.0,
+            math.cos(angle_rad) if direction == 'OUTSIDE' else -math.cos(angle_rad)
+        )
+
+        base_len = bend_radius + thickness
+        flange_len = flange_height
+
+        profile_wire_maker = BRepBuilderAPI_MakeWire()
+
+        p0 = gp_Pnt(0.0, 0.0, 0.0)
+        p1 = gp_Pnt(base_len, 0.0, 0.0)
+        edge1 = BRepBuilderAPI_MakeEdge(p0, p1).Edge()
+        profile_wire_maker.Add(edge1)
+
+        arc_center = gp_Pnt(base_len, 0.0, 0.0)
+        arc_start = gp_Pnt(base_len + bend_radius, 0.0, 0.0)
+        arc_end = gp_Pnt(base_len, 0.0, bend_radius)
+        arc = GC_MakeArcOfCircle(arc_start, arc_center, arc_end)
+        if arc.IsDone():
+            edge2 = BRepBuilderAPI_MakeEdge(arc.Value()).Edge()
+            profile_wire_maker.Add(edge2)
+        else:
+            p_mid = gp_Pnt(base_len + bend_radius * 0.707, 0.0, bend_radius * 0.707)
+            edge2 = BRepBuilderAPI_MakeEdge(p1, p_mid).Edge()
+            profile_wire_maker.Add(edge2)
+            edge2b = BRepBuilderAPI_MakeEdge(p_mid, arc_end).Edge()
+            profile_wire_maker.Add(edge2b)
+
+        p3 = gp_Pnt(base_len, 0.0, bend_radius + flange_len)
+        edge3 = BRepBuilderAPI_MakeEdge(arc_end, p3).Edge()
+        profile_wire_maker.Add(edge3)
+
+        edge4 = BRepBuilderAPI_MakeEdge(p3, p0).Edge()
+        profile_wire_maker.Add(edge4)
+
+        profile_wire = profile_wire_maker.Wire()
+        profile_face = BRepBuilderAPI_MakeFace(profile_wire).Face()
+
+        flange_width = max(thickness * 4.0, 10.0)
+        extrude_vec = gp_Vec(0.0, flange_width, 0.0)
+        flange_shape = BRepPrimAPI_MakePrism(profile_face, extrude_vec).Shape()
+
+        shape_hash = str(uuid.uuid4())
+        _EDGE_FLANGE_SHAPE_CACHE[shape_hash] = flange_shape
+        if len(_EDGE_FLANGE_SHAPE_CACHE) > _EDGE_FLANGE_CACHE_MAX:
+            oldest = next(iter(_EDGE_FLANGE_SHAPE_CACHE))
+            del _EDGE_FLANGE_SHAPE_CACHE[oldest]
+
+        return shape_hash
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Edge flange generation failed: {e}")
+
+
+def generate_miter_flange(
+    edge_refs: list[str],
+    flange_height: float,
+    bend_radius: float,
+    bend_angle: float,
+    thickness: float,
+    k_factor: float = 0.5,
+    direction: str = 'OUTSIDE',
+    corner_angle: float = 90.0,
+) -> str:
+    """Generate a miter flange with automatically mitered corners."""
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        angle_rad = math.radians(bend_angle)
+        corner_rad = math.radians(corner_angle)
+
+        base_len = bend_radius + thickness
+        flange_len = flange_height
+
+        def _make_flange_segment() -> TopoDS_Shape:
+            w = BRepBuilderAPI_MakeWire()
+
+            p0 = gp_Pnt(0.0, 0.0, 0.0)
+            p1 = gp_Pnt(base_len, 0.0, 0.0)
+            w.Add(BRepBuilderAPI_MakeEdge(p0, p1).Edge())
+
+            arc_center = gp_Pnt(base_len, 0.0, 0.0)
+            arc_start = gp_Pnt(base_len + bend_radius, 0.0, 0.0)
+            arc_end = gp_Pnt(base_len, 0.0, bend_radius)
+            arc = GC_MakeArcOfCircle(arc_start, arc_center, arc_end)
+            if arc.IsDone():
+                w.Add(BRepBuilderAPI_MakeEdge(arc.Value()).Edge())
+            else:
+                pm = gp_Pnt(base_len + bend_radius * 0.707, 0.0, bend_radius * 0.707)
+                w.Add(BRepBuilderAPI_MakeEdge(p1, pm).Edge())
+                w.Add(BRepBuilderAPI_MakeEdge(pm, arc_end).Edge())
+
+            p3 = gp_Pnt(base_len, 0.0, bend_radius + flange_len)
+            w.Add(BRepBuilderAPI_MakeEdge(arc_end, p3).Edge())
+            w.Add(BRepBuilderAPI_MakeEdge(p3, p0).Edge())
+
+            face = BRepBuilderAPI_MakeFace(w.Wire()).Face()
+            fw = max(thickness * 4.0, 10.0)
+            return BRepPrimAPI_MakePrism(face, gp_Vec(0.0, fw, 0.0)).Shape()
+
+        seg1 = _make_flange_segment()
+
+        trsf = gp_Trsf()
+        trsf.SetRotation(
+            gp_Ax1(gp_Pnt(0.0, 0.0, 0.0), gp_Dir(0.0, 0.0, 1.0)),
+            -corner_rad
+        )
+        seg2 = BRepBuilderAPI_Transform(seg1, trsf).Shape()
+
+        fuse = BRepAlgoAPI_Fuse(seg1, seg2)
+        fuse.Build()
+        if fuse.IsDone():
+            miter_shape = fuse.Shape()
+        else:
+            miter_shape = seg1
+
+        shape_hash = str(uuid.uuid4())
+        _MITER_FLANGE_SHAPE_CACHE[shape_hash] = miter_shape
+        if len(_MITER_FLANGE_SHAPE_CACHE) > _MITER_FLANGE_CACHE_MAX:
+            oldest = next(iter(_MITER_FLANGE_SHAPE_CACHE))
+            del _MITER_FLANGE_SHAPE_CACHE[oldest]
+
+        return shape_hash
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Miter flange generation failed: {e}")
+
+
+def generate_hem(
+    edge_ref: str,
+    hem_length: float,
+    hem_radius: float,
+    thickness: float,
+    hem_type: str = 'CLOSED',
+    gap: float = 0.0,
+) -> str:
+    """Generate a sheet metal hem — a folded edge that curls back on itself."""
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        R = max(hem_radius, 0.1)
+        flat_len = max(hem_length, R * 2.5)
+
+        if hem_type == 'CLOSED':
+            gap_val = 0.0
+        elif hem_type == 'TEARDROP':
+            gap_val = R * 0.6
+        else:
+            gap_val = max(gap, 0.2)
+
+        w = BRepBuilderAPI_MakeWire()
+
+        p0 = gp_Pnt(0.0, 0.0, 0.0)
+        p1 = gp_Pnt(flat_len, 0.0, 0.0)
+        w.Add(BRepBuilderAPI_MakeEdge(p0, p1).Edge())
+
+        arc_start = p1
+        arc_mid = gp_Pnt(flat_len - R, 0.0, R)
+        arc_end = gp_Pnt(flat_len - 2.0 * R, 0.0, 2.0 * R)
+        arc = GC_MakeArcOfCircle(arc_start, arc_mid, arc_end)
+        if arc.IsDone():
+            w.Add(BRepBuilderAPI_MakeEdge(arc.Value()).Edge())
+        else:
+            w.Add(BRepBuilderAPI_MakeEdge(p1, arc_mid).Edge())
+            w.Add(BRepBuilderAPI_MakeEdge(arc_mid, arc_end).Edge())
+
+        p3 = gp_Pnt(gap_val, 0.0, 2.0 * R)
+        w.Add(BRepBuilderAPI_MakeEdge(arc_end, p3).Edge())
+        w.Add(BRepBuilderAPI_MakeEdge(p3, p0).Edge())
+
+        profile_face = BRepBuilderAPI_MakeFace(w.Wire()).Face()
+        ext_width = max(thickness * 4.0, 10.0)
+        hem_shape = BRepPrimAPI_MakePrism(profile_face, gp_Vec(0.0, ext_width, 0.0)).Shape()
+
+        shape_hash = str(uuid.uuid4())
+        _HEM_SHAPE_CACHE[shape_hash] = hem_shape
+        if len(_HEM_SHAPE_CACHE) > _HEM_CACHE_MAX:
+            oldest = next(iter(_HEM_SHAPE_CACHE))
+            del _HEM_SHAPE_CACHE[oldest]
+
+        return shape_hash
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Hem generation failed: {e}")
+
+
+def generate_flat_pattern(
+    features: list,
+    k_factor: float = 0.44,
+    thickness: float = 1.0,
+) -> str:
+    """
+    Generate a flat/unfolded 3D shape from a list of sheet metal features.
+    Returns a hash key for cache lookup during rebuild.
+    """
+    if not HAS_OCC:
+        return str(uuid.uuid4())
+
+    try:
+        base_w = 0.0
+        base_d = 0.0
+        for f in features:
+            f_type = f.type if hasattr(f, 'type') else f.get('type', '')
+            if f_type in ('BOX', 'EXTRUDE'):
+                fp = f.parameters if hasattr(f, 'parameters') else f.get('parameters', {})
+                base_w = float(fp.get('width', fp.get('w', 20.0)))
+                base_d = float(fp.get('depth', fp.get('d', 20.0)))
+                if f_type == 'EXTRUDE':
+                    s = fp.get('shape', 'RECTANGLE')
+                    if s in ('CIRCLE', 'ELLIPSE'):
+                        r = float(fp.get('radius', 10.0))
+                        base_w = base_d = r * 2.0
+                break
+
+        if base_w < 1e-6 or base_d < 1e-6:
+            base_w = 20.0
+            base_d = 20.0
+
+        ext = {'+X': 0.0, '-X': 0.0, '+Y': 0.0, '-Y': 0.0}
+        bend_lines = []
+
+        for f in features:
+            f_type = f.type if hasattr(f, 'type') else f.get('type', '')
+            fp = f.parameters if hasattr(f, 'parameters') else f.get('parameters', {})
+            t = float(fp.get('thickness', thickness))
+            br = float(fp.get('bend_radius', 0.5))
+            ba = float(fp.get('bend_angle', 90.0))
+            kf = float(fp.get('k_factor', k_factor))
+
+            if fp.get('_unfold') is False:
+                continue
+
+            if f_type == 'EDGE_FLANGE':
+                fh = float(fp.get('flange_height', 10.0))
+                unfold_len = fh - br - t + _bend_allowance(ba, br, t, kf)
+                edge_dir = _infer_flange_edge_dir(fp)
+                ext[edge_dir] = max(ext[edge_dir], unfold_len)
+                if edge_dir == '+Y':
+                    bend_lines.append((-base_w/2 + ext['-X'], base_d/2, base_w/2 + ext['+X'], base_d/2))
+                elif edge_dir == '-Y':
+                    bend_lines.append((-base_w/2 + ext['-X'], -base_d/2, base_w/2 + ext['+X'], -base_d/2))
+                elif edge_dir == '+X':
+                    bend_lines.append((base_w/2, -base_d/2 + ext['-Y'], base_w/2, base_d/2 + ext['+Y']))
+                elif edge_dir == '-X':
+                    bend_lines.append((-base_w/2, -base_d/2 + ext['-Y'], -base_w/2, base_d/2 + ext['+Y']))
+
+            elif f_type == 'MITER_FLANGE':
+                fh = float(fp.get('flange_height', 10.0))
+                unfold_len = fh - br - t + _bend_allowance(ba, br, t, kf)
+                edge_dir = _infer_flange_edge_dir(fp)
+                ext[edge_dir] = max(ext[edge_dir], unfold_len)
+
+            elif f_type == 'HEM':
+                hl = float(fp.get('hem_length', 5.0))
+                unfold_len = hl + _bend_allowance(180.0, br, t, kf)
+                edge_dir = _infer_flange_edge_dir(fp)
+                ext[edge_dir] = max(ext[edge_dir], unfold_len)
+
+        total_w = base_w + ext['+X'] + ext['-X']
+        total_d = base_d + ext['+Y'] + ext['-Y']
+
+        total_w = max(total_w, 1.0)
+        total_d = max(total_d, 1.0)
+
+        half_w = total_w / 2.0
+        half_d = total_d / 2.0
+
+        plate_thickness = 0.1
+
+        flat_face = BRepBuilderAPI_MakeFace(
+            BRepBuilderAPI_MakeWire(
+                BRepBuilderAPI_MakeEdge(gp_Pnt(-half_w, -half_d, 0.0),
+                                        gp_Pnt( half_w, -half_d, 0.0)).Edge(),
+                BRepBuilderAPI_MakeEdge(gp_Pnt( half_w, -half_d, 0.0),
+                                        gp_Pnt( half_w,  half_d, 0.0)).Edge(),
+                BRepBuilderAPI_MakeEdge(gp_Pnt( half_w,  half_d, 0.0),
+                                        gp_Pnt(-half_w,  half_d, 0.0)).Edge(),
+                BRepBuilderAPI_MakeEdge(gp_Pnt(-half_w,  half_d, 0.0),
+                                        gp_Pnt(-half_w, -half_d, 0.0)).Edge(),
+            ).Wire()
+        ).Face()
+
+        flat_shape = BRepPrimAPI_MakePrism(
+            flat_face, gp_Vec(0.0, 0.0, plate_thickness)
+        ).Shape()
+
+        if not flat_shape or flat_shape.IsNull():
+            return str(uuid.uuid4())
+
+        shape_hash = str(uuid.uuid4())
+        _FLAT_PATTERN_SHAPE_CACHE[shape_hash] = flat_shape
+        if len(_FLAT_PATTERN_SHAPE_CACHE) > _FLAT_PATTERN_CACHE_MAX:
+            oldest = next(iter(_FLAT_PATTERN_SHAPE_CACHE))
+            del _FLAT_PATTERN_SHAPE_CACHE[oldest]
+
+        return shape_hash
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise RuntimeError(f"Flat pattern generation failed: {e}")
+
+
+def generate_unfold(features, bend_ids=None, k_factor=0.44, thickness=1.0):
+    """Unfold (selectively flatten) sheet metal bends."""
+    modified_features = list(features)
+    for f in modified_features:
+        if isinstance(f, dict) and f.get('type') in ('EDGE_FLANGE', 'MITER_FLANGE', 'HEM'):
+            params = f.get('parameters', {})
+            if bend_ids is None or f.get('id') in bend_ids:
+                params['_unfold'] = True
+            else:
+                params['_unfold'] = False
+
+    return generate_flat_pattern(modified_features, k_factor, thickness)
+
+
+def generate_fold(features, bend_ids, k_factor=0.44, thickness=1.0):
+    """Re-fold previously unfolded bends."""
+    modified_features = list(features)
+    for f in modified_features:
+        if isinstance(f, dict) and f.get('type') in ('EDGE_FLANGE', 'MITER_FLANGE', 'HEM'):
+            params = f.get('parameters', {})
+            if f.get('id') in bend_ids:
+                params['_unfold'] = False
+
+    return generate_flat_pattern(modified_features, k_factor, thickness)
