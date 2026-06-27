@@ -1,8 +1,8 @@
 # 3D-Builder × SOLIDWORKS 差距分析報告
 
-> **生成日期**: 2026-06-26 (v2.2 — 更新)
+> **生成日期**: 2026-06-27 (v2.3 — 更新)
 > **基準**: SOLIDWORKS 2010 Chinese Edition (依 PLAN.md)
-> **上次更新重點**: RibbonController 拆分、Sub-assemblies、3D Sketch、BOM 多階層、Surface Cut 修正
+> **上次更新重點**: Smart Mates Alt+Drag、Conical 推論、Python 3.12+OCC 強制、12 個跳過測試改寫
 
 ---
 
@@ -15,7 +15,7 @@
 | 特徵引擎 (3D Part) | 85% | +5% (Rib/Split/Combine 實裝) | 🟡 小幅差距 |
 | 鈑金 (Sheet Metal) | 90% | +5% | 🟡 小幅差距 |
 | 曲面 (Surfacing) | 55% | +5% (Boundary/Trim Surface 實裝) | 🟡 部分完成 |
-| 組件 (Assembly) | 50% | **+10%** (Sub-assemblies CRUD) | 🟡 基礎架構 |
+| 組件 (Assembly) | 60% | **+10%** (Smart Mates Alt+Drag) | 🟡 持續成長 |
 | 工程圖 (Drawing) | 72% | **+7%** (BOM 多階層樹狀表) | 🟡 中等差距 |
 | 公差 (Tolerancing) | 0% | — | ⚪ 未開始 |
 | 焊接 (Weldments) | 0% | — | ⚪ 未開始 |
@@ -23,7 +23,7 @@
 | 檔案互通性 | 60% | — | 🟡 基礎 STEP/STL |
 | 技術債清理 | — | **顯著改善** (RibbonController 拆分 ~1489→~197 行) | 🟢 持續改善 |
 
-**總體成熟度**: ~73% — 功能性持續成長，P0/P1 已全數關閉，P2 多項已完成 (3D Sketch, BOM 多階層, Sub-assemblies)
+**總體成熟度**: ~76% — 功能性持續成長，P0/P1 已全數關閉，P2 多項已完成 (Smart Mates, 3D Sketch, BOM 多階層, Sub-assemblies)
 
 ---
 
@@ -191,7 +191,7 @@
 
 ---
 
-## 6. 組件 (Assembly) — 🟡 50%
+## 6. 組件 (Assembly) — 🟡 60%
 
 ### 已實作 ✅
 - 組件樹 (AssemblyTreePanel)
@@ -204,11 +204,11 @@
 - **Symmetric Mate** — **新實裝** (2026-06-25)
 - **Width Mate** — **新實裝** (2026-06-25)
 - **Sub-assemblies CRUD** — 子組件新增/加入/移除/變換 (addSubAssembly, addToSubAssembly, removeFromSubAssembly, updateSubComponentTransform + 遞迴輔助函式)
+- **Smart Mates** — **新實裝** (2026-06-27): Alt+Drag 快速鍵 + 推理引擎 (含 Conical 面) + Ghost 環預覽 + 兩鍵工作流
 
 ### 缺失 ❌
 | 功能 | 優先級 |
 |:---|---:|
-| **Smart Mates** (智慧結合) | Medium |
 | **Assembly Features** (組件特徵) | Medium |
 | **Pattern Component** (元件陣列) | Medium |
 | **Mirror Component** (鏡射元件) | Low |
@@ -285,7 +285,7 @@
 ### 測試覆蓋率 — 🟡 35%
 | 項目 | 數量 | 說明 |
 |:---|---:|:---|
-| Backend pytest | **104 passed** | 測試 API、特徵函數、繪圖端點、Surface Cut |
+| Backend pytest | **105 passed** | 12 個先前 skipped 測試改寫為真實 OCC 測試，全部通過 |
 | Frontend Jest tests | **89 passed, 6 suites** | 含 utility 測試 + 元件渲染測試 + FeatureTypes |
 | E2E tests | 0 (骨架) | playwright 設定就緒，尚無完整 E2E 測試 |
 | **測試涵蓋模組** | | geometry_service, features, surfacing, sheet_metal, drawing API, split/combine, section_view, components |
@@ -391,6 +391,9 @@
 | **Sub-assemblies CRUD** (遞迴子組件管理) | 2026-06-26 | 新功能 |
 | **3D Sketch 模式** (state/tool/UI 平面選擇器) | 2026-06-26 | 新功能 |
 | **BOM 多階層樹狀表** (遞迴 BomEntry + BomTable) | 2026-06-26 | 新功能 |
+| **Python 3.12+OCC 強制** (abandon Python 3.14) | 2026-06-27 | 維護 |
+| **12 個跳過測試改寫** (mock→real OCC) | 2026-06-27 | 測試 |
+| **Smart Mates Alt+Drag** (推理引擎 + ghost 預覽 + Conical 面) | 2026-06-27 | 新功能 |
 
 ---
 
@@ -398,7 +401,7 @@
 
 **UI/UX 相容性 (SCS)** 維持 100%，基礎互動已完全對齊 SOLIDWORKS 2010。
 
-**功能成熟度**約 **73%** — 較上期 +3%。P0/P1 全數關閉。P2 多項已完成：3D Sketch、BOM 多階層、Sub-assemblies CRUD。
+**功能成熟度**約 **76%** — 較上期 +3%。P0/P1 全數關閉。P2 多項已完成：Smart Mates、3D Sketch、BOM 多階層、Sub-assemblies CRUD。
 
 **最立即的價值缺口**：
 1. ~~**Unfold/Fold** (鈑金)~~ — ✅ 已完成 2026-06-25
@@ -406,11 +409,11 @@
 3. ~~**前端測試修復**~~ — ✅ 已完成 2026-06-26
 4. ~~**3D Sketch**~~ — ✅ 已完成 2026-06-26
 5. ~~**BOM 多階層**~~ — ✅ 已完成 2026-06-26
-6. **Smart Mates** (組件) — 下一個 P2 優先項目
+6. ~~**Smart Mates** (組件)~~ — ✅ 已完成 2026-06-27
 7. **DimXpert** (工程圖尺寸專家) — 工程圖生產力關鍵
 
 **技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)
 
 ---
 
-*本報告由 Sisyphus 於 2026-06-26 自動生成 v2.2，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*
+*本報告由 Sisyphus 於 2026-06-27 自動生成 v2.3，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*

@@ -2,13 +2,35 @@
 
 import React, { useState } from 'react';
 import { useCadStore } from '../store/useCadStore';
+import type { DimXpertGrade } from '../store/dimxpert-state';
+
+const TOLERANCE_GRADES: { value: DimXpertGrade; label: string; description: string }[] = [
+  { value: 'IT01', label: 'IT01', description: 'Gauge tolerance' },
+  { value: 'IT0',  label: 'IT0',  description: 'Gauge tolerance' },
+  { value: 'IT1',  label: 'IT1',  description: 'Gauge tolerance' },
+  { value: 'IT2',  label: 'IT2',  description: 'High precision' },
+  { value: 'IT3',  label: 'IT3',  description: 'High precision' },
+  { value: 'IT4',  label: 'IT4',  description: 'Precision fit' },
+  { value: 'IT5',  label: 'IT5',  description: 'Precision fit' },
+  { value: 'IT6',  label: 'IT6',  description: 'Fine fit' },
+  { value: 'IT7',  label: 'IT7',  description: 'Standard fit' },
+  { value: 'IT8',  label: 'IT8',  description: 'Standard fit' },
+];
 
 /**
  * DimXpertPanel shows recognized features with their dimensions
  * and allows toggling visibility.
  */
 export default function DimXpertPanel() {
-  const { dimxpertFeatures: features, toggleDimxpertFeatureVisibility: toggleVisibility, removeDimxpertFeature: removeFeature, isDimXpertActive, setIsDimXpertActive } = useCadStore();
+  const {
+    dimxpertFeatures: features,
+    toggleDimxpertFeatureVisibility: toggleVisibility,
+    removeDimxpertFeature: removeFeature,
+    isDimXpertActive,
+    setIsDimXpertActive,
+    dimxpertActiveGrade,
+    setDimxpertActiveGrade,
+  } = useCadStore();
   const [expandedFeatures, setExpandedFeatures] = useState<Set<string>>(new Set());
 
   if (!isDimXpertActive) return null;
@@ -82,6 +104,30 @@ export default function DimXpertPanel() {
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-1">{features.length} features recognized</p>
+
+        {/* Tolerance grade selector */}
+        <div className="mt-3">
+          <label className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Tolerance Grade</label>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {TOLERANCE_GRADES.map(({ value, label, description }) => (
+              <button
+                key={value}
+                onClick={() => setDimxpertActiveGrade(value)}
+                className={`px-1.5 py-0.5 text-[10px] font-mono rounded border transition-all ${
+                  dimxpertActiveGrade === value
+                    ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:text-blue-600'
+                }`}
+                title={`${label} - ${description}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[9px] text-gray-400 mt-1">
+            {TOLERANCE_GRADES.find(g => g.value === dimxpertActiveGrade)?.description}
+          </p>
+        </div>
       </div>
 
       <div className="p-2 space-y-2">

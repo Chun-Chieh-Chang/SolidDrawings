@@ -129,6 +129,21 @@ export class HeavyEngineClient {
     }
   }
 
+  public async recognizeDimXpert(features: CADFeature[]): Promise<{ features: any[]; count: number }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/dimxpert/recognize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ features }),
+      });
+      if (!response.ok) throw new Error('DimXpert recognition failed');
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] DimXpert recognition error:', error);
+      return { features: [], count: 0 };
+    }
+  }
+
   public async project(features: CADFeature[], plane: string, sectionPlane?: any): Promise<any[]> {
     try {
       const response = await fetch(`${this.baseUrl}/project`, {

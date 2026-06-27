@@ -3499,3 +3499,25 @@ def calculate_mass_properties(features, material_id='GENERIC'):
         print("[ERROR] calculate_mass_properties failed:", err)
         return None
 
+
+def recognize_dimxpert_features(features):
+    """
+    Build the shape from features and run DimXpert feature recognition.
+    Returns a list of recognized manufacturing features (holes, slots, fillets, chamfers).
+    """
+    try:
+        from app.services.feature_recognition import recognize_features
+        shape = build_shape_only(features)
+        if shape is None:
+            return []
+        result = recognize_features(shape)
+        return result if result else []
+    except ImportError as e:
+        print("[ERROR] DimXpert feature_recognition not available:", e)
+        return []
+    except Exception as e:
+        print("[ERROR] recognize_dimxpert_features failed:", e)
+        import traceback
+        traceback.print_exc()
+        return []
+

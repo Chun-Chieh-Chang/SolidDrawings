@@ -11,6 +11,7 @@ import { SketchPreview } from './SketchPreview';
 import { TopologySelector } from '../kernel/TopologySelector';
 import SmartMateOverlay from './SmartMateOverlay';
 import DimXpertOverlay from './DimXpertOverlay';
+import { CameraCapture } from './DimXpertCameraRef';
 
 
 const CameraHandler = () => {
@@ -1120,6 +1121,7 @@ const Viewport = ({ children }: ViewportProps) => {
           cellColor="#CBD5E1"
         />
         <OrbitControlsWrapper />
+        <CameraCapture />
       </Canvas>
 
       <SmartMateOverlay />

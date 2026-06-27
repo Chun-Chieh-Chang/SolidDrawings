@@ -860,3 +860,25 @@ async def create_combine(request: CombineRequest):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
+
+class DimXpertRequest(BaseModel):
+    features: List[FeatureDefinition]
+
+
+@router.post("/dimxpert/recognize")
+async def dimxpert_recognize(request: DimXpertRequest):
+    """
+    Run DimXpert feature recognition on the current part.
+    Returns a list of recognized features (holes, slots, fillets, chamfers)
+    with dimensions and tolerances.
+    """
+    try:
+        features = geometry_service.recognize_dimxpert_features(
+            [f.model_dump() for f in request.features]
+        )
+        return {"features": features, "count": len(features)}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
