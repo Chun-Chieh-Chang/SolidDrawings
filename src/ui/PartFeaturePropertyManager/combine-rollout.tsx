@@ -24,7 +24,7 @@ export function CombineRollout({
   const currentToolId = selectedFeature.parameters?.tool_feature_id || '';
 
   // Filter candidate tool bodies: exclude the current feature itself
-  const toolCandidates = features.filter(
+  const toolCandidates = (features ?? []).filter(
     (f: any) => f.id !== selectedFeature.id && f.id && !['REFERENCE_PLANE', 'REFERENCE_AXIS', 'REFERENCE_POINT', 'REFERENCE_COORDINATE_SYSTEM', 'SKETCH'].includes(f.type)
   );
 
