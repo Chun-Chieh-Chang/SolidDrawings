@@ -9,6 +9,8 @@ import { useCadStore } from '../store/useCadStore';
 import { DatumPlanes } from './DatumPlanes';
 import { SketchPreview } from './SketchPreview';
 import { TopologySelector } from '../kernel/TopologySelector';
+import SmartMateOverlay from './SmartMateOverlay';
+import DimXpertOverlay from './DimXpertOverlay';
 
 
 const CameraHandler = () => {
@@ -860,9 +862,7 @@ const FeatureCallouts = () => {
                         feat.type === 'SHELL' ? 'thickness' : 
                         feat.type === 'HOLE_WIZARD' ? 'diameter' : null;
       if (mainParam) {
-        // eslint-disable-next-line
         setLocalVal(String(feat.parameters[mainParam] || 0));
-        // eslint-disable-next-line
         setActiveFeatId(feat.id);
       }
     }
@@ -1121,6 +1121,9 @@ const Viewport = ({ children }: ViewportProps) => {
         />
         <OrbitControlsWrapper />
       </Canvas>
+
+      <SmartMateOverlay />
+      <DimXpertOverlay />
 
       <div className="absolute top-4 left-4 glass-effect p-2 rounded-lg text-[14px] font-mono text-slate-700 pointer-events-none">
         VIEWPORT: {isSketchMode ? 'SKETCHING MODE (LOCKED)' : 'PERSPECTIVE'}

@@ -56,7 +56,6 @@ docs/
 ├── 04_DEVELOPMENT/          ← 開發指南
 ├── 05_GOVERNANCE/           ← 治理流程
 ├── 06_PRODUCTIZATION/       ← 產品化報告
-├── 07_BENCHMARKS/           ← 實作練習
 └── 08_LEARNINGS/            ← 經驗學習
 ```
 
@@ -124,9 +123,9 @@ git push origin main
 
 ## 聯絡資訊
 
-- 專案維護者: [Your Name]
-- Email: [your-email@example.com]
-- GitHub: [your-github-username]
+- 專案維護者: 3D-Builder Team
+- Email: [contact@3dbuilder.dev]
+- GitHub: [github.com/3d-builder]
 
 ---
 

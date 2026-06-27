@@ -68,6 +68,25 @@ export const EvaluateTab: React.FC<RibbonTabProps> = ({
         </div>
         <span className="text-[11px] font-semibold text-slate-800 leading-tight">Equations</span>
       </button>
+
+      <div className="w-px h-10 bg-slate-300 mx-1"></div>
+
+      <button
+        onClick={() => {
+          const { isDimXpertActive, setIsDimXpertActive } = useCadStore.getState();
+          setIsDimXpertActive(!isDimXpertActive);
+        }}
+        className={`flex flex-col items-center justify-center gap-0.5 px-3 h-[78px] min-w-[75px] transition-all border border-transparent hover:bg-white hover:border-[#A0A0A0] active:bg-slate-100 rounded-md group ${useCadStore.getState().isDimXpertActive ? 'bg-blue-50 border-blue-300 shadow-inner' : ''}`}
+        title="DimXpert - Automatic Feature Recognition"
+      >
+        <div className={`w-10 h-10 flex items-center justify-center transition-transform ${useCadStore.getState().isDimXpertActive ? 'text-blue-600 scale-110' : 'text-slate-600 group-hover:scale-110'}`}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+          </svg>
+        </div>
+        <span className="text-[11px] font-semibold text-slate-800 leading-tight">DimXpert</span>
+      </button>
     </div>
   );
 };

@@ -1,9 +1,6 @@
 import React from 'react';
 import type { RibbonTabProps } from './types';
-
-// Required by the original render tab for material presets
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const MATERIAL_PRESETS: Record<string, any> = require('../../../store/useCadStore').MATERIAL_PRESETS || {};
+import { MATERIAL_PRESETS } from '../../../store/types';
 
 export const RenderTab: React.FC<RibbonTabProps> = ({
   partMaterial, setPartMaterial,

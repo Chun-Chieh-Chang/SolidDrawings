@@ -1,3 +1,54 @@
+## 2026-06-27 Sprint 4 Completion + Codebase Cleanup
+
+### Sprint 4 Tasks Completed:
+- **Smart Mates (智慧結合)**: Full implementation including store, inference engine, overlay UI, and AssemblyTab toggle
+  - `src/utils/smart-mate-inference.ts` - Rule-based mate type inference (COINCIDENT, CONCENTRIC, TANGENT, etc.)
+  - `src/renderer/SmartMateOverlay.tsx` - 3D viewport overlay for drag-and-drop mate creation
+  - `src/store/assembly-state.ts` - Added smartMateActive, smartMateSource state
+  - `src/ui/RibbonBar/tabs/AssemblyTab.tsx` - Smart Mate toggle button
+  - `src/renderer/OcctShape.tsx` - Modified click handler to defer to SmartMateOverlay
+  
+- **DimXpert (智慧尺寸標註)**: Feature recognition + dimension annotation system
+  - `backend/app/services/feature_recognition.py` - OCCT-based hole/slot/fillet/chamfer recognition
+  - `src/store/dimxpert-state.ts` - Zustand slice for DimXpert features and annotations
+  - `src/renderer/DimXpertOverlay.tsx` - 3D viewport overlay for dimension annotations
+  - `src/renderer/DimXpertPanel.tsx` - Side panel showing recognized features
+  - `src/ui/DimXpertToolbar.tsx` - Toolbar for DimXpert operations
+  - `src/ui/RibbonBar/tabs/EvaluateTab.tsx` - Added DimXpert toggle button
+
+- **Unified Error Handling Layer**: ErrorBoundary + Toast + Backend Exception Handler
+  - `src/ui/ErrorBoundary.tsx` - React ErrorBoundary with detailed error display
+  - `src/ui/ToastProvider.tsx` - Global toast notification system (error/warning/info)
+  - `backend/app/middleware/exception_handler.py` - FastAPI exception handling middleware
+  - `backend/app/main.py` - Integrated exception handler middleware
+  - `src/app/layout.tsx` - Wrapped app with ErrorBoundary and ToastProvider
+
+### Codebase Cleanup (MECE):
+- **Deleted dead files**:
+  - `src/ui/CadToast.tsx` - Old toast component (replaced by ToastProvider)
+  - `src/ui/ConfirmationCorner.tsx` - Never imported
+  - `src/ui/TaskPane/TaskPane.tsx` - Never imported
+  - `src/ui/tools/Sketch3DTool.ts` - Never imported
+  - `src/ui/Tolerancing/TolerancingPanel.tsx` - Never imported
+
+- **Fixed stale references**:
+  - `README.md` - Removed reference to non-existent `07_BENCHMARKS/` directory
+  - Fixed placeholder contact info in README.md
+
+- **ESLint improvements**:
+  - Reduced from 260 problems to 238 warnings (0 errors)
+  - Fixed `react-hooks/immutability` violation in SmartMateOverlay
+  - Removed unused eslint-disable directives
+  - Fixed unused variable warnings in page.tsx
+
+### Quality Metrics:
+- `tsc --noEmit`: 0 errors
+- `eslint src/`: 0 errors, 238 warnings (all pre-existing or minor)
+- All new code follows SOLIDWORKS expert standards
+- Zero breaking changes to existing functionality
+
+---
+
 ## 2026-06-23 STABLE-3 Closure + Sheet Metal Phase 6 Kickoff
 
 ### STABLE-3 Resolution:

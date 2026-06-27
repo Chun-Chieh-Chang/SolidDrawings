@@ -42,6 +42,7 @@ import { createSelectionState } from './selection-state';
 import { createConfigState } from './config-state';
 import { createUiState } from './ui-state';
 import { createAppState } from './app-state';
+import { createDimXpertState } from './dimxpert-state';
 
 export type {
   CadMode,
@@ -281,6 +282,11 @@ export type CombinedState = {
   setIsCameraAnimating: (active: boolean) => void;
   sectionView: import('./types').SectionViewState;
   setSectionView: (view: Partial<import('./types').SectionViewState>) => void;
+  // ── Smart Mates ────────────────────────────────────────────
+  smartMateActive: boolean;
+  setSmartMateActive: (active: boolean) => void;
+  smartMateSource: any;
+  setSmartMateSource: (src: any) => void;
   explodedView: import('./types').ExplodedViewState;
   setExplodedView: (view: Partial<import('./types').ExplodedViewState>) => void;
   setExplosionFactor: (factor: number) => void;
@@ -312,6 +318,18 @@ export type CombinedState = {
   selectionFilter: import('@/utils/selection-filters').SelectionFilterType;
   setSelectionFilter: (filter: import('@/utils/selection-filters').SelectionFilterType) => void;
   selection: { type?: string; ids?: string[]; nodes: string[]; edges: string[]; features: string[]; faces: string[] };
+  // ── DimXpert ───────────────────────────────────────────────
+  dimxpertFeatures: import('./dimxpert-state').DimXpertFeature[];
+  setDimxpertFeatures: (features: import('./dimxpert-state').DimXpertFeature[]) => void;
+  addDimxpertFeature: (feature: import('./dimxpert-state').DimXpertFeature) => void;
+  removeDimxpertFeature: (id: string) => void;
+  toggleDimxpertFeatureVisibility: (id: string) => void;
+  dimxpertAnnotations: import('./dimxpert-state').DimXpertAnnotation[];
+  setDimxpertAnnotations: (annotations: import('./dimxpert-state').DimXpertAnnotation[]) => void;
+  dimxpertActiveGrade: string;
+  setDimxpertActiveGrade: (grade: string) => void;
+  isDimXpertActive: boolean;
+  setIsDimXpertActive: (active: boolean) => void;
   drawingSheets: import('./types').DrawingSheetData[];
   activeSheetId: string;
   setDrawingSheets: (sheets: import('./types').DrawingSheetData[]) => void;
@@ -352,6 +370,7 @@ export const useCadStore = create<CombinedState>()(
       ...createConfigState(set, get),
       ...createUiState(set, get),
       ...createAppState(set, get),
+      ...createDimXpertState(set, get),
       // ── Bend Table ─────────────────────────────────────────────
       showBendTable: false,
       setShowBendTable: (show: boolean) => set({ showBendTable: show }),
@@ -448,6 +467,11 @@ export const useCadStore = create<CombinedState>()(
         hoveredEntityId: state.hoveredEntityId,
         selectionFilter: state.selectionFilter,
         selection: state.selection,
+        // ── DimXpert ───────────────────────────────────────────
+        dimxpertFeatures: state.dimxpertFeatures,
+        dimxpertAnnotations: state.dimxpertAnnotations,
+        dimxpertActiveGrade: state.dimxpertActiveGrade,
+        isDimXpertActive: state.isDimXpertActive,
         drawingSheets: state.drawingSheets,
         activeSheetId: state.activeSheetId,
       }),

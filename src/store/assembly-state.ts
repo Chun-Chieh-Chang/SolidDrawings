@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import type { CADComponent, CADMate, MateEntity, ExplodedViewState, MotionStudyState, MotionDriver, SectionViewState } from './types';
+import type { SelectedTopology } from '../kernel/TopologySelector';
 
 // ── Recursive tree helpers ──────────────────────────────────────────────
 function findComponentDeep(list: CADComponent[], id: string): CADComponent | undefined {
@@ -81,6 +82,11 @@ export type AssemblySlice = {
   removeMotionDriver: (id: string) => void;
   sectionView: SectionViewState;
   setSectionView: (view: Partial<SectionViewState>) => void;
+  // ── Smart Mates ────────────────────────────────────────────
+  smartMateActive: boolean;
+  setSmartMateActive: (active: boolean) => void;
+  smartMateSource: SelectedTopology | null;
+  setSmartMateSource: (src: SelectedTopology | null) => void;
   // ── Sub-assembly CRUD ────────────────────────────────────────
   addSubAssembly: (parentId: string, name: string) => void;
   addToSubAssembly: (subAssemblyId: string, component: CADComponent) => void;
@@ -174,6 +180,12 @@ export const createAssemblyState = (set: any, get: any) => ({
   sectionView: { isActive: false, plane: 'FRONT', offset: 0, flip: false } as SectionViewState,
   setSectionView: (view: Partial<SectionViewState>) =>
     set((state: any) => ({ sectionView: { ...state.sectionView, ...view } })),
+
+  // ── Smart Mates ────────────────────────────────────────────
+  smartMateActive: false,
+  setSmartMateActive: (smartMateActive: boolean) => set({ smartMateActive }),
+  smartMateSource: null as SelectedTopology | null,
+  setSmartMateSource: (smartMateSource: SelectedTopology | null) => set({ smartMateSource }),
 
   // ── Sub-assembly CRUD ────────────────────────────────────────
   addSubAssembly: (parentId: string, name: string) => {

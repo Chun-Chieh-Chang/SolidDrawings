@@ -63,6 +63,7 @@ export const createConfigState = (set: any, get: any) => ({
     set((state: any) => {
       const normalizedName = name.toUpperCase().replace(/[^A-Z0-9_]/g, '');
       const nextVars = { ...state.globalVariables, [normalizedName]: formula };
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { EquationEngine } = require('../utils/EquationEngine');
       const nextEvaluated = EquationEngine.solveVariableChain(nextVars);
       return { globalVariables: nextVars, evaluatedVariables: nextEvaluated, rebuildDirty: true };
@@ -72,6 +73,7 @@ export const createConfigState = (set: any, get: any) => ({
     set((state: any) => {
       const nextVars = { ...state.globalVariables };
       delete nextVars[name];
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { EquationEngine } = require('../utils/EquationEngine');
       const nextEvaluated = EquationEngine.solveVariableChain(nextVars);
       return { globalVariables: nextVars, evaluatedVariables: nextEvaluated, rebuildDirty: true };
@@ -79,6 +81,7 @@ export const createConfigState = (set: any, get: any) => ({
 
   refreshEvaluatedVariables: () =>
     set((state: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { EquationEngine } = require('../utils/EquationEngine');
       const nextEvaluated = EquationEngine.solveVariableChain(state.globalVariables);
       return { evaluatedVariables: nextEvaluated };

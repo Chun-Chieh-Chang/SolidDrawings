@@ -1,8 +1,12 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import geometry, robot, drawing
+from app.middleware import register_exception_handlers
 
 app = FastAPI(title="3D-Builder Heavy Engine", version="0.1.0")
+
+# Register global exception handlers
+register_exception_handlers(app, include_details=True)
 
 # Enable CORS for Next.js frontend
 app.add_middleware(

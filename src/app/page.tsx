@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import Viewport from '@/renderer/Viewport';
 import OcctShape, { type MeshData } from '@/renderer/OcctShape';
 import { useCadStore, type CADFeature } from '@/store/useCadStore';
@@ -56,7 +56,7 @@ export default function Home() {
     features, addFeature, updateFeatureParams, 
     setSelectedId, setMeshData,
     isSketchMode, setSketchMode, setSketchTool,
-    activePlane, setActivePlane, setActiveFaceOrigin, setActiveFaceNormal, setActiveFaceId,
+    activePlane, setActivePlane,
     activeTab, setActiveTab,
     sketchNodes, sketchEdges, sketchConstraints,
     selectedId, selectedSubNodeType, setSelectedSubNodeType,
@@ -69,9 +69,8 @@ export default function Home() {
     defaultFilletRadius, defaultChamferDistance,
     components, meshData,
     rollbackIndex, setRollbackIndex,
-    massProperties, setMassProperties,
+    massProperties,
     showExportModal, setShowExportModal,
-    hint: _hint,
     setHint,
   } = useCadStore();
 
@@ -112,7 +111,7 @@ export default function Home() {
     try {
       const result = await fileAPI.printToPdf();
       if (result.success && result.path) (window as any).electronAPI.app.notify('PDF Export', `Success: ${result.path}`);
-    } catch (e) { alert('PDF Export failed'); }
+    } catch { alert('PDF Export failed'); }
   }, []);
 
   useAppIntegrations(loadCadData, handleSaveProject, handlePrintToPDF);
@@ -128,7 +127,7 @@ export default function Home() {
         addFeature({ id: `dumb_${uuidv4()}`, name: file.name, type: 'DUMB_SOLID', parameters: { filepath: result.filepath, x: 0, y: 0, z: 0 } });
         setTimeout(handleRebuild, 50);
       }
-    } catch (err) {
+    } catch {
       useCadStore.getState().pushToast('Failed to import STEP file.', 'error');
     } finally {
       setLoading(false);
@@ -142,7 +141,7 @@ export default function Home() {
       try {
         const alive = await client.checkHealth();
         setEngineStatus(alive ? 'CONNECTED' : 'DISCONNECTED');
-      } catch (e) { setEngineStatus('DISCONNECTED'); }
+      } catch { setEngineStatus('DISCONNECTED'); }
     };
     const timer = setInterval(check, 3000);
     check();
@@ -163,7 +162,7 @@ export default function Home() {
       sketchTool: 'SELECT',
     });
     setActiveTab('SKETCH');
-  }, []);
+  }, [setActiveTab]);
 
   const handleStartPlaneSketch = useCallback((plane: 'FRONT' | 'TOP' | 'RIGHT') => {
     resetSketchSession();

@@ -139,7 +139,9 @@ export default function OcctShape({
       }
 
       if (selected && cadMode === 'ASSEMBLY' && !isSketchMode) {
-        // Assembly Mate Selection
+        // Smart Mates: defer to SmartMateOverlay's global handler
+        if (useCadStore.getState().smartMateActive) return;
+        // Assembly Mate Selection (legacy panel-based flow)
         selected.componentId = componentId;
         const currentState = useCadStore.getState().mateSelection;
         if (currentState.length < 2) {

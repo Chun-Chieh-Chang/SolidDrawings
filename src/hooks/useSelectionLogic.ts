@@ -246,7 +246,6 @@ export function useSelectionLogic(deps: SelectionLogicDeps) {
     features, updateFeatureParams, setSelectedTopology, handleRebuild,
   ]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const handleShiftClick = (e: MouseEvent) => {
       if (!e.shiftKey && !e.ctrlKey) return;
