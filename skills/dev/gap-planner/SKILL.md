@@ -54,7 +54,7 @@ Each task MUST include explicit, verifiable acceptance criteria written at the h
 
 1. **Verifiable** — can be checked by a command, a test, a UI assertion, or a diff inspection
 2. **Unambiguous** — one objective interpretation only
-3. **Highest standard** — matches SOLIDWORKS 2025 professional quality, not "minimal viable"
+3. **Highest standard** — matches SOLIDWORKS 2010 professional quality, not "minimal viable"
 
 Use the existing `task_plan.md` format as template:
 
@@ -135,7 +135,7 @@ Before completing, verify:
 - [ ] Every task has a clear P0/P1/P2 label
 - [ ] **Every task has explicit, verifiable acceptance criteria defined upfront — NOT just a verification step, but specific functional criteria**
 - [ ] **Every acceptance criterion is unambiguous and objectively checkable (command output, API response, UI assertion, diff inspection)**
-- [ ] **Acceptance criteria are set at the highest standard — matching SOLIDWORKS 2025 professional quality, not "minimal viable"**
+- [ ] **Acceptance criteria are set at the highest standard — matching SOLIDWORKS 2010 professional quality, not "minimal viable"**
 - [ ] No tasks duplicate each other (MECE)
 - [ ] Every task references specific files or APIs
 - [ ] Every task includes a verification step

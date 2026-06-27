@@ -9,7 +9,7 @@
 docs/
 ├── 00_INDEX.md                       ← 本文件 (總索引)
 ├── 01_REFERENCE/                     ← 參考標準
-│   ├── SOLIDWORKS_2025_基準.md        ← SOLIDWORKS 2025 專家知識標準
+│   ├── SOLIDWORKS_2010_基準.md         ← SOLIDWORKS 2010 專家知識標準
 │   └── SOLIDWORKS_知識領域.md          ← 知識領域分類
 ├── 02_SPEC/                          ← 技術規格
 │   ├── feature-schema.md             ← 特徵資料模型
@@ -59,7 +59,7 @@ docs/
 
 ## 快速連結
 
-- [SOLIDWORKS 2025 基準](01_REFERENCE/SOLIDWORKS_2025_基準.md)
+- [SOLIDWORKS 2010 基準](01_REFERENCE/SOLIDWORKS_2010_基準.md)
 - [開發路線圖](04_DEVELOPMENT/ROADMAP.md)
 - [系統設計](03_ARCHITECTURE/SYSTEM_DESIGN.md)
 - [發布門檻](02_SPEC/release-gates.md)

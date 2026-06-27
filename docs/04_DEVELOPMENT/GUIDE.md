@@ -3,7 +3,7 @@
 ## 開發流程
 
 ### 1. 需求分析階段
-- 對照 [SOLIDWORKS 2025 參考標準](./SOLIDWORKS_2025_參考標準.md)
+- 對照 [SOLIDWORKS 2010 參考標準](./SOLIDWORKS_2010_參考標準.md)
 - 更新 [Gap Report](../gap-audit-report.md)
 - 評估開發優先級
 

@@ -1,4 +1,4 @@
-# 🚀 3D-Builder 開發路線圖 (基於 SOLIDWORKS 2025 專家知識標準)
+# 🚀 3D-Builder 開發路線圖 (基於 SOLIDWORKS 2010 專家知識標準)
 
 ## 路線圖總覽
 

@@ -90,7 +90,7 @@ After the sub-agent reports completion, verification is TWO-layer:
 Go through EVERY acceptance criterion defined for this task in task_plan.md. For each criterion:
 - **Functional criteria**: Manually verify the behavior (e.g., call the API endpoint, check the UI renders, inspect the output).
 - **Build criteria**: Run the stated verification command (e.g., `tsc --noEmit`, `python -m py_compile`).
-- **Quality criteria**: Inspect the diff — does the implementation meet SOLIDWORKS 2025 professional standards? No shortcuts, no stubs, no "TODO: implement later."
+- **Quality criteria**: Inspect the diff — does the implementation meet SOLIDWORKS 2010 professional standards? No shortcuts, no stubs, no "TODO: implement later."
 
 Each criterion must be checked off explicitly. If any criterion FAILS:
 → The task is NOT complete. Dispatch a fix sub-agent via `task(task_id="ses_...", prompt="Acceptance criterion failed: [criterion]. Fix.")`
