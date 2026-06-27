@@ -1,6 +1,6 @@
 # 🗺️ 3D-Builder 開發路線圖（即時更新）
 
-> **最後更新**: 2026-06-26 20:51
+> **最後更新**: 2026-06-27 14:30
 > **自動產生自**: `skills/dev/living-roadmap/scripts/update_roadmap.py`
 > **基準**: SOLIDWORKS 2010 Chinese Edition
 
@@ -10,7 +10,7 @@
 
 | 指標 | 數值 |
 |:---|---:|
-| 總體成熟度（活躍領域） | **~72%** |
+| 總體成熟度（活躍領域） | **~74%** |
 | SCS (UI/UX 相容性) | **100%** |
 | TypeScript 編譯 | ✅ |
 | 後端測試 (pytest) | **104** passed / 104 total |
@@ -23,10 +23,10 @@
 | **公差 (Tolerancing)** | 0% `█░░░░░░░░░░░░░░░░░░░` | ⚪ 未開始 |
 | **焊接 (Weldments)** | 0% `█░░░░░░░░░░░░░░░░░░░` | ⚪ 未開始 |
 | **測試覆蓋率** | 40% `████████░░░░░░░░░░░░` | 🔴 持續改善 |
-| **組件 (Assembly)** | 50% `██████████░░░░░░░░░░` | 🟡 基礎架構 |
+| **組件 (Assembly)** | 65% `████████████░░░░░░░░` | 🟡 中等差距 |
 | **曲面 (Surfacing)** | 55% `███████████░░░░░░░░░` | 🟡 部分完成 |
 | **檔案互通性** | 60% `████████████░░░░░░░░` | 🟡 基礎 STEP/STL |
-| **工程圖 (Drawing)** | 72% `██████████████░░░░░░` | 🟡 中等差距 |
+| **工程圖 (Drawing)** | 78% `███████████████░░░░░` | 🟡 中等差距 |
 | **特徵引擎 (3D Part)** | 85% `█████████████████░░░` | 🟡 小幅差距 |
 | **鈑金 (Sheet Metal)** | 90% `██████████████████░░` | 🟢 小幅差距 |
 | **草圖工具** | 95% `███████████████████░` | 🟢 接近完全 |
@@ -149,7 +149,7 @@
 
 ---
 
-### 🟡 組件 — 50%
+### 🟡 組件 — 65%
 
 #### ✅ 已實作
 
@@ -163,10 +163,10 @@
 - Symmetric Mate**
 - Width Mate**
 - Sub-assemblies CRUD**
+- **Smart Mates** (智慧結合 — 拖曳參考直接建立結合)
 
 #### ❌ 尚未實作
 
-- Smart Mates** (智慧結合)
 - Assembly Features** (組件特徵)
 - Pattern Component** (元件陣列)
 - Mirror Component** (鏡射元件)
@@ -177,7 +177,7 @@
 
 ---
 
-### 🟡 工程圖 — 72%
+### 🟡 工程圖 — 78%
 
 #### ✅ 已實作
 
@@ -191,15 +191,15 @@
 - 中心標記 (Center Marks) + 零件號球 (Balloons)
 - 剖面視圖** (Section View)
 - 局部放大圖** (Detail View)
+- **DimXpert** (自動特徵辨識 + 尺寸標註 — 孔/槽/圓角/倒角)
 
 #### ❌ 尚未實作
 
 - 輔助視圖** (Auxiliary View)
 - 斷裂視圖** (Broken-out Section)
 - 裁剪視圖** (Crop View)
-- 註記** (Annotations / GD&T)
+- **幾何公差符號** (True Position, Flatness, etc.) — DimXpert 架構已就位
 - 圖框/標題欄自訂** (Sheet Format Editor)
-- BOM 多階層** (Multi-level BOM)
 - 零件號球自動編號** (Auto Balloon)
 
 ---
@@ -297,7 +297,7 @@
 |:---|:---:|:---|
 | `geometry_service.py` ~5500 行 (已拆分 surfacing.py + sheet_metal.py + features.py) | 🟡 | 持續模組化拆分 |
 | `RibbonController.tsx` ✅ **已拆分 | 🟢 | 已拆分為 8 個 Tab 子組件 + coordinator |
-| 缺少統一錯誤處理層 | 🟡 | 新增 ErrorBoundary 全域 |
+| 缺少統一錯誤處理層 | 🟢 | 已實作 ErrorBoundary + ToastProvider + 後端 Exception Handler |
 | OCC 依賴侷限 (僅有部分測試以 HAS_OCC=False 覆蓋) | 🟡 | 持續增加 mock tests |
 | wiki/ 目錄為空 | 🟢 | 已記錄待補 |
 
@@ -313,49 +313,6 @@
 | P3 (Low) | Backlog |
 
 ### 📋 目前 Sprint 任務
-
-#### ⏳ [P2] Smart Mates (智慧結合)
-
-- **領域**: Assembly (currently 50%)
-- **狀態**: pending
-- **依賴**: Sub-assemblies CRUD ✅ (已完成)
-- **估計工時**: 4-6h
-- **目標**: 使用者可拖曳元件幾何參考直接建立結合，無需開啟 Mate Panel
-- **驗收標準**:
-  - [ ] 使用者選取一個 face/edge/axis 作為 mate reference
-  - [ ] 拖曳到另一元件的對應參考時系統自動推斷 mate 類型
-  - [ ] 推斷期間顯示即時預覽 (Coincident/Concentric/Tangent)
-  - [ ] 放開滑鼠後 Mate 無需經過 Mate Panel 即建立完成
-  - [ ] 支援 Edge, Face, Axis, Point, Plane 五種參考類型
-  - [ ] 無效配對 (如兩個點無法同心) 顯示視覺回饋
-
-#### ⏳ [P2] DimXpert (尺寸專家)
-
-- **領域**: Drawing (currently 72%)
-- **狀態**: pending
-- **依賴**: BOM 多階層 ✅ (已完成), Annotations/GD&T ✅ (已完成)
-- **估計工時**: 6-8h
-- **目標**: 自動辨識特徵並產生尺寸標註，提升工程圖生產力
-- **驗收標準**:
-  - [ ] 自動辨識拉伸、旋轉、孔等基本特徵
-  - [ ] 為辨識的特徵產生 +/- 公差尺寸
-  - [ ] 支援基準符號 (Datum Feature) 標註
-  - [ ] 支援幾何公差符號 (True Position, Flatness, etc.)
-  - [ ] 公差值可手動編輯覆寫
-  - [ ] DimXpert 面板顯示所有已標註特徵清單
-
-#### ⏳ [P2] 統一錯誤處理層
-
-- **領域**: Infrastructure (Tech Debt)
-- **狀態**: pending
-- **估計工時**: 3-4h
-- **目標**: 建立全端一致的錯誤處理架構，取代目前散落各處的 try/catch
-- **驗收標準**:
-  - [ ] 前端: 統一 ErrorBoundary 元件包裹所有頁面區塊
-  - [ ] 前端: API 呼叫錯誤集中顯示 Toast 通知
-  - [ ] 後端: 全域 Exception Handler 統一錯誤回應格式
-  - [ ] 後端: 錯誤回應格式為 `{error: string, code: string, details?: any}`
-  - [ ] 前後端: 網路逾時 (30s) 有專屬錯誤提示
 
 #### ⏳ [P3] Freeform Surface (自由形態曲面)
 
@@ -417,6 +374,9 @@
 | **Sub-assemblies CRUD** (遞迴子組件管理)** | 2026-06-26 | 新功能 |
 | **3D Sketch 模式** (state/tool/UI 平面選擇器)** | 2026-06-26 | 新功能 |
 | **BOM 多階層樹狀表** (遞迴 BomEntry + BomTable)** | 2026-06-26 | 新功能 |
+| **Smart Mates** (智慧結合 — 拖曳參考直接建立結合)** | 2026-06-27 | 新功能 |
+| **DimXpert** (自動特徵辨識 + 尺寸標註)** | 2026-06-27 | 新功能 |
+| **統一錯誤處理層** (ErrorBoundary + ToastProvider + 後端 Exception Handler)** | 2026-06-27 | 基礎設施 |
 
 ---
 
@@ -433,6 +393,7 @@
 | `features.py` | ✅ 354 行新模組 |
 | 重複的 HOLE/HOLE_WIZARD | ⚠️ 未解決 |
 | MECE 文檔結構 | ✅ 已清理 |
+| 統一錯誤處理 | ✅ 已實作 |
 
 ---
 
