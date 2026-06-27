@@ -13,7 +13,7 @@ try:
     from OCC.Core.gp import gp_Pnt, gp_Dir, gp_Vec, gp_Pln
     from OCC.Core.BRepBuilderAPI import BRepBuilderAPI_MakeEdge, BRepBuilderAPI_MakeWire, BRepBuilderAPI_MakeFace
     from OCC.Core.BRepPrimAPI import BRepPrimAPI_MakeBox, BRepPrimAPI_MakeCylinder, BRepPrimAPI_MakeSphere, BRepPrimAPI_MakePrism
-    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Split, BRepAlgoAPI_Section
+    from OCC.Core.BRepAlgoAPI import BRepAlgoAPI_Fuse, BRepAlgoAPI_Cut, BRepAlgoAPI_Common, BRepAlgoAPI_Splitter, BRepAlgoAPI_Section
     HAS_OCC = True
 except ImportError:
     HAS_OCC = False
@@ -266,7 +266,7 @@ def generate_rib(features, thickness=2.0, direction="BOTH"):
 
 def generate_split(features, split_plane):
     """
-    Split a solid body using a plane. Uses OCC BRepAlgoAPI_Split.
+    Split a solid body using a plane. Uses OCC BRepAlgoAPI_Splitter.
     """
     if not HAS_OCC:
         return str(uuid.uuid4())
@@ -287,7 +287,7 @@ def generate_split(features, split_plane):
         face = BRepBuilderAPI_MakeFace(plane, -1000, 1000, -1000, 1000).Face()
 
         # Perform split
-        splitter = BRepAlgoAPI_Split(shape, face)
+        splitter = BRepAlgoAPI_Splitter(shape, face)
         splitter.Build()
         if splitter.IsDone():
             shape_hash = str(uuid.uuid4())

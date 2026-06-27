@@ -22,7 +22,7 @@
 
 ### 環境需求
 - Node.js 18+
-- Python 3.10-3.12
+- **Python 3.10-3.12**（**Python ≥ 3.13 不支援** — OCC/OpenCASCADE 僅相容至 3.12）
 - Git
 
 ### 安裝步驟

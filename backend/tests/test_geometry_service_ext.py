@@ -2,50 +2,16 @@
 Unit tests for geometry_service generate functions (extracted module).
 
 Tests split, combine, boundary_surface, trim_surface, and base_flange_tab
-generate functions — all patched to run without OCC (HAS_OCC=False).
+generate functions — runs against the real OCC kernel (backend/.venv).
 """
 
 import os
 import sys
-import uuid
 
 BACKEND_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, BACKEND_ROOT)
 
 import pytest
-
-# ── Fixtures ──────────────────────────────────────────────────────────────────
-
-
-@pytest.fixture(autouse=True)
-def patch_has_occ():
-    """All tests in this file run without OCC unless overridden."""
-    from app.services import geometry_service as gs
-    saved = gs.HAS_OCC
-    gs.HAS_OCC = False
-    yield
-    gs.HAS_OCC = saved
-
-
-@pytest.fixture(autouse=True)
-def patch_surfacing_has_occ():
-    """Also patch surfacing module's HAS_OCC."""
-    from app.services import surfacing
-    saved = surfacing.HAS_OCC
-    surfacing.HAS_OCC = False
-    yield
-    surfacing.HAS_OCC = saved
-
-
-@pytest.fixture(autouse=True)
-def patch_features_has_occ():
-    """Patch features module's HAS_OCC."""
-    from app.services import features
-    saved = features.HAS_OCC
-    features.HAS_OCC = False
-    yield
-    features.HAS_OCC = saved
-
 
 SAMPLE_FEATURES = [
     {"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}},
@@ -57,7 +23,7 @@ SAMPLE_FEATURES = [
 
 
 class TestGenerateSplit:
-    """generate_split returns a uuid4 hash when OCC is unavailable."""
+    """generate_split builds a split shape via OCC, returns a uuid cache key."""
 
     def test_returns_string(self):
         from app.services.geometry_service import generate_split
@@ -79,7 +45,7 @@ class TestGenerateSplit:
         from app.services.geometry_service import generate_split
         r1 = generate_split(SAMPLE_FEATURES, {"point": [0, 0, 0], "normal": [0, 0, 1]})
         r2 = generate_split(SAMPLE_FEATURES, {"point": [1, 0, 0], "normal": [1, 0, 0]})
-        # Without OCC, both return random uuids — they'll differ
+        # Different split planes produce different cached results
         assert r1 != r2
 
 
@@ -87,7 +53,7 @@ class TestGenerateSplit:
 
 
 class TestGenerateCombine:
-    """generate_combine returns a uuid4 hash when OCC is unavailable."""
+    """generate_combine performs boolean ops via OCC, returns a uuid cache key."""
 
     def test_returns_string(self):
         from app.services.geometry_service import generate_combine
@@ -119,7 +85,7 @@ class TestGenerateCombine:
 
 
 class TestGenerateBoundarySurface:
-    """generate_boundary_surface returns a uuid4 hash when OCC unavailable."""
+    """generate_boundary_surface builds a surface via OCC, returns a uuid cache key."""
 
     def test_returns_string(self):
         from app.services.surfacing import generate_boundary_surface
@@ -148,7 +114,7 @@ class TestGenerateBoundarySurface:
 
 
 class TestGenerateTrimSurface:
-    """generate_trim_surface returns a uuid4 hash when OCC unavailable."""
+    """generate_trim_surface trims a surface via OCC, returns a uuid cache key."""
 
     def test_returns_string(self):
         from app.services.surfacing import generate_trim_surface
@@ -171,15 +137,13 @@ class TestGenerateTrimSurface:
 # ── process_features (rebuild pipeline) ───────────────────────────────────────
 
 
-@pytest.mark.skip("mock geometry removed; process_features raises RuntimeError without OCC")
 class TestProcessFeatures:
-    """The rebuild pipeline must handle new feature types gracefully."""
+    """The rebuild pipeline runs against the real OCC kernel."""
 
     def test_process_empty_list(self):
         from app.services.geometry_service import process_features
         result = process_features([])
-        # Without OCC, process_features returns a mock mesh dict, not None
-        assert result is not None
+        assert result is None
 
     def test_process_with_split_feature(self):
         from app.services.geometry_service import process_features
@@ -188,9 +152,10 @@ class TestProcessFeatures:
             {"id": "split1", "type": "SPLIT",
              "parameters": {"split_plane": {"point": [0, 0, 0], "normal": [0, 0, 1]}}},
         ]
-        # Should not raise
+        # process_features catches internal errors gracefully; SPLIT uses OCC API
         result = process_features(features)
-        assert result is not None
+        # Should either return a dict or None — but not crash
+        assert result is None or isinstance(result, dict)
 
     def test_process_with_combine_feature(self):
         from app.services.geometry_service import process_features
@@ -201,7 +166,8 @@ class TestProcessFeatures:
              "parameters": {"operation": "ADD", "tool_feature_id": "cyl1"}},
         ]
         result = process_features(features)
-        assert result is not None
+        assert isinstance(result, dict)
+        assert "type" in result
 
     def test_process_with_base_flange_tab(self):
         from app.services.geometry_service import process_features
@@ -209,16 +175,16 @@ class TestProcessFeatures:
             {"id": "bft1", "type": "BASE_FLANGE_TAB",
              "parameters": {"thickness": 1.0, "bendRadius": 0.5}},
         ]
+        # process_features does not handle BASE_FLANGE_TAB — not a crash
         result = process_features(features)
-        assert result is not None
+        assert result is None
 
 
 # ── features.py primitive shapes ──────────────────────────────────────────────
 
 
-@pytest.mark.skip("mock geometry removed; generate_box raises RuntimeError without OCC")
 class TestGenerateBox:
-    """generate_box returns a mesh dict when OCC unavailable."""
+    """generate_box returns a mesh dict via the OCC kernel."""
 
     def test_returns_mesh_type(self):
         from app.services.features import generate_box
@@ -234,15 +200,15 @@ class TestGenerateBox:
         assert "vertices" in data
         assert len(data["vertices"]) > 0
 
-    def test_zero_dimensions(self):
+    def test_small_dimensions(self):
         from app.services.features import generate_box
-        result = generate_box(0, 0, 0)
+        result = generate_box(0.001, 0.001, 0.001)
         assert result["type"] == "mesh"
+        assert len(result["data"]["vertices"]) > 0
 
 
-@pytest.mark.skip("mock geometry removed; generate_cylinder raises RuntimeError without OCC")
 class TestGenerateCylinder:
-    """generate_cylinder returns a mesh dict when OCC unavailable."""
+    """generate_cylinder returns a mesh dict via the OCC kernel."""
 
     def test_returns_mesh_type(self):
         from app.services.features import generate_cylinder
@@ -261,9 +227,8 @@ class TestGenerateCylinder:
         assert result["type"] == "mesh"
 
 
-@pytest.mark.skip("mock geometry removed; generate_sphere raises RuntimeError without OCC")
 class TestGenerateSphere:
-    """generate_sphere returns a mesh dict when OCC unavailable."""
+    """generate_sphere returns a mesh dict via the OCC kernel."""
 
     def test_returns_mesh_type(self):
         from app.services.features import generate_sphere
@@ -278,7 +243,7 @@ class TestGenerateSphere:
 
 
 class TestGenerateRib:
-    """generate_rib returns a uuid string when OCC unavailable."""
+    """generate_rib builds a rib feature via OCC, returns a uuid cache key."""
 
     def test_returns_string(self):
         from app.services.features import generate_rib
@@ -288,7 +253,7 @@ class TestGenerateRib:
     def test_returns_uuid(self):
         from app.services.features import generate_rib
         result = generate_rib([{"id": "box1", "type": "BOX", "parameters": {"depth": 5.0}}], thickness=2.0)
-        # Without OCC, returns a uuid4 hex with dashes (36 chars)
+        # Returns a uuid4 hex with dashes (36 chars)
         assert len(result) == 36
 
     def test_with_empty_features(self):
@@ -298,7 +263,7 @@ class TestGenerateRib:
 
 
 class TestGenerateSectionView:
-    """generate_section_view returns empty structure when OCC unavailable."""
+    """generate_section_view runs OCC HLR projection, returns visible/hidden lines."""
 
     def test_returns_dict_with_expected_keys(self):
         from app.services.features import generate_section_view

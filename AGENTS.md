@@ -82,3 +82,23 @@ See `docs/04_DEVELOPMENT/stra-prompt-framework.md` for full documentation.
 </audit>
 ```
 <!-- END:strata-prompt-framework -->
+
+<!-- BEGIN:python-version-constitution -->
+# Python Version Constitution (HARD RULE)
+
+This project **REQUIRES Python 3.10-3.12 + OCC (OpenCASCADE)**. 
+
+## Absolute Prohibitions
+- **Python ≥ 3.13 is FORBIDDEN.** OCC does not support it. Any code, config, or tooling that assumes or defaults to Python ≥ 3.13 must be rejected.
+- **Never install, reference, or configure Python 3.14** for any backend task.
+- **Never suppress or mock OCC unavailability** — OCC is a hard dependency.
+
+## Active Environment
+- Backend `.venv` uses **Python 3.12** with OCC pre-installed.
+- Always run backend commands via `backend\.venv\Scripts\python.exe` (Windows) or after activating `.venv`.
+- All `pip install`, `pytest`, and backend dev commands MUST use the `.venv` Python — never the system Python.
+
+## Enforcement
+- Any test that `skip`s due to missing OCC is a **code smell**. Fix the test or fix the environment — do not paper over missing OCC.
+- CI must validate OCC availability before running tests.
+<!-- END:python-version-constitution -->
