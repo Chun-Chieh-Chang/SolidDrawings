@@ -1,6 +1,6 @@
 # 🗺️ 3D-Builder 開發路線圖（即時更新）
 
-> **最後更新**: 2026-06-27 14:30
+> **最後更新**: 2026-06-28 10:03
 > **自動產生自**: `skills/dev/living-roadmap/scripts/update_roadmap.py`
 > **基準**: SOLIDWORKS 2010 Chinese Edition
 
@@ -13,22 +13,22 @@
 | 總體成熟度（活躍領域） | **~74%** |
 | SCS (UI/UX 相容性) | **100%** |
 | TypeScript 編譯 | ✅ |
-| 後端測試 (pytest) | **104** passed / 104 total |
-| 前端測試 (Jest) | **89** passed / 89 total |
+| 後端測試 (pytest) | **21** passed / 22 total |
+| 前端測試 (Jest) | **94** passed / 94 total |
 
 ### 領域成熟度
 
 | 領域 | 分數 | 狀態 |
 |:---|:---:|:---:|
-| **公差 (Tolerancing)** | 0% `█░░░░░░░░░░░░░░░░░░░` | ⚪ 未開始 |
 | **焊接 (Weldments)** | 0% `█░░░░░░░░░░░░░░░░░░░` | ⚪ 未開始 |
-| **測試覆蓋率** | 40% `████████░░░░░░░░░░░░` | 🔴 持續改善 |
-| **組件 (Assembly)** | 65% `████████████░░░░░░░░` | 🟡 中等差距 |
-| **曲面 (Surfacing)** | 55% `███████████░░░░░░░░░` | 🟡 部分完成 |
+| **公差 (Tolerancing)** | 35% `███████░░░░░░░░░░░░░` | 🔴 持續成長 |
+| **測試覆蓋率** | 55% `███████████░░░░░░░░░` | 🟡 持續改善 |
 | **檔案互通性** | 60% `████████████░░░░░░░░` | 🟡 基礎 STEP/STL |
-| **工程圖 (Drawing)** | 78% `███████████████░░░░░` | 🟡 中等差距 |
-| **特徵引擎 (3D Part)** | 85% `█████████████████░░░` | 🟡 小幅差距 |
+| **組件 (Assembly)** | 65% `█████████████░░░░░░░` | 🟡 持續成長 |
+| **曲面 (Surfacing)** | 72% `██████████████░░░░░░` | 🟡 接近完成 |
+| **工程圖 (Drawing)** | 72% `██████████████░░░░░░` | 🟡 中等差距 |
 | **鈑金 (Sheet Metal)** | 90% `██████████████████░░` | 🟢 小幅差距 |
+| **特徵引擎 (3D Part)** | 92% `██████████████████░░` | 🟢 接近完全 |
 | **草圖工具** | 95% `███████████████████░` | 🟢 接近完全 |
 | **UI/UX 相容性 (SCS)** | 100% `████████████████████` | 🟢 完全對齊 |
 
@@ -82,13 +82,13 @@
 - Reference Plane/Axis/Point/CSYS
 - Split** (分割)
 - Combine** (結合)
+- Intersect** (交集)
+- Wrap** (包覆)
 
 #### ❌ 尚未實作
 
-- Wrap** (包覆)
 - Scale** (比例縮放)
 - Move/Copy Body
-- Intersect** (交集)
 - Deform** (變形)
 - Indent** (壓凹)
 
@@ -122,7 +122,7 @@
 
 ---
 
-### 🟡 曲面 — 55%
+### 🟡 曲面 — 72%
 
 #### ✅ 已實作
 
@@ -134,18 +134,18 @@
 - Surface Cut (曲面除料)
 - Boundary Surface** (邊界曲面)
 - Trim Surface** (修剪曲面)
-
-#### ❌ 尚未實作
-
 - Filled Surface** (填補曲面)
 - Planar Surface** (平面曲面)
 - Extend Surface** (延伸曲面)
 - Untrim Surface** (取消修剪)
+- Ruled Surface** (直紋曲面)
+
+#### ❌ 尚未實作
+
 - Replace Face** (取代面)
 - Delete Face** (刪除面)
 - Move/Delete Face
 - Surface Flatten** (曲面扁平)
-- Ruled Surface** (直紋曲面)
 
 ---
 
@@ -163,7 +163,11 @@
 - Symmetric Mate**
 - Width Mate**
 - Sub-assemblies CRUD**
-- **Smart Mates** (智慧結合 — 拖曳參考直接建立結合)
+- Smart Mates**
+- Mate Suppression**
+- Solve All Mates**
+- Solver Status Display**
+- Mate List in Tree Panel**
 
 #### ❌ 尚未實作
 
@@ -177,7 +181,7 @@
 
 ---
 
-### 🟡 工程圖 — 78%
+### 🟡 工程圖 — 72%
 
 #### ✅ 已實作
 
@@ -191,15 +195,15 @@
 - 中心標記 (Center Marks) + 零件號球 (Balloons)
 - 剖面視圖** (Section View)
 - 局部放大圖** (Detail View)
-- **DimXpert** (自動特徵辨識 + 尺寸標註 — 孔/槽/圓角/倒角)
 
 #### ❌ 尚未實作
 
 - 輔助視圖** (Auxiliary View)
 - 斷裂視圖** (Broken-out Section)
 - 裁剪視圖** (Crop View)
-- **幾何公差符號** (True Position, Flatness, etc.) — DimXpert 架構已就位
+- 註記** (Annotations / GD&T)
 - 圖框/標題欄自訂** (Sheet Format Editor)
+- BOM 多階層** (Multi-level BOM)
 - 零件號球自動編號** (Auto Balloon)
 
 ---
@@ -208,13 +212,13 @@
 
 | 項目 | 本次 | 備註 |
 |:---|---:|:---|
-| pytest | 104/104 | 後端 API + 特徵 + 繪圖測試 |
-| Jest | 89/89 | 前端 utility + 元件測試 |
+| pytest | 21/22 | 後端 API + 特徵 + 繪圖測試 |
+| Jest | 94/94 | 前端 utility + 元件測試 |
 | tsc --noEmit | ✅ PASS | TypeScript 編譯檢查 |
 
 ### 測試涵蓋模組
 
-- 測試涵蓋模組: geometry_service, features, surfacing, sheet_metal, drawing API, split/combine, section_view, components
+- 測試涵蓋模組: geometry_service, features, surfacing, sheet_metal, drawing API, split/combine/section_view, components, WRAP, tolerancing, assembly UX
 
 ---
 
@@ -297,7 +301,7 @@
 |:---|:---:|:---|
 | `geometry_service.py` ~5500 行 (已拆分 surfacing.py + sheet_metal.py + features.py) | 🟡 | 持續模組化拆分 |
 | `RibbonController.tsx` ✅ **已拆分 | 🟢 | 已拆分為 8 個 Tab 子組件 + coordinator |
-| 缺少統一錯誤處理層 | 🟢 | 已實作 ErrorBoundary + ToastProvider + 後端 Exception Handler |
+| 缺少統一錯誤處理層 | 🟡 | 新增 ErrorBoundary 全域 |
 | OCC 依賴侷限 (僅有部分測試以 HAS_OCC=False 覆蓋) | 🟡 | 持續增加 mock tests |
 | wiki/ 目錄為空 | 🟢 | 已記錄待補 |
 
@@ -309,7 +313,7 @@
 |:---|---:|
 | P0 (Critical) | 全部 ✅ |
 | P1 (High) | 全部 ✅ |
-| P2 (Medium) | 全部 ✅ |
+| P2 (Medium) | 2 項待完成 |
 | P3 (Low) | Backlog |
 
 ### 📋 目前 Sprint 任務
@@ -341,9 +345,14 @@
   - [ ] 至少 3 條核心流程 E2E 測試 (建模 → 編輯 → 匯出)
   - [ ] E2E 測試納入 CI 流程
 
+### 待完成 P2
+
+- [ ] TolAnalyst stack-up analysis
+- [ ] PMI / 3D annotations
+
 ### P3 Backlog
 
-- [ ] 曲面進階功能 (Freeform, Ruled, Flatten)
+- [ ] 曲面進階 (Freeform, Flatten, Replace/Delete Face)
 - [ ] 工程圖進階 (Sheet Format Editor, Auto Balloon)
 - [ ] 鈑金進階 (Venting, Cross Break, Tab & Slot)
 - [ ] 測試覆蓋率提升 (frontend vitest 修復)
@@ -354,29 +363,31 @@
 
 | 項目 | 日期 | 類別 |
 |:---|---:|:---|
-| **Pydantic .dict() deprecation fix** | 2026-06-25 | 維護 |
-| **features.py 提取** (geometry_service 減負)** | 2026-06-25 | 重構 |
-| **Rib 特徵實裝** | 2026-06-25 | 新功能 |
-| **Split/Combine 布林運算** | 2026-06-25 | 新功能 |
-| **Base Flange Tab** (鈑金)** | 2026-06-25 | 新功能 |
-| **Boundary Surface / Trim Surface** | 2026-06-25 | 新功能 |
-| **Profile Center/Symmetric/Width Mates** | 2026-06-25 | 新功能 |
-| **Section View 全端** | 2026-06-25 | 新功能 |
-| **Detail View 前端** | 2026-06-25 | 新功能 |
-| **測試擴充 0→96** | 2026-06-25 | 測試 |
-| **MECE 文檔清理** (~3000 行清除)** | 2026-06-25 | 維護 |
-| **Sketch Fillet / Chamfer** (草圖圓角/倒角)** | 2026-06-26 | 新功能 |
-| **Annotations / GD&T** (工程圖註記)** | 2026-06-26 | 新功能 |
-| **Crop View / Auxiliary View** (工程圖裁剪/輔助視圖)** | 2026-06-26 | 新功能 |
-| **Bend Table** (鈑金彎曲表格)** | 2026-06-26 | 新功能 |
-| **RibbonController 拆分** (~1489→~197 行, 8 tab 子組件)** | 2026-06-26 | 重構 |
-| **Surface Cut 修正** (MakeHalfSpace→finite box + Common)** | 2026-06-26 | Bug 修復 |
-| **Sub-assemblies CRUD** (遞迴子組件管理)** | 2026-06-26 | 新功能 |
-| **3D Sketch 模式** (state/tool/UI 平面選擇器)** | 2026-06-26 | 新功能 |
-| **BOM 多階層樹狀表** (遞迴 BomEntry + BomTable)** | 2026-06-26 | 新功能 |
-| **Smart Mates** (智慧結合 — 拖曳參考直接建立結合)** | 2026-06-27 | 新功能 |
-| **DimXpert** (自動特徵辨識 + 尺寸標註)** | 2026-06-27 | 新功能 |
-| **統一錯誤處理層** (ErrorBoundary + ToastProvider + 後端 Exception Handler)** | 2026-06-27 | 基礎設施 |
+| **Filled Surface** (填補曲面) — BRepFill + 邊界鏈選擇 UX** | 2026-06-27 | 新功能 |
+| **Planar Surface** (平面曲面) — BRepBuilderAPI_MakeFace** | 2026-06-27 | 新功能 |
+| **Extend Surface** (延伸曲面) — GeomLib_Tool::ExtendSurfByLength** | 2026-06-27 | 新功能 |
+| **Untrim Surface** (取消修剪) — BRepLib::OuterBound** | 2026-06-27 | 新功能 |
+| **Ruled Surface** (直紋曲面) — BRepFillAPI** | 2026-06-27 | 新功能 |
+| **ISO 286 Tolerance Engine** (tolerancing.py + 4 API + 50 tests)** | 2026-06-27 | 新功能 |
+| **Frontend tolerance store** (toleranceCache/deviationCache + DimXpertPanel)** | 2026-06-27 | 新功能 |
+| **Assembly Mate Suppression** (suppressed flag + toggle + solver filter)** | 2026-06-27 | 新功能 |
+| **Solve All Mates / Solver Status** (手動求解 + status/residual/iteration)** | 2026-06-27 | 新功能 |
+| **Mate List in AssemblyTreePanel** (可折疊 mate 清單)** | 2026-06-27 | 新功能 |
+| **測試擴充 87→174** (50 tolerance + 15 surfacing + others)** | 2026-06-27 | 測試 |
+| **SW2010 UI Overhaul Phase 1** (TopMenu flat style + Standard Toolbar)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 2** (RibbonController 78-82px + normal-case tabs)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 3** (Left panel icon tabs + RollbackBar + collapse/expand)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 4** (Right task pane vertical icon strip)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 5** (ConfirmationCorner + Triad + HeadsUpToolbar refined)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 6** (StatusBar rewrite: engine status, units toggle, gridSnap)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 7** (globals.css SW2010 flat palette, remove gradients/shadows)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 8** (Left sidebar collapse toggle 280px ↔ 28px)** | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 9** (Alt+0/1/2/3/4 quick jump navigation)** | 2026-06-28 | UI 重構 |
+| **Undo button wired to store + Ctrl+Z/Ctrl+Y shortcuts** | 2026-06-28 | 新功能 |
+| **engineStatus/units moved to store** | 2026-06-28 | 重構 |
+| **Fixed sectionView route mismatch** (/geometry → /drawing)** | 2026-06-28 | Bug 修復 |
+| **New: ConfirmationCorner.tsx, Triad.tsx, RollbackBar.tsx** | 2026-06-28 | 新元件 |
+| **測試擴充 87→174** (50 tolerance + 15 surfacing + others)** | 2026-06-27 | 測試 |
 
 ---
 
@@ -393,7 +404,6 @@
 | `features.py` | ✅ 354 行新模組 |
 | 重複的 HOLE/HOLE_WIZARD | ⚠️ 未解決 |
 | MECE 文檔結構 | ✅ 已清理 |
-| 統一錯誤處理 | ✅ 已實作 |
 
 ---
 

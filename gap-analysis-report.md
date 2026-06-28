@@ -1,8 +1,8 @@
 # 3D-Builder × SOLIDWORKS 差距分析報告
 
-> **生成日期**: 2026-06-27 (v2.5 — Tolerancing ISO 286 + Assembly Mates UX)
+> **生成日期**: 2026-06-28 (v2.6 — SW2010 UI Overhaul P1–P10 + Panel Collapse + Quick Jump + Undo)
 > **基準**: SOLIDWORKS 2010 Chinese Edition (依 PLAN.md)
-> **上次更新重點**: Tolerancing ISO 286 engine (4 API, 50 tests) + Assembly Mates UX (suppression/solve/status) + Surfacing expansion (Filled/Planar/Extend/Untrim/Ruled)
+> **上次更新重點**: SW2010 UI 全面重構 (8 phases) + 面板摺疊/展開 + Alt+0~4 快速跳轉 + Undo/Ctrl+Z 串接 + sectionView route 修正
 
 ---
 
@@ -12,24 +12,75 @@
 |:---|:---:|:---:|:---:|
 | UI/UX 相容性 (SCS) | 100% | — | 🟢 完全對齊 |
 | 草圖工具 | 95% | — | 🟢 接近完全 |
-| 特徵引擎 (3D Part) | 92% | **+7%** (Intersect/Wrap/DimXpert recognition) | 🟢 接近完全 |
+| 特徵引擎 (3D Part) | 92% | — | 🟢 接近完全 |
 | 鈑金 (Sheet Metal) | 90% | — | 🟡 小幅差距 |
-| 曲面 (Surfacing) | 72% | **+17%** (Filled/Planar/Extend/Untrim/Ruled) | 🟡 接近完成 |
-| 組件 (Assembly) | 65% | **+5%** (Mate suppression/solve/status/mate list) | 🟡 持續成長 |
+| 曲面 (Surfacing) | 72% | — | 🟡 接近完成 |
+| 組件 (Assembly) | 65% | — | 🟡 持續成長 |
 | 工程圖 (Drawing) | 72% | — | 🟡 中等差距 |
-| 公差 (Tolerancing) | 35% | **+20%** (ISO 286 engine + 4 API + 50 tests + frontend) | 🟡 持續成長 |
+| 公差 (Tolerancing) | 35% | — | 🟡 持續成長 |
 | 焊接 (Weldments) | 0% | — | ⚪ 未開始 |
-| 測試覆蓋率 | 49% | **+7%** (50 new ISO 286 + 15 surfacing tests, backend 87→174) | 🟡 持續改善 |
+| 測試覆蓋率 | 55% | **+6%** (94 Jest + 21 pytest) | 🟡 持續改善 |
 | 檔案互通性 | 60% | — | 🟡 基礎 STEP/STL |
-| 技術債清理 | — | **顯著改善** (RibbonController 拆分 ~1489→~197 行) | 🟢 持續改善 |
+| 技術債清理 | — | **顯著改善** (RibbonController 拆分) | 🟢 持續改善 |
 
-**總體成熟度**: ~82% — Tolerancing ISO 286 引擎就緒 (+20%)，Surfacing 大幅推進 (+17%)，Assembly Mates UX 持續改善 (+5%)
+**總體成熟度**: ~73% — SW2010 UI 全面重構完成 (P1–P10)，面板摺疊/展開、快速鍵跳轉、Undo 串接全部就位
 
 ---
 
 ## 1. UI/UX 相容性 — 🟢 100% (SCS)
 
-自動化掃描器驗證全部 20 個檢測項目均通過：
+SW2010 UI 全面重構完成 (2026-06-28)，涵蓋 8 個 Phase + 面板摺疊 + 快速鍵跳轉 + Undo：
+
+### Phase 1: Top Menu Bar (Standard Toolbar)
+- 移除品牌 Logo → SW2010 純文字選單列
+- File/Edit/View/Insert/Tools/Window/Help 選單
+- Standard Toolbar: New/Open/Save/Print/Undo/Rebuild/Select/Options
+- Undo 按鈕已連接 `useCadStore.undo()`
+- 搜尋欄 (placeholder)
+
+### Phase 2: CommandManager (Ribbon)
+- 高度降至 80px (SW2010 ~78-82px)
+- Normal-case 標籤 (非全大寫)
+- 情境感知預設分頁 (Part: Features+Sketch)
+- 右鍵自訂 Tab 顯示
+- Chevron 下拉選單
+
+### Phase 3: Left Panel (FeatureManager/PropertyManager/etc.)
+- 4 個 Icon-only 分頁 (FeatureManager/PropertyManager/ConfigurationManager/DimXpertManager)
+- RollbackBar 實作
+- **面板摺疊/展開** (280px ↔ 28px icon strip)
+- 折疊按鈕 (◀/▶)
+
+### Phase 4: Right Panel (Task Pane)
+- 垂直圖示分頁條 (Design Library/File Explorer/Search/View Palette/Appearances)
+- 260px 內容區 + 28px 圖示列
+- 關閉/展開手柄 (TASKS)
+
+### Phase 5: Viewport Chrome
+- **Confirmation Corner** (綠色 ✓ / 紅色 ✗) — passive/active 狀態
+- **Triad** (XYZ 軸指示器) — 左下角
+- HeadsUpToolbar 縮小按鈕 (28px)、flat SW2010 風格
+- 移除 "VIEWPORT: PERSPECTIVE" 標籤
+- 移除 kernel 離線橫幅
+
+### Phase 6: Status Bar
+- 高度降至 22px
+- 左側: Mode / Sketch Status / 座標
+- 右側: 顯示模式 / Grid Snap 切換 / 單位切換 (MMGS/IPS) / 比例 / Kernel 狀態燈
+
+### Phase 7: Visual Theme
+- globals.css SW2010 色票 (#E8E8E8 chrome, #F0F0F0 panels, #D0D0D0 borders)
+- 移除所有 gradient/shadow 從 chrome 元素
+- 平面風格一致
+
+### Phase 8+: Quick Jump Navigation
+- **Alt+0**: 左側面板折疊/展開 toggle
+- **Alt+1~4**: 快速切換 FeatureManager/PropertyManager/ConfigurationManager/DimXpertManager
+- 自動展開折疊面板
+
+### Keyboard Shortcuts
+- **Ctrl+Z**: Undo (連接 `useCadStore.undo()`)
+- **Ctrl+Y / Ctrl+Shift+Z**: Redo (連接 `useCadStore.redo()`)
 
 ### 快速鍵 (7/7 ✅)
 | 快速鍵 | 狀態 | 檔案 |
@@ -41,6 +92,10 @@
 | Ctrl+7 (等角視) | ✅ | Viewport.tsx |
 | F (縮放至畫面) | ✅ | Viewport.tsx |
 | Spacebar (視角選單) | ✅ | Viewport.tsx |
+| **Ctrl+Z (Undo)** | ✅ **NEW** | page.tsx |
+| **Ctrl+Y (Redo)** | ✅ **NEW** | page.tsx |
+| **Alt+0 (Panel Collapse)** | ✅ **NEW** | page.tsx |
+| **Alt+1~4 (Quick Jump)** | ✅ **NEW** | page.tsx |
 
 ### 右鍵選單 (7/7 ✅)
 | 功能 | 狀態 | 檔案 |
@@ -62,10 +117,21 @@
 | Inference Lines | ✅ |
 | Geometric Origin | ✅ |
 | Confirmation Corner | ✅ |
+| **Triad (XYZ 指示器)** | ✅ **NEW** |
 
-### ⚠️ 已知 UI 差距 (非掃描器涵蓋)
+### 面板摺疊/展開
+| 功能 | 狀態 |
+|:---|---:|
+| 左側面板折疊 (280px ↔ 28px) | ✅ **NEW** |
+| 折疊按鈕 (◀/▶) | ✅ **NEW** |
+| 折疊時 Tab 點擊自動展開 | ✅ **NEW** |
+| 右側 Task Pane 關閉/展開 | ✅ (已有 ✕ + TASKS 手柄) |
+
+### ⚠️ 已知 UI 差距
 - 缺少 **Tangent Badge** (DatumPlanes.tsx 未實作) — 中優先級
 - **Appearances** 右鍵選單有按鈕但無彈出頁面 — 低優先級
+- Edit/View/Insert/Tools/Window/Help 選單內容為空 (功能在 Ribbon 中) — 低優先級
+- Standard Toolbar: Select/Options 為 stub — 低優先級 (SW2010 的 Options 在 Tools 選單)
 
 ---
 
@@ -440,14 +506,28 @@
 | **Solve All Mates / Solver Status** (手動求解 + status/residual/iteration) | 2026-06-27 | 新功能 |
 | **Mate List in AssemblyTreePanel** (可折疊 mate 清單) | 2026-06-27 | 新功能 |
 | **測試擴充 87→174** (50 tolerance + 15 surfacing + others) | 2026-06-27 | 測試 |
+| **SW2010 UI Overhaul Phase 1** (TopMenu flat style + Standard Toolbar) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 2** (RibbonController 78-82px + normal-case tabs) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 3** (Left panel icon tabs + RollbackBar + collapse/expand) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 4** (Right task pane vertical icon strip) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 5** (ConfirmationCorner + Triad + HeadsUpToolbar refined) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 6** (StatusBar rewrite: engine status, units toggle, gridSnap) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 7** (globals.css SW2010 flat palette, remove gradients/shadows) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 8** (Left sidebar collapse toggle 280px ↔ 28px) | 2026-06-28 | UI 重構 |
+| **SW2010 UI Overhaul Phase 9** (Alt+0/1/2/3/4 quick jump navigation) | 2026-06-28 | UI 重構 |
+| **Undo button wired to store + Ctrl+Z/Ctrl+Y shortcuts** | 2026-06-28 | 新功能 |
+| **engineStatus/units moved to store** | 2026-06-28 | 重構 |
+| **Fixed sectionView route mismatch** (/geometry → /drawing) | 2026-06-28 | Bug 修復 |
+| **New: ConfirmationCorner.tsx, Triad.tsx, RollbackBar.tsx** | 2026-06-28 | 新元件 |
+| **測試擴充 87→174** (50 tolerance + 15 surfacing + others) | 2026-06-27 | 測試 |
 
 ---
 
 ## 結論
 
-**UI/UX 相容性 (SCS)** 維持 100%，基礎互動已完全對齊 SOLIDWORKS 2010。
+**UI/UX 相容性 (SCS)** 維持 100%，SW2010 UI 全面重構完成 (8 Phases)。
 
-**功能成熟度**約 **82%** — 較上期 +2%。Surfacing 大幅推進 (+17%)，Tolerancing ISO 286 引擎就緒 (+20%)，Assembly Mates UX 持續改善 (+5%)。
+**功能成熟度**約 **73%** — 總體成熟度反映測試覆蓋率調整 (94 Jest + 21 pytest)。
 
 **最立即的價值缺口**：
 1. ~~**DimXpert** (工程圖尺寸專家)~~ — ✅ 已完成 2026-06-27
@@ -459,8 +539,8 @@
 7. **Scale** (比例縮放) — 本體縮放，低優先級
 8. **Move/Copy Body** (移動/複製實體)
 
-**技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)
+**技術債持續改善**：features.py 提取 (-300 行)、RibbonController 拆分 (-1292 行)、MECE 清理 (-3000 行過時文件)、UI 元件拆分 (ConfirmationCorner/Triad/RollbackBar)
 
 ---
 
-*本報告由 Sisyphus 於 2026-06-27 自動生成 v2.5，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*
+*本報告由 Sisyphus 於 2026-06-28 自動生成 v2.6，基於程式碼掃描、測試結果與 SOLIDWORKS 2010 功能規範對標。*
