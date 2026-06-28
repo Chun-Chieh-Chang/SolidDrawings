@@ -13,11 +13,13 @@ const SHEET_SIZES = [
 interface SheetFormatSelectorProps {
   currentSize: string;
   onChange: (size: string) => void;
+  onOpenEditor?: () => void;
 }
 
 export const SheetFormatSelector: React.FC<SheetFormatSelectorProps> = ({
   currentSize,
   onChange,
+  onOpenEditor,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -33,7 +35,7 @@ export const SheetFormatSelector: React.FC<SheetFormatSelectorProps> = ({
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold text-slate-700 bg-white border border-slate-300 rounded hover:bg-slate-50"
-        title="Sheet Format"
+        title="Sheet Format — click to open editor"
       >
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
@@ -49,8 +51,17 @@ export const SheetFormatSelector: React.FC<SheetFormatSelectorProps> = ({
         <>
           <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
           <div className="absolute z-20 mt-1 bg-white border border-slate-300 rounded shadow-lg min-w-[180px]">
-            <div className="px-2 py-1 bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-wider">
-              Sheet Format
+            <div className="px-2 py-1 bg-slate-100 text-[9px] font-black text-slate-500 uppercase tracking-wider flex items-center justify-between">
+              <span>Sheet Format</span>
+              {onOpenEditor && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onOpenEditor(); }}
+                  className="text-[8px] text-[#005B9A] hover:text-[#004A80] font-bold"
+                  title="Open Sheet Properties Editor"
+                >
+                  ⚙ Edit
+                </button>
+              )}
             </div>
             {SHEET_SIZES.map((size) => (
               <button

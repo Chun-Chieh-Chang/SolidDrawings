@@ -16,6 +16,7 @@ import {
 import { DimensionOverlay } from './DrawingSheet/DimensionOverlay';
 import { AnnotationLayer } from './DrawingSheet/AnnotationLayer';
 import { SheetFormatSelector } from './DrawingSheet/SheetFormatSelector';
+import { SheetFormatEditor } from './DrawingSheet/SheetFormatEditor';
 import { BendTablePanel } from './BendTablePanel';
 import { BomTable } from './DrawingSheet/BomTable';
 
@@ -1014,6 +1015,21 @@ export const DrawingSheet = () => {
   const [annotationTool, setAnnotationTool] = useState<'DATUM' | 'GD&T' | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Sheet Format Editor state
+  const [showSheetEditor, setShowSheetEditor] = useState(false);
+  const [sheetOrientation, setSheetOrientation] = useState<'PORTRAIT' | 'LANDSCAPE'>('LANDSCAPE');
+  const [sheetBorderStyle, setSheetBorderStyle] = useState('title_block');
+  const [titleBlockFields, setTitleBlockFields] = useState<Record<string, string>>({
+    title: '3D-Builder Drawing',
+    partNo: '3DB-001',
+    material: partMaterial || 'Steel',
+    scale: drawingScale || '1:1',
+    drawnBy: drawnBy || '—',
+    checkedBy: '—',
+    approvedBy: approvedBy || '—',
+    date: new Date().toISOString().slice(0, 10),
+  });
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
   );
@@ -1022,6 +1038,20 @@ export const DrawingSheet = () => {
     drawingSheets.find(s => s.id === activeSheetId) || drawingSheets[0],
     [drawingSheets, activeSheetId]
   );
+
+  // Compute display dimensions based on sheet format
+  const SHEET_DISPLAY_SCALE = 3; // pixels per mm
+  const SHEET_SIZES_MAP: Record<string, { w: number; h: number }> = {
+    A4: { w: 210, h: 297 },
+    A3: { w: 297, h: 420 },
+    A2: { w: 420, h: 594 },
+    A1: { w: 594, h: 841 },
+    A0: { w: 841, h: 1189 },
+  };
+  const activeSheetSize = activeSheet?.sheetSize || 'A4';
+  const baseSize = SHEET_SIZES_MAP[activeSheetSize] || SHEET_SIZES_MAP.A4;
+  const displaySheetWidth = (sheetOrientation === 'LANDSCAPE' ? baseSize.h : baseSize.w) * SHEET_DISPLAY_SCALE;
+  const displaySheetHeight = (sheetOrientation === 'LANDSCAPE' ? baseSize.w : baseSize.h) * SHEET_DISPLAY_SCALE;
 
   const calculateMass = () => {
     if (!massProperties) return 0;
@@ -1065,6 +1095,11 @@ export const DrawingSheet = () => {
       fetchProjections();
     }
   }, [features, components, mode]);
+
+  // Sheet Format Editor handlers
+  const handleTitleBlockFieldChange = useCallback((key: string, value: string) => {
+    setTitleBlockFields(prev => ({ ...prev, [key]: value }));
+  }, []);
 
   // Drag handlers
   const [draggingViewId, setDraggingViewId] = React.useState<string | null>(null);
@@ -1184,7 +1219,11 @@ export const DrawingSheet = () => {
       <div 
         ref={containerRef}
         id="drawing-sheet-container" 
-        className="w-[1120px] min-h-[792px] bg-white shadow-2xl relative flex flex-col border-[6px] border-slate-900 mx-auto"
+        className="bg-white shadow-2xl relative flex flex-col border-[6px] border-slate-900 mx-auto transition-all duration-300"
+        style={{
+          width: `${displaySheetWidth}px`,
+          minHeight: `${displaySheetHeight}px`,
+        }}
       >
         
         {/* Drawing Border & Frame Reference */}
@@ -1371,22 +1410,23 @@ export const DrawingSheet = () => {
                <span className="text-[9px] font-black">{new Date().toLocaleDateString()}</span>
             </div>
 
-            <div className="col-span-2 row-span-1 border-r border-b border-slate-900 p-0.5 flex flex-col">
+             <div className="col-span-2 row-span-1 border-r border-b border-slate-900 p-0.5 flex flex-col">
                <span className="text-[6px] text-slate-400">Drawn By</span>
-               <span className="truncate">{drawnBy}</span>
-            </div>
-            <div className="col-span-2 row-span-1 border-r border-b border-slate-900 p-0.5 flex flex-col">
+               <span className="truncate">{titleBlockFields.drawnBy || drawnBy}</span>
+             </div>
+             <div className="col-span-2 row-span-1 border-r border-b border-slate-900 p-0.5 flex flex-col">
                <span className="text-[6px] text-slate-400">Approved By</span>
-               <span className="truncate">{approvedBy}</span>
-            </div>
-            <div className="col-span-2 row-span-1 border-b border-slate-900 p-0.5 flex flex-col">
+               <span className="truncate">{titleBlockFields.approvedBy || approvedBy}</span>
+             </div>
+             <div className="col-span-2 row-span-1 border-b border-slate-900 p-0.5 flex flex-col">
                <span className="text-[6px] text-slate-400">Material</span>
-               <span className="truncate text-indigo-600">{partMaterial}</span>
-            </div>
+               <span className="truncate text-indigo-600">{titleBlockFields.material || partMaterial}</span>
+             </div>
 
             <div className="col-span-4 row-span-2 border-r border-slate-900 p-1.5 flex flex-col justify-center bg-slate-50/50">
                <span className="text-[6px] text-slate-400">Drawing Title / Part ID</span>
-               <span className="text-base font-black text-slate-900 leading-tight">3DB-{projectName.slice(0,3).toUpperCase()}-REF</span>
+               <span className="text-base font-black text-slate-900 leading-tight">{titleBlockFields.title || '3D-Builder Drawing'}</span>
+               <span className="text-[7px] text-slate-400">{titleBlockFields.partNo || '3DB-001'}</span>
             </div>
             
             <div className="col-span-1 row-span-1 border-r border-b border-slate-900 p-0.5 flex flex-col">
@@ -1421,6 +1461,7 @@ export const DrawingSheet = () => {
                 s.id === activeSheetId ? { ...s, sheetSize: sheetSize as any } : s
               ));
             }}
+            onOpenEditor={() => setShowSheetEditor(true)}
           />
           <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">
             Third Angle Projection
@@ -1470,6 +1511,26 @@ export const DrawingSheet = () => {
           </div>
         </div>
       )}
+
+      {/* Sheet Format Editor Dialog */}
+      <SheetFormatEditor
+        visible={showSheetEditor}
+        currentSize={activeSheetData?.sheetSize || 'A4'}
+        currentOrientation={sheetOrientation}
+        currentBorderStyle={sheetBorderStyle}
+        titleBlockFields={titleBlockFields}
+        onClose={() => setShowSheetEditor(false)}
+        onSizeChange={(size) => {
+          const validSizes = ['A4', 'A3', 'A2', 'A1', 'A0'] as const;
+          const sheetSize = validSizes.includes(size as any) ? size : 'A4';
+          setDrawingSheets(drawingSheets.map(s =>
+            s.id === activeSheetId ? { ...s, sheetSize: sheetSize as any } : s
+          ));
+        }}
+        onOrientationChange={setSheetOrientation}
+        onBorderStyleChange={setSheetBorderStyle}
+        onTitleBlockFieldChange={handleTitleBlockFieldChange}
+      />
     </div>
   );
 };
