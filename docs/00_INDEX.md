@@ -8,6 +8,7 @@
 ```
 docs/
 ├── 00_INDEX.md                       ← 本文件 (總索引)
+├── DEVELOPMENT_ROADMAP.md             ← 自動生成路線圖 (即時儀表板)
 ├── 01_REFERENCE/                     ← 參考標準
 │   ├── SOLIDWORKS_2010_基準.md         ← SOLIDWORKS 2010 專家知識標準
 │   └── SOLIDWORKS_知識領域.md          ← 知識領域分類
@@ -26,23 +27,35 @@ docs/
 │   └── UI_ENHANCEMENT_SPEC.md
 ├── 03_ARCHITECTURE/                  ← 架構設計
 │   ├── ARCHITECTURE_MAP.md           ← 架構總覽
+│   ├── CONTINUOUS_IMPROVEMENT_PLAN.md ← 持續改善計畫
+│   ├── gap_report_index_unit.md      ← Gap Report 索引單位
 │   ├── implementation_plan.md        ← 實作計畫
+│   ├── PROJECT_LANDING_PLAN.md       ← 專案落地計畫
+│   ├── SOLIDWORKS_2010_GAP_ANALYSIS.md ← SW2010 差距分析
 │   ├── SOLIDWORKS_FEATURE_ROADMAP.md ← 功能路線圖
 │   ├── SOLIDWORKS_MASTER_PLAN.md     ← 總設計計畫
 │   ├── SYSTEM_DESIGN.md              ← 系統設計
 │   └── video-driven-gap-detection.md   ← 影片驅動缺口檢測
 ├── 04_DEVELOPMENT/                   ← 開發指南
-│   ├── ROADMAP.md                    ← 開發路線圖
-│   └── GUIDE.md                      ← 開發指南
+│   ├── ROADMAP.md                    ← 開發路線圖 (MECE 版)
+│   ├── GUIDE.md                      ← 開發指南
+│   └── stra-prompt-framework.md      ← StraTA 提示工程框架
 ├── 05_GOVERNANCE/                    ← 治理流程
+│   ├── EXECUTION_ASSURANCE_PROTOCOL.md ← 執行保證協議
 │   ├── PDCA_GOVERNANCE.md            ← PDCA 治理流程
 │   ├── RCA_CAPA_TEMPLATE.md          ← 根本原因分析模板
-│   └── master_workflow_hook.md       ← 主工作流 hook
+│   ├── master_workflow_hook.md       ← 主工作流 hook
+│   ├── ROBOT_STRESS_TEST_PLAN.md     ← 機器人壓力測試計畫
+│   └── VIDEO_DRIVEN_VERIFICATION_PROTOCOL.md ← 影片驅動驗證協議
 ├── 06_PRODUCTIZATION/                ← 產品化報告
-│   └── SOLIDWORKS_GAP_AUDIT.md       ← 總體缺口報告
+│   ├── PRODUCTIZATION_PLAN.md        ← 產品化實施計畫
+│   ├── SOLIDWORKS_GAP_AUDIT.md       ← 總體缺口報告
+│   └── SOLIDWORKS_USABLE_PARITY_ROADMAP.md ← 可用性對等路線圖
 ├── 08_LEARNINGS/                     ← 經驗學習
 │   └── LEARNINGS.md                  ← 學習筆記
-```
+├── superpowers/                      ← 技能規劃文檔
+│   └── plans/                        ← 執行計畫存檔
+└── .trash/                           ← 清理暫存區
 
 ## 文件類別定義
 
@@ -60,7 +73,9 @@ docs/
 ## 快速連結
 
 - [SOLIDWORKS 2010 基準](01_REFERENCE/SOLIDWORKS_2010_基準.md)
-- [開發路線圖](04_DEVELOPMENT/ROADMAP.md)
+- [開發路線圖 (自動生成)](DEVELOPMENT_ROADMAP.md)
+- [開發路線圖 (MECE 版)](04_DEVELOPMENT/ROADMAP.md)
 - [系統設計](03_ARCHITECTURE/SYSTEM_DESIGN.md)
+- [產品化計畫](06_PRODUCTIZATION/PRODUCTIZATION_PLAN.md)
 - [發布門檻](02_SPEC/release-gates.md)
 - [學習筆記](08_LEARNINGS/LEARNINGS.md)

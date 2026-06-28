@@ -1,4 +1,27 @@
-## 2026-06-27 Sprint 4 Completion + Codebase Cleanup
+## 2026-06-28 Codebase Cleanup + SheetFormatEditor Integration
+
+### SheetFormatEditor Integration:
+- Created `src/ui/DrawingSheet/SheetFormatEditor.tsx` — SW2010-style Sheet Properties dialog
+- Wired into `DrawingSheet.tsx`: dynamic canvas resize (A4-A0, portrait/landscape)
+- Title block fields (title, partNo, drawnBy, approvedBy, material) now editable via editor
+- SheetFormatSelector updated with ⚙ Edit button → opens Sheet Properties dialog
+
+### Codebase Cleanup (MECE):
+- **Deleted stale redundant files**:
+  - `PROJECT_ROADMAP.md` — 3rd redundant roadmap (had 3 total, kept the 2 canonical ones)
+  - `ui-completion-plan.md` — Stale interim plan, zero references
+  - `ui-layout-refactor-plan.md` — Stale interim plan, zero references
+  - `docs/DEVELOPMENT_ROADMAP.html` — Generated artifact from .md, zero references
+- **Updated docs/00_INDEX.md**: Added 12 missing docs (CONTINUOUS_IMPROVEMENT_PLAN, gap_report_index_unit, PROJECT_LANDING_PLAN, SOLIDWORKS_2010_GAP_ANALYSIS, stra-prompt-framework, EXECUTION_ASSURANCE_PROTOCOL, ROBOT_STRESS_TEST_PLAN, VIDEO_DRIVEN_VERIFICATION_PROTOCOL, PRODUCTIZATION_PLAN, SOLIDWORKS_USABLE_PARITY_ROADMAP, DEVELOPMENT_ROADMAP, superpowers/plans/)
+- **Build artifacts**: tsconfig.tsbuildinfo already in .gitignore ✓
+- **Mojibake filenames**: Verified docs/01_REFERENCE/ filenames are correct Chinese characters (only PowerShell display garbled) ✓
+- **Workflow files preserved**: handover_resume_guide.md, task_plan.md, PLAN.md, progress.md, sprint-backlog.md all kept (part of development workflow system)
+
+### Quality Metrics:
+- `npm run build`: Compiled successfully
+- All changes verified no broken imports
+
+---
 
 ### Sprint 4 Tasks Completed:
 - **Smart Mates (智慧結合)**: Full implementation including store, inference engine, overlay UI, and AssemblyTab toggle
