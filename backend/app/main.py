@@ -1,6 +1,6 @@
 ﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import geometry, robot, drawing
+from app.routers import geometry, robot, drawing, text_to_cad
 
 app = FastAPI(title="3D-Builder Heavy Engine", version="0.1.0")
 
@@ -16,6 +16,7 @@ app.add_middleware(
 app.include_router(geometry.router, prefix="/api/v1/geometry", tags=["geometry"])
 app.include_router(robot.router, prefix="/api/v1/robot", tags=["robot"])
 app.include_router(drawing.router, prefix="/api/v1/drawing", tags=["drawing"])
+app.include_router(text_to_cad.router, prefix="/api/v1/text-to-cad", tags=["text-to-cad"])
 
 @app.get("/api/v1/health")
 async def health():
