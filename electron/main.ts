@@ -139,7 +139,7 @@ function createWindow() {
 }
 
 // 檔案系統操作 IPC handlers
-ipcMain.handle('file:open', async (event: IpcMainInvokeEvent) => {
+ipcMain.handle("file:open", async (_event: IpcMainInvokeEvent) => {
   const result = (await dialog.showOpenDialog(mainWindow!, {
     properties: ['openFile'],
     filters: [
