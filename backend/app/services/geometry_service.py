@@ -6,6 +6,15 @@ import sys
 import uuid
 from collections import OrderedDict
 
+# OpenSCAD / STL import bridge (stdlib-only at import time; OCC is lazy)
+try:
+    from app.services.openscad_service import openscad_to_shape, import_stl_file
+    HAS_OPENSCAD_SERVICE = True
+except ImportError:
+    openscad_to_shape = None
+    import_stl_file = None
+    HAS_OPENSCAD_SERVICE = False
+
 # Global flags and placeholders
 HAS_OCC = False
 
@@ -702,6 +711,43 @@ def build_feature_shape_in_isolation(f_type, params, parent_shape=None, all_feat
             imported_shape = import_step_file(filepath)
             if imported_shape:
                 # Apply optional transformation
+                x, y, z = float(params.get('x', 0)), float(params.get('y', 0)), float(params.get('z', 0))
+                if x != 0 or y != 0 or z != 0:
+                    trsf = gp_Trsf()
+                    trsf.SetTranslation(gp_Vec(x, y, z))
+                    imported_shape.Move(TopLoc_Location(trsf))
+                return imported_shape
+        return None
+
+    if f_type == 'OPENSCAD':
+        scad_code = params.get('scad_code')
+        if not scad_code:
+            print("[ERROR] OPENSCAD feature missing 'scad_code' parameter")
+            return None
+        if not HAS_OPENSCAD_SERVICE or openscad_to_shape is None:
+            print("[ERROR] OPENSCAD feature unavailable — openscad_service import failed")
+            return None
+        shape, err = openscad_to_shape(scad_code)
+        if shape is None:
+            print(f"[ERROR] OPENSCAD compile failed: {err}")
+            return None
+        # Apply optional transformation (mirror DUMB_SOLID)
+        x, y, z = float(params.get('x', 0)), float(params.get('y', 0)), float(params.get('z', 0))
+        if x != 0 or y != 0 or z != 0:
+            trsf = gp_Trsf()
+            trsf.SetTranslation(gp_Vec(x, y, z))
+            shape.Move(TopLoc_Location(trsf))
+        return shape
+
+    if f_type == 'IMPORTED_STL':
+        filepath = params.get('filepath')
+        if filepath and os.path.exists(filepath):
+            if not HAS_OPENSCAD_SERVICE or import_stl_file is None:
+                print("[ERROR] IMPORTED_STL feature unavailable — openscad_service import failed")
+                return None
+            imported_shape = import_stl_file(filepath)
+            if imported_shape:
+                # Apply optional transformation (mirror DUMB_SOLID)
                 x, y, z = float(params.get('x', 0)), float(params.get('y', 0)), float(params.get('z', 0))
                 if x != 0 or y != 0 or z != 0:
                     trsf = gp_Trsf()
@@ -2355,7 +2401,7 @@ def process_features(features, deflection=0.01):
                 print(f"[ERROR] BASE_FLANGE_TAB failed: {bft_err}")
             continue
 
-        if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
+        if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP', 'OPENSCAD', 'IMPORTED_STL']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
         elif f_type == 'PATTERN':
@@ -2968,7 +3014,7 @@ def build_shape_only(
                 print(f'[ERROR] FLAT_PATTERN failed: {fp_err}')
             continue
 
-        if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP']:
+        if f_type in ['SKETCH', 'SKETCH_POLYLINE', 'EXTRUDE', 'REVOLVE', 'BOX', 'CYLINDER', 'SPHERE', 'SWEEP', 'LOFT', 'WRAP', 'OPENSCAD', 'IMPORTED_STL']:
             current_feat_shape = build_feature_shape_in_isolation(f_type, params, final_shape, features)
 
         elif f_type == 'PATTERN':

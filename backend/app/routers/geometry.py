@@ -30,6 +30,86 @@ async def upload_step_file(file: UploadFile = File(...)):
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
 
+class OpenScadCompileRequest(BaseModel):
+    scad_code: str
+    timeout: Optional[int] = 30
+
+@router.post("/openscad/compile")
+async def compile_openscad(request: OpenScadCompileRequest):
+    """Compile OpenSCAD source to STL and return a mesh preview."""
+    try:
+        from app.services import openscad_service
+        if not openscad_service.openscad_available():
+            raise HTTPException(
+                status_code=503,
+                detail="OpenSCAD not found. Install it from https://openscad.org/downloads.html or set the OPENSCAD_PATH environment variable.",
+            )
+
+        stl_filename = f"openscad_{uuid.uuid4().hex}.stl"
+        stl_path = os.path.join(UPLOAD_DIR, stl_filename)
+        result = openscad_service.compile_scad_to_stl(
+            request.scad_code, stl_path, timeout=request.timeout or 30
+        )
+        if not result["ok"]:
+            raise HTTPException(status_code=400, detail=result["error"])
+
+        # Import the compiled STL and mesh it for immediate preview
+        shape = openscad_service.import_stl_file(stl_path)
+        if shape is None:
+            raise HTTPException(status_code=500, detail="Failed to import compiled STL into OCCT.")
+        mesh = geometry_service._shape_to_mesh(shape)
+        return {"ok": True, "filepath": os.path.abspath(stl_path), "mesh": mesh}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"OpenSCAD compile failed: {str(e)}")
+
+@router.post("/upload_stl")
+async def upload_stl_file(file: UploadFile = File(...)):
+    try:
+        if not file.filename.lower().endswith('.stl'):
+            raise HTTPException(status_code=400, detail="Invalid file extension. Only .stl allowed.")
+
+        unique_filename = f"{uuid.uuid4().hex}_{file.filename}"
+        file_path = os.path.join(UPLOAD_DIR, unique_filename)
+
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Return absolute path so the feature pipeline can open it
+        return {"filepath": os.path.abspath(file_path)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"File upload failed: {str(e)}")
+
+class OpenScadImportPreviewRequest(BaseModel):
+    filepath: str
+
+@router.post("/openscad/import_preview")
+async def openscad_import_preview(request: OpenScadImportPreviewRequest):
+    """Import an STL file (from upload or compile) and return its mesh."""
+    try:
+        if not os.path.exists(request.filepath):
+            raise HTTPException(status_code=404, detail="STL file not found.")
+
+        from app.services import openscad_service
+        shape = openscad_service.import_stl_file(request.filepath)
+        if shape is None:
+            raise HTTPException(status_code=500, detail="Failed to import STL file.")
+        mesh = geometry_service._shape_to_mesh(shape)
+        return {"ok": True, "mesh": mesh}
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"STL import failed: {str(e)}")
+
 class BoxParams(BaseModel):
     width: float = 10.0
     height: float = 10.0
