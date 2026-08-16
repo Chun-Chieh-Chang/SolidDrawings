@@ -34,7 +34,7 @@ export function handleCreateStandard3Views(): void {
  * Create a Model View from a custom orientation.
  * Currently defaults to ISO view as a reasonable trimetric default.
  */
-export function handleCreateModelView(orientation?: { eye: number[]; up: number[] }): void {
+export function handleCreateModelView(): void {
   const store = useCadStore.getState();
   const sheetId = store.activeSheetId;
 

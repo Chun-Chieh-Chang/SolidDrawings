@@ -7,7 +7,7 @@
  * 4. IPC 通訊 (與 Renderer Process 通訊)
  */
 
-import { app, BrowserWindow, ipcMain, dialog, shell, IpcMainInvokeEvent, globalShortcut, Notification } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, shell, IpcMainInvokeEvent, globalShortcut } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
