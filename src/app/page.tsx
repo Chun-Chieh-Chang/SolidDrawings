@@ -263,7 +263,7 @@ export default function Home() {
     const timer = setInterval(check, 3000);
     check();
     return () => clearInterval(timer);
-  }, [client]);
+  }, [client]); // eslint-disable-next-line react-hooks/exhaustive-deps — setEngineStatus is a stable React setter
 
   // Alt+Number Quick Jump — panel tabs & collapse
   useEffect(() => {
@@ -407,7 +407,6 @@ export default function Home() {
           handleCreateFormingTool={handleCreateFormingTool}
           onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
-        onOpenScadPanel={() => setTaskPaneTab('OPENSCAD')}
       />
 
       <div className="flex-1 flex w-full overflow-hidden relative">
