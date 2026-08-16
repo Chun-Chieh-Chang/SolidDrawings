@@ -263,7 +263,8 @@ export default function Home() {
     const timer = setInterval(check, 3000);
     check();
     return () => clearInterval(timer);
-  }, [client]); // eslint-disable-next-line react-hooks/exhaustive-deps — setEngineStatus is a stable React setter
+    // eslint-disable-next-line react-hooks/exhaustive-deps — setEngineStatus is stable
+  }, [client]);
 
   // Alt+Number Quick Jump — panel tabs & collapse
   useEffect(() => {

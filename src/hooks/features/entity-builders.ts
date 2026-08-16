@@ -78,7 +78,7 @@ export const useEntityBuilders = () => {
         pushToast('Entities converted successfully.', 'info');
         setSelectedTopology(null);
       }
-    } catch (err) {
+    } catch (_err) { // eslint-disable-line @typescript-eslint/no-unused-vars
       pushToast('Failed to convert entities.', 'error');
     }
   }, [
@@ -137,7 +137,7 @@ export const useEntityBuilders = () => {
         setSketchEdges(nextEdges);
         pushToast(`Entities offset by ${offsetDistance}mm.`, 'info');
       }
-    } catch (err) {
+    } catch (_err) { // eslint-disable-line @typescript-eslint/no-unused-vars
       pushToast('Failed to offset entities.', 'error');
     }
   }, [
