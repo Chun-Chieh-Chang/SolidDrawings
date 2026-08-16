@@ -319,7 +319,11 @@ interface TopologyReference {
 |---|---|
 | STEP | 匯入為 dumb solid |
 | IGES | 匯入為 surfaces/shape |
-| STL | 匯入為 mesh reference |
+| STL | 匯入為 mesh reference（`IMPORTED_STL` 特徵，可平移 x/y/z） |
+| OpenSCAD | `OPENSCAD` 特徵：headless CLI 編譯 `.scad` → STL → OCCT shape，與原生特徵共存同一 B-Rep 樹 |
+| text-to-CAD | LLM（OpenRouter）自然語言 → OpenSCAD 程式碼 → 編譯預覽 → 插入文件（`OPENSCAD` 特徵） |
+
+> 2026-08-16 Sprint 已落地：Ribbon FEATURES 分頁「OpenSCAD」按鈕開啟 Task Pane（Editor / Import / Text-to-CAD 三分頁），後端無 OpenSCAD binary 時優雅降級 503 + 安裝指引。
 
 ### 7.5 UX 打磨
 
