@@ -71,3 +71,12 @@ playwright-report/
 
 # IDE scaffolding
 .opencode/
+
+# Runtime/generated uploads
+backend/app/uploads/
+
+# Playwright test results (auto-generated)
+test-results/
+
+# Dev debug snapshots (not part of CI)
+tests/e2e/screenshots/
