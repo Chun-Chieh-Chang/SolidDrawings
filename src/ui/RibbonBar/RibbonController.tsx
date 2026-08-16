@@ -18,6 +18,8 @@ interface RibbonControllerProps {
   handleCreateMiterFlange?: (params: any) => void;
   handleCreateHem?: (params: any) => void;
   handleCreateFlatPattern?: () => void;
+  handleUnfold?: (bendIds?: string[]) => void;
+  handleFold?: (bendIds: string[]) => void;
   handleCreateFormingTool?: (params: { toolType: string; width: number; height: number; depth: number; radius: number; angle: number; thickness: number; direction: string }) => void;
   onShowMassProps?: () => void;
   onShowEquations?: () => void;
@@ -36,6 +38,8 @@ export const RibbonController: React.FC<RibbonControllerProps> = ({
   handleCreateMiterFlange,
   handleCreateHem,
   handleCreateFlatPattern,
+  handleUnfold,
+  handleFold,
   handleCreateFormingTool,
   onShowMassProps,
   onShowEquations,
