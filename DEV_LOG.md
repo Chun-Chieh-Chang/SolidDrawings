@@ -968,3 +968,22 @@ Systematic MECE cleanup: identify and quarantine outdated, duplicate, or irrelev
 ### Git Baseline
 - Cleanup commit: `[to be created]`
 - All quarantined files recoverable from `.trash/`
+
+---
+
+## 2026-08-16 Sprint: Tool-Calling 3D 工程繪圖工具引擎級整合（OpenSCAD + text-to-CAD + STL）
+
+### Goal
+整合 Tool-Calling 註冊庫「3D工程繪圖」分類工具（OpenSCAD、CADAM text-to-CAD）進入 3D-Builder 建模管線：OpenSCAD CLI 編譯 `.scad` → STL → OCCT shape，成為新特徵類型 `OPENSCAD`；LLM（OpenRouter）自然語言 → OpenSCAD 程式碼；`IMPORTED_STL` 匯入 — 三者與原生草圖-特徵建模共存於同一 B-Rep 特徵樹。
+
+### Actions (PDCA)
+- **P（計畫）**: task_plan.md 定義 M1 後端引擎 / M2 text-to-CAD / M3 前端面板與管線整合 / M5 驗證與 PDCA。
+- **D（實作）**:
+  - 後端: `openscad_service.py`（find_openscad / compile_scad / import_stl_to_shape / shape_to_mesh）、`text_to_cad_service.py`（OpenRouter LLM → OpenSCAD 程式碼，fence 剝離、錯誤處理）、`OPENSCAD`/`IMPORTED_STL` 特徵分派鏈、路由 `/openscad/compile` `/upload_stl` `/openscad/import_preview` `/text-to-cad/generate`。
+  - 前端: `HeavyEngineClient` 擴充 4 API；`OpenScadPanel`（Editor / Import / Text-to-CAD 三分頁 + Three.js mesh 預覽 + 插入文件）；Ribbon FEATURES 分頁「OpenSCAD」按鈕開啟 Task Pane；`OPENSCAD`/`IMPORTED_STL` 特徵樹圖示；PartFeaturePropertyManager 新增 rollouts（腳本可再編輯 → updateFeatureParams → rebuild）。
+- **C（驗證）**: 後端 pytest 全綠 141 passed / 1 skipped（`test_surface_cut.py` 既有 pythonocc binding 問題，與本 sprint 無關）；OpenSCAD 相關 19 測試含真實 binary（compile → STL → OCCT round-trip）全數通過；前端 `tsc --noEmit` 僅剩既有 tests/e2e/helpers 未追蹤檔案錯誤，`eslint` 僅既有 warnings；E2E 冒煙 `tests/e2e/openscad-smoke.spec.ts` 2 passed（Ribbon → 面板 → 編譯預覽 → 插入特徵 → 視埠顯示）。
+- **A（處置）**: task_plan.md 勾選 M1/M2/M3/M5 完成（含 Task 0.2 OpenSCAD CLI 安裝、Task 5.1 E2E 冒煙）。
+
+### Status
+- M1/M2/M3/M5 ✅ 全部完成；OpenSCAD CLI 已安裝於 `C:\Program Files\OpenSCAD\openscad.exe`。
+- 已知限制：`test_surface_cut.py` 因 pythonocc-core 7.8.1 BRepMesh_IncrementalMesh binding 執行緒問題 skip（既有，非本 sprint 引入）。
