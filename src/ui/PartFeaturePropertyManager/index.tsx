@@ -20,6 +20,7 @@ import { DomeRollout } from './dome-rollout';
 import { CombineRollout } from './combine-rollout';
 import { WrapRollout } from './wrap-rollout';
 import { DumbSolidRollout, LoftRollout } from './loft-dumb-rollout';
+import { OpenScadRollout, ImportedStlRollout } from './openscad-rollout';
 import type { PartFeaturePropertyManagerProps } from './types';
 
 export function PartFeaturePropertyManager({
@@ -88,6 +89,10 @@ export function PartFeaturePropertyManager({
         return <RefGeometryRollout selectedFeature={selectedFeature} features={features} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
       case 'DUMB_SOLID':
         return <DumbSolidRollout selectedFeature={selectedFeature} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
+      case 'OPENSCAD':
+        return <OpenScadRollout selectedFeature={selectedFeature} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
+      case 'IMPORTED_STL':
+        return <ImportedStlRollout selectedFeature={selectedFeature} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
       case 'DOME':
         return <DomeRollout selectedFeature={selectedFeature} onParamChange={onParamChange} pendingFeatureCommand={pendingFeatureCommand} />;
       case 'COMBINE':

@@ -19,6 +19,9 @@ export const CAD_API = {
   /** Full health-check URL. */
   healthUrl: DEFAULT_BASE_URL.replace(/\/api\/v1\/geometry$/, '/api/v1/health'),
 
+  /** Base URL for text-to-CAD endpoints (separate router). */
+  textToCadUrl: DEFAULT_BASE_URL.replace(/\/api\/v1\/geometry$/, '/api/v1/text-to-cad'),
+
   /**
    * Check whether the geometry-engine URL has been customized.
    * Useful for diagnostics / UI warnings.

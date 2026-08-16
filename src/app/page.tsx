@@ -39,6 +39,7 @@ import { ExportModal } from '@/ui/Modals/ExportModal';
 import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
 import { EquationsModal } from '@/ui/Modals/EquationsModal';
 import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
+import { OpenScadPanel } from '@/ui/OpenScadPanel/OpenScadPanel';
 import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
 import { SheetMetalPanel } from '@/ui/SheetMetal';
 import { RollbackBar } from '@/ui/RollbackBar';
@@ -130,7 +131,14 @@ const IconAppearances = () => (
   </svg>
 );
 
-type TaskPaneTabId = 'LIBRARY' | 'FILE_EXPLORER' | 'SEARCH' | 'VIEW_PALETTE' | 'APPEARANCES';
+const IconOpenScad = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#505050" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="2 11 6 8 2 5" />
+    <line x1="8" y1="13" x2="14" y2="13" />
+  </svg>
+);
+
+type TaskPaneTabId = 'LIBRARY' | 'FILE_EXPLORER' | 'SEARCH' | 'VIEW_PALETTE' | 'APPEARANCES' | 'OPENSCAD';
 
 const TASK_PANE_TABS: { id: TaskPaneTabId; label: string; icon: React.FC }[] = [
   { id: 'LIBRARY', label: 'Design Library', icon: IconDesignLibrary },
@@ -138,6 +146,7 @@ const TASK_PANE_TABS: { id: TaskPaneTabId; label: string; icon: React.FC }[] = [
   { id: 'SEARCH', label: 'Search', icon: IconSearch },
   { id: 'VIEW_PALETTE', label: 'View Palette', icon: IconViewPalette },
   { id: 'APPEARANCES', label: 'Appearances', icon: IconAppearances },
+  { id: 'OPENSCAD', label: 'OpenSCAD / Import', icon: IconOpenScad },
 ];
 
 const TASK_PANE_PLACEHOLDER: Record<TaskPaneTabId, string> = {
@@ -146,6 +155,7 @@ const TASK_PANE_PLACEHOLDER: Record<TaskPaneTabId, string> = {
   SEARCH: 'Search — Coming Soon',
   VIEW_PALETTE: 'View Palette — Coming Soon',
   APPEARANCES: 'Appearances — Coming Soon',
+  OPENSCAD: '',
 };
 
 export default function Home() {
@@ -317,7 +327,7 @@ export default function Home() {
 
   const onParamChange = (key: string, value: string) => {
     if (!selectedId) return;
-    const stringParams = ['operation', 'plane', 'type', 'target_feature_id', 'pattern_type', 'axis'];
+    const stringParams = ['operation', 'plane', 'type', 'target_feature_id', 'pattern_type', 'axis', 'scad_code'];
     if (stringParams.includes(key)) {
       updateFeatureParams(selectedId, { [key]: value });
       setTimeout(handleRebuild, 0);
@@ -397,6 +407,7 @@ export default function Home() {
           handleCreateFormingTool={handleCreateFormingTool}
           onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
+        onOpenScadPanel={() => setTaskPaneTab('OPENSCAD')}
       />
 
       <div className="flex-1 flex w-full overflow-hidden relative">
@@ -557,6 +568,8 @@ export default function Home() {
               </div>
               {taskPaneTab === 'LIBRARY' ? (
                 <DesignLibraryPanel />
+              ) : taskPaneTab === 'OPENSCAD' ? (
+                <OpenScadPanel onAddFeature={() => setTimeout(handleRebuild, 50)} />
               ) : (
                 <div className="flex-1 flex items-center justify-center text-[11px] text-[#909090] italic px-4 text-center">
                   {TASK_PANE_PLACEHOLDER[taskPaneTab]}

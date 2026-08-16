@@ -577,4 +577,93 @@ export class HeavyEngineClient {
       return { success: false, error: error.message || 'Unknown error' };
     }
   }
+
+  // ── OpenSCAD / STL import / text-to-CAD (M1 + M2) ──────────────────────────
+
+  public async compileOpenScad(
+    scadCode: string,
+    timeout?: number,
+  ): Promise<{ ok: boolean; filepath?: string; mesh?: MeshData; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/openscad/compile`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scad_code: scadCode, timeout: timeout ?? 30 }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { ok: false, error: body.detail || `OpenSCAD compile failed (${response.status})` };
+      }
+      return {
+        ok: true,
+        filepath: body.filepath,
+        mesh: body.mesh as MeshData,
+      };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] OpenSCAD compile error:', error);
+      return { ok: false, error: error.message || 'OpenSCAD compile failed' };
+    }
+  }
+
+  public async importStlPreview(filepath: string): Promise<{ ok: boolean; mesh?: MeshData; error?: string }> {
+    try {
+      const response = await fetch(`${this.baseUrl}/openscad/import_preview`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filepath }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { ok: false, error: body.detail || `STL import failed (${response.status})` };
+      }
+      return { ok: true, mesh: body.mesh as MeshData };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] STL import error:', error);
+      return { ok: false, error: error.message || 'STL import failed' };
+    }
+  }
+
+  public async uploadStlFile(file: File): Promise<{ filepath: string }> {
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await fetch(`${this.baseUrl}/upload_stl`, {
+        method: 'POST',
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.detail || 'Failed to upload STL file');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('[HeavyEngineClient] STL upload error:', error);
+      throw error;
+    }
+  }
+
+  public async textToCad(
+    description: string,
+    model?: string,
+  ): Promise<{ ok: boolean; scadCode?: string; mesh?: MeshData; error?: string }> {
+    try {
+      const response = await fetch(`${CAD_API.textToCadUrl}/generate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description, model }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        return { ok: false, error: body.detail || `Text-to-CAD failed (${response.status})` };
+      }
+      return {
+        ok: true,
+        scadCode: body.scad_code,
+        mesh: body.mesh as MeshData,
+      };
+    } catch (error: any) {
+      console.error('[HeavyEngineClient] Text-to-CAD error:', error);
+      return { ok: false, error: error.message || 'Text-to-CAD failed' };
+    }
+  }
 }
