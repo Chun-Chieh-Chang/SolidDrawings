@@ -16,6 +16,8 @@ const eslintConfig = defineConfig([
     "backend/**",
     "vendor/**",
     ".trash/**",
+    ".opencode/**",
+    "skills/**",
   ]),
   {
     rules: {
