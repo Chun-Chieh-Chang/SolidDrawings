@@ -39,6 +39,7 @@ import { ExportModal } from '@/ui/Modals/ExportModal';
 import { ConfigurationManagerPanel } from '@/ui/ConfigurationManagerPanel';
 import { EquationsModal } from '@/ui/Modals/EquationsModal';
 import { DesignLibraryPanel } from '@/ui/DesignLibraryPanel';
+import { OpenScadPanel } from '@/ui/OpenScadPanel/OpenScadPanel';
 import { MaterialSelectorModal } from '@/ui/Modals/MaterialSelectorModal';
 import { SheetMetalPanel } from '@/ui/SheetMetal';
 
@@ -46,7 +47,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [engineStatus, setEngineStatus] = useState<'CONNECTED' | 'DISCONNECTED'>('DISCONNECTED');
   const [sidebarTab, setSidebarTab] = useState<'TREE' | 'PROPERTIES' | 'CONFIGS'>('TREE');
-  const [taskPaneTab, setTaskPaneTab] = useState<'LIBRARY' | 'NONE'>('LIBRARY');
+  const [taskPaneTab, setTaskPaneTab] = useState<'LIBRARY' | 'OPENSCAD' | 'NONE'>('LIBRARY');
   const [showMassPropsModal, setShowMassPropsModal] = useState(false);
   const [showTranslatorModal, setShowTranslatorModal] = useState(false);
   const [showEquationsModal, setShowEquationsModal] = useState(false);
@@ -177,7 +178,7 @@ export default function Home() {
 
   const onParamChange = (key: string, value: string) => {
     if (!selectedId) return;
-    const stringParams = ['operation', 'plane', 'type', 'target_feature_id', 'pattern_type', 'axis'];
+    const stringParams = ['operation', 'plane', 'type', 'target_feature_id', 'pattern_type', 'axis', 'scad_code'];
     if (stringParams.includes(key)) {
       updateFeatureParams(selectedId, { [key]: value });
       setTimeout(handleRebuild, 0);
@@ -238,6 +239,7 @@ export default function Home() {
           handleCreateFormingTool={handleCreateFormingTool}
           onShowMassProps={() => setShowMassPropsModal(true)}
         onShowEquations={() => setShowEquationsModal(true)}
+        onOpenScadPanel={() => setTaskPaneTab('OPENSCAD')}
       />
 
       {engineStatus === 'DISCONNECTED' && (
@@ -359,19 +361,23 @@ export default function Home() {
           {showExportModal && <ExportModal onClose={() => setShowExportModal(false)} activeTab={activeTab} />}
         </section>
 
-        {/* Right Task Pane (Design Library) */}
+        {/* Right Task Pane (Design Library / OpenSCAD) */}
         {taskPaneTab !== 'NONE' && (
           <aside className="w-[280px] h-full bg-[#F5F6F9] border-l border-slate-300 flex flex-col z-10 shrink-0 animate-in slide-in-from-right duration-300">
             <div className="h-[32px] w-full bg-[#E8E8E8] flex items-center border-b border-slate-300">
                <div className="flex-1 h-full flex items-center justify-center text-[10px] font-bold uppercase tracking-tighter bg-white text-[#005B9A] border-b-2 border-b-[#005B9A]">
-                 Library
+                 {taskPaneTab === 'OPENSCAD' ? 'OpenSCAD / Import' : 'Library'}
                </div>
                <button 
                  onClick={() => setTaskPaneTab('NONE')}
                  className="px-2 text-slate-400 hover:text-slate-600"
                >✕</button>
             </div>
-            <DesignLibraryPanel />
+            {taskPaneTab === 'OPENSCAD' ? (
+              <OpenScadPanel onAddFeature={() => setTimeout(handleRebuild, 50)} />
+            ) : (
+              <DesignLibraryPanel />
+            )}
           </aside>
         )}
 
