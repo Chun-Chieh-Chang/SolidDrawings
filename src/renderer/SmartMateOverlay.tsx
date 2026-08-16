@@ -53,7 +53,7 @@ export default function SmartMateOverlay() {
   const [isAltDrag, setIsAltDrag] = useState(false);
   const overlayRef = useRef<HTMLDivElement>(null);
   const altPressedRef = useRef(false);
-  const dragSourceRef = useRef<{ ndcX: number; ndcY: number } | null>(null);
+  const [dragSource, setDragSource] = useState<{ ndcX: number; ndcY: number } | null>(null);
 
   // ── Alt key tracking ──────────────────────────────────────────
   useEffect(() => {
@@ -87,7 +87,7 @@ export default function SmartMateOverlay() {
       setGhostScreenPos(null);
       setHoverScreenPos(null);
       setIsAltDrag(false);
-      dragSourceRef.current = null;
+      setDragSource(null);
     }
     prevActiveRef.current = smartMateActive;
   }, [smartMateActive, setSmartMateDragActive, setSmartMateGhostPosition, setSmartMateHoverTarget]);
@@ -196,7 +196,7 @@ export default function SmartMateOverlay() {
     useCadStore.setState({ smartMateSource: selected });
     setSmartMateDragActive(true);
     setIsAltDrag(true);
-    dragSourceRef.current = { ndcX, ndcY };
+    setDragSource({ ndcX, ndcY });
     setGhostScreenPos({ x: e.clientX, y: e.clientY });
   }, [smartMateActive, smartMateSource, setSmartMateDragActive]);
 
@@ -280,7 +280,7 @@ export default function SmartMateOverlay() {
     setGhostScreenPos(null);
     setHoverScreenPos(null);
     setIsAltDrag(false);
-    dragSourceRef.current = null;
+    setDragSource(null);
     setInferenceLabel(null);
   }, [smartMateActive, smartMateSource, smartMateDragActive, createMate, setSmartMateDragActive, setSmartMateGhostPosition, setSmartMateHoverTarget]);
 
@@ -367,14 +367,14 @@ export default function SmartMateOverlay() {
       )}
 
       {/* Source-to-ghost dashed line */}
-      {smartMateDragActive && smartMateSource && ghostScreenPos && dragSourceRef.current && (
+      {smartMateDragActive && smartMateSource && ghostScreenPos && dragSource && (
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
           style={{ overflow: 'visible' }}
         >
           <line
-            x1={(dragSourceRef.current.ndcX * 0.5 + 0.5) * (typeof window !== 'undefined' ? window.innerWidth : 0)}
-            y1={(-dragSourceRef.current.ndcY * 0.5 + 0.5) * (typeof window !== 'undefined' ? window.innerHeight : 0)}
+            x1={(dragSource.ndcX * 0.5 + 0.5) * (typeof window !== 'undefined' ? window.innerWidth : 0)}
+            y1={(-dragSource.ndcY * 0.5 + 0.5) * (typeof window !== 'undefined' ? window.innerHeight : 0)}
             x2={ghostScreenPos.x}
             y2={ghostScreenPos.y}
             stroke="rgba(99, 102, 241, 0.4)"

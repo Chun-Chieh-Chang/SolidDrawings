@@ -859,14 +859,16 @@ const FeatureCallouts = () => {
 
   useEffect(() => {
     if (feat && feat.id !== activeFeatId) {
-      const mainParam = feat.type === 'EXTRUDE' ? 'depth' : 
-                        feat.type === 'FILLET' ? 'radius' : 
-                        feat.type === 'CHAMFER' ? 'distance' : 
-                        feat.type === 'SHELL' ? 'thickness' : 
+      const mainParam = feat.type === 'EXTRUDE' ? 'depth' :
+                        feat.type === 'FILLET' ? 'radius' :
+                        feat.type === 'CHAMFER' ? 'distance' :
+                        feat.type === 'SHELL' ? 'thickness' :
                         feat.type === 'HOLE_WIZARD' ? 'diameter' : null;
       if (mainParam) {
-        setLocalVal(String(feat.parameters[mainParam] || 0));
-        setActiveFeatId(feat.id);
+        requestAnimationFrame(() => {
+          setLocalVal(String(feat.parameters[mainParam] || 0));
+          setActiveFeatId(feat.id);
+        });
       }
     }
   }, [feat, activeFeatId]);
