@@ -106,7 +106,7 @@ export default function SmartMateOverlay() {
         setGhostScreenPos(null);
         setHoverScreenPos(null);
         setIsAltDrag(false);
-        dragSourceRef.current = null;
+        setDragSource(null);
       }
     };
     window.addEventListener('keydown', onKeyDown);
