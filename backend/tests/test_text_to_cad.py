@@ -192,6 +192,12 @@ class TestTextToCad:
             text_to_cad_service, "generate_scad_code",
             lambda *a, **k: ("garbage !!!", None, None),
         )
+        # The invalid-code branch sits behind the availability check, so the
+        # test must pretend OpenSCAD is installed even on hosts (CI) without it.
+        monkeypatch.setattr(
+            text_to_cad_service.openscad_service, "openscad_available",
+            lambda: True,
+        )
         monkeypatch.setattr(
             text_to_cad_service.openscad_service, "compile_scad_to_stl",
             lambda *a, **k: {"ok": False, "error": "syntax error"},

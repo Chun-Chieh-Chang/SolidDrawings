@@ -43,7 +43,7 @@ class FitSuggestionRequest(BaseModel):
 # ── Endpoints ──────────────────────────────────────────────────────
 
 
-@router.post("/tolerance/calculate", summary="Calculate IT tolerance value")
+@router.post("/calculate", summary="Calculate IT tolerance value")
 def api_calculate_tolerance(req: ToleranceRequest):
     """Calculate the standard tolerance value (in μm and mm) for a given nominal size and IT grade."""
     try:
@@ -53,7 +53,7 @@ def api_calculate_tolerance(req: ToleranceRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/tolerance/deviations", summary="Calculate upper/lower deviations")
+@router.post("/deviations", summary="Calculate upper/lower deviations")
 def api_calculate_deviations(req: DeviationRequest):
     """Calculate upper and lower deviations for a hole/shaft fit."""
     try:
@@ -63,7 +63,7 @@ def api_calculate_deviations(req: DeviationRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/tolerance/suggest-fit", summary="Suggest standard fit")
+@router.post("/suggest-fit", summary="Suggest standard fit")
 def api_suggest_fit(req: FitSuggestionRequest):
     """Suggest a standard hole/shaft fit for common applications."""
     try:
@@ -73,7 +73,7 @@ def api_suggest_fit(req: FitSuggestionRequest):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/tolerance/table", summary="Get complete IT tolerance lookup table")
+@router.get("/table", summary="Get complete IT tolerance lookup table")
 def api_tolerance_table():
     """Return the full ISO 286 tolerance table for all size ranges and IT01-IT8."""
     try:

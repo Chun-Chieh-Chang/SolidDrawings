@@ -5,8 +5,8 @@ import { execFileSync } from "node:child_process";
 const failures = [];
 const warnings = [];
 const requiredFiles = [
-  "docs/productization/PRODUCTIZATION_PLAN.md",
-  "docs/governance/PDCA_GOVERNANCE.md",
+  "docs/06_PRODUCTIZATION/PRODUCTIZATION_PLAN.md",
+  "docs/05_GOVERNANCE/PDCA_GOVERNANCE.md",
   "task_plan.md",
   "DEV_LOG.md",
 ];
@@ -30,8 +30,8 @@ for (const file of requiredFiles) {
   if (!existsSync(file)) failures.push("Missing required PDCA file: " + file);
 }
 
-if (existsSync("docs/productization/PRODUCTIZATION_PLAN.md")) {
-  const plan = read("docs/productization/PRODUCTIZATION_PLAN.md");
+if (existsSync("docs/06_PRODUCTIZATION/PRODUCTIZATION_PLAN.md")) {
+  const plan = read("docs/06_PRODUCTIZATION/PRODUCTIZATION_PLAN.md");
   for (const term of [
     "Phase 0",
     "Phase 1",
@@ -49,7 +49,7 @@ if (existsSync("docs/productization/PRODUCTIZATION_PLAN.md")) {
   }
 }
 
-if (existsSync("docs/productization/PRODUCTIZATION_PLAN.html")) {
+if (existsSync("docs/06_PRODUCTIZATION/PRODUCTIZATION_PLAN.html")) {
   const html = read("docs/productization/PRODUCTIZATION_PLAN.html");
   for (const term of [
     "<!doctype html>",
@@ -96,8 +96,8 @@ if (highRiskHit) {
     (name) =>
       name === "DEV_LOG.md" ||
       name === "task_plan.md" ||
-      name.startsWith("docs/productization/") ||
-      name.startsWith("docs/governance/"),
+      name.startsWith("docs/06_PRODUCTIZATION/") ||
+      name.startsWith("docs/05_GOVERNANCE/"),
   );
   if (!hasGovernanceUpdate) {
     failures.push(
